@@ -13,13 +13,24 @@
 #define RAYTRACINGSHADERHELPER_H
 
 #include "RayTracingHlslCompat.h"
-
+#define M_PI 3.14159265358979323846
 #define INFINITY (1.0/0.0)
+#define     EQN_EPS     1e-9
+#define	    IsZero(x)	((x) > -EQN_EPS && (x) < EQN_EPS)
+
+#define     cbrt(x)     ((x) > 0.0 ? pow((float)(x), 1.0/3.0) : \
+                         ((x) < 0.0 ? -pow((float)-(x), 1.0/3.0) : 0.0))
 
 struct Ray
 {
     float3 origin;
     float3 direction;
+};
+
+struct Quartic {
+    float4 c;
+    float4 s;
+    float lastC;
 };
 
 float length_toPow2(float2 p)
@@ -181,5 +192,6 @@ float3 FresnelReflectanceSchlick(in float3 I, in float3 N, in float3 f0)
     return f0 + (1 - f0)*pow(1 - cosi, 5);
 }
 
+  
 
 #endif // RAYTRACINGSHADERHELPER_H

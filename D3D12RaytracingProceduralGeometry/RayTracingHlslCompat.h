@@ -84,6 +84,7 @@ struct PrimitiveConstantBuffer
 {
     XMFLOAT4 albedo;
     float reflectanceCoef;
+    float refractiveCoef;
     float diffuseCoef;
     float specularCoef;
     float specularPower;
@@ -153,6 +154,7 @@ namespace AnalyticPrimitive {
     enum Enum {
         AABB = 0,
         Spheres,
+        Cone,
         Count
     };
 }

@@ -41,6 +41,7 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     {
     case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);
     case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
+    case AnalyticPrimitive::Cone: return RayConeIntersectionTest(ray, thit, attr);
     default: return false;
     }
 }

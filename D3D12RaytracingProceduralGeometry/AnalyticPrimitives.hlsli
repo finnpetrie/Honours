@@ -60,6 +60,55 @@ bool SolveRaySphereIntersectionEquation(in Ray ray, out float tmin, out float tm
     return SolveQuadraticEqn(a, b, c, tmin, tmax);
 }
 
+bool SolveRayConeIntersection(in Ray ray, out float tmin, out float tmax, in float3 tip, in float3 axis, in float theta) {
+    float dv = dot(ray.direction, axis);
+    float3 co = ray.origin - tip;
+    float dcoV = dot(co, axis);
+    float dco = dot(co, co);
+    float dirCo = dot(ray.direction, co);
+    float cosTheta = cos(theta);
+
+
+    float a = dv * dv - cosTheta * cosTheta;
+    float b = 2 * (dv * dcoV - dirCo * cosTheta * cosTheta);
+    float c = (dcoV * dcoV - dirCo * cosTheta * cosTheta);
+
+    return SolveQuadraticEqn(a, b, c, tmin, tmax);
+}
+
+bool RayConeIntersectionTest(in Ray ray, out float thit,out ProceduralPrimitiveAttributes attr) {
+    float t0, t1;
+    float tmax;
+    if (!SolveRayConeIntersection(ray, t0, t1, float3(0, 0, 0), float3(0, 1, 0), 45)) return false;
+    tmax = t1;
+    if (t0 < RayTMin()) {
+        if (t1 < RayTMin()) {
+            return false;
+      }
+        attr.normal = float3(1, 0, 0);
+        if (IsAValidHit(ray, t1, attr.normal)) {
+            thit = t1;
+            return true;
+        }
+    }
+    else
+    {
+        attr.normal = float3(1, 0, 0);
+        if (IsAValidHit(ray, t0, attr.normal))
+        {
+            thit = t0;
+            return true;
+        }
+
+        attr.normal = float3(1, 0, 0);
+        if (IsAValidHit(ray, t1, attr.normal))
+        {
+            thit = t1;
+            return true;
+        }
+    }
+    return false;
+}
 // Test if a ray with RayFlags and segment <RayTMin(), RayTCurrent()> intersects a hollow sphere.
 bool RaySphereIntersectionTest(in Ray ray, out float thit, out float tmax, out ProceduralPrimitiveAttributes attr, in float3 center = float3(0, 0, 0), in float radius = 1)
 {

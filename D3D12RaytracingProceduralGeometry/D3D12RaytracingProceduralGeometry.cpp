@@ -313,9 +313,10 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
     // Setup materials.
     {
         auto SetAttributes = [&](
-            UINT primitiveIndex, 
-            const XMFLOAT4& albedo, 
+            UINT primitiveIndex,
+            const XMFLOAT4& albedo,
             float reflectanceCoef = 0.0f,
+            float refractiveCoef = 0.0f,
             float diffuseCoef = 0.9f,
             float specularCoef = 0.7f,
             float specularPower = 50.0f,
@@ -324,6 +325,7 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
             auto& attributes = m_aabbMaterialCB[primitiveIndex];
             attributes.albedo = albedo;
             attributes.reflectanceCoef = reflectanceCoef;
+            attributes.refractiveCoef = refractiveCoef;
             attributes.diffuseCoef = diffuseCoef;
             attributes.specularCoef = specularCoef;
             attributes.specularPower = specularPower;
@@ -331,7 +333,7 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
         };
 
 
-        m_planeMaterialCB = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 0.25f, 1, 0.4f, 50, 1};
+        m_planeMaterialCB = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 0.25f, 0,  1, 0.4f, 50, 1};
 
         // Albedos
         XMFLOAT4 green = XMFLOAT4(0.1f, 1.0f, 0.5f, 1.0f);
@@ -343,7 +345,7 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
         {
             using namespace AnalyticPrimitive;
             SetAttributes(offset + AABB, red);
-            SetAttributes(offset + Spheres, ChromiumReflectance, 1);
+            SetAttributes(offset + Spheres, ChromiumReflectance, 0.1f, 0, 0.6f,0.0f, 1);
             offset += AnalyticPrimitive::Count;
         }
 
@@ -366,7 +368,6 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
 
         // Rotate camera around Y axis.
         
-
         UpdateCameraMatrices();
     }
 
@@ -377,7 +378,7 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
         XMFLOAT4 lightAmbientColor;
         XMFLOAT4 lightDiffuseColor;
 
-        lightPosition = XMFLOAT4(0.0f, 18.0f, -20.0f, 0.0f);
+        lightPosition = XMFLOAT4(20.0f, 18.0f, -20.0f, 0.0f);
         m_sceneCB->lightPosition = XMLoadFloat4(&lightPosition);
 
         lightAmbientColor = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
@@ -732,6 +733,7 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
             using namespace AnalyticPrimitive;
             m_aabbs[offset + AABB] = InitializeAABB(XMINT3(3, 0, 0), XMFLOAT3(2, 3, 2));
             m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(0.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
+            m_aabbs[offset + Cone] = InitializeAABB(XMFLOAT3(-3, 0, 0), XMFLOAT3(2, 2, 2));
             offset += AnalyticPrimitive::Count;
         }
 

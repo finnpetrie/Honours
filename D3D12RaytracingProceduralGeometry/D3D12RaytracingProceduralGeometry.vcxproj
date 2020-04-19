@@ -162,6 +162,9 @@
   <ItemGroup>
     <ClInclude Include="AnalyticPrimitives.hlsli" />
     <ClInclude Include="DirectXRaytracingHelper.h" />
+    <ClInclude Include="Solvers.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="ProceduralPrimitivesLibrary.hlsli" />
     <ClInclude Include="RaytracingSceneDefines.h" />
     <ClInclude Include="RaytracingHlslCompat.h" />
