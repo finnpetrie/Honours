@@ -80,10 +80,12 @@ float PhongLighting(float3 normal, bool shadowHit) {
         illum = l_materialCB.specularCoef * pow(saturate(dot(refl, viewDir)), l_materialCB.specularPower);
 
     }
-    if (!shadowHit && l_materialCB.refractiveCoef > 0) {
+    if (!shadowHit) {
+
     }
     else {
-       // illum = 0;
+        illum = 0;
+
     }
     return illum;
 }
@@ -113,10 +115,10 @@ float4 TraceRadianceRay(in Ray ray, in UINT currentRayRecursionDepth)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0;
+    rayDesc.TMin = 0.0001;
     rayDesc.TMax = 10000;
     RayPayload rayPayload = { float4(0, 0, 0, 0), currentRayRecursionDepth + 1 };
-    TraceRay(g_scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+    TraceRay(g_scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_FORCE_NON_OPAQUE,
         TraceRayParameters::InstanceMask,
         TraceRayParameters::HitGroup::Offset[RayType::Radiance],
         TraceRayParameters::HitGroup::GeometryStride,
@@ -139,8 +141,8 @@ float4 TraceRefractiveRay(in Ray ray, in RayPayload pay)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.1;
-    rayDesc.TMax = 100;
+    rayDesc.TMin = 0.01;
+    rayDesc.TMax = 10000;
   //  RayPayload rayPayload = { float4(0, 0, 0, 0), currentRayRecursionDepth + 1 };
     pay.recursionDepth += 1;
     TraceRay(g_scene, RAY_FLAG_NONE,
@@ -268,8 +270,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitiveAttributes attr)
 {   
 
-    // PERFORMANCE TIP: it is recommended to minimize values carry over across TraceRay() calls. 
-    // Therefore, in cases like retrieving HitWorldPosition(), it is recomputed every time.
+
       
     // Shadow component.
     // Trace a shadow ray.
@@ -329,7 +330,8 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
       
        // Ray refract = {HitWorldPosition(),r };
     */
-      rayPayload.color = refractionColour + 0.1f*reflectionColour;
+     rayPayload.color = refractionColour + 0.1f*reflectionColour;
+      //rayPayload.color = ambient;
 }
 
 //***************************************************************************

@@ -297,8 +297,10 @@ void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float anim
     // Analytic primitives.
     {
         using namespace AnalyticPrimitive;
-        //SetTransformForAABB(offset + AABB, mScale15y, mIdentity);
+        SetTransformForAABB(offset + AABB, mScale15y, mIdentity);
         SetTransformForAABB(offset + Spheres, mScale15, mRotation);
+        SetTransformForAABB(offset + Cone, mScale15, mRotation);
+
         offset += AnalyticPrimitive::Count;
     }
 
@@ -346,6 +348,8 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
             using namespace AnalyticPrimitive;
             SetAttributes(offset + AABB, red);
             SetAttributes(offset + Spheres, ChromiumReflectance, 0.1f, 0, 0.6f,0.0f, 1);
+            SetAttributes(offset + Cone, ChromiumReflectance, 0.1f, 0, 0.6f, 0.0f, 1);
+
             offset += AnalyticPrimitive::Count;
         }
 
@@ -731,9 +735,9 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
         // Analytic primitives.
         {
             using namespace AnalyticPrimitive;
-            m_aabbs[offset + AABB] = InitializeAABB(XMINT3(3, 0, 0), XMFLOAT3(2, 3, 2));
-            m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(0.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
-            m_aabbs[offset + Cone] = InitializeAABB(XMFLOAT3(-3, 0, 0), XMFLOAT3(2, 2, 2));
+            m_aabbs[offset + AABB] = InitializeAABB(XMINT3(3, 0, 1), XMFLOAT3(2, 3, 2));
+            m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(5.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
+            m_aabbs[offset + Cone] = InitializeAABB(XMFLOAT3(0, 0, 0), XMFLOAT3(5, 5, 5));
             offset += AnalyticPrimitive::Count;
         }
 
@@ -784,6 +788,7 @@ void D3D12RaytracingProceduralGeometry::BuildGeometryDescsForBottomLevelAS(array
     // Mark the geometry as opaque. 
     // PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing optimizations.
     // Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is present or not.
+    //note only apply to plane
     D3D12_RAYTRACING_GEOMETRY_FLAGS geometryFlags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
     // Triangle geometry desc
@@ -811,7 +816,7 @@ void D3D12RaytracingProceduralGeometry::BuildGeometryDescsForBottomLevelAS(array
         aabbDescTemplate.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
         aabbDescTemplate.AABBs.AABBCount = 1;
         aabbDescTemplate.AABBs.AABBs.StrideInBytes = sizeof(D3D12_RAYTRACING_AABB);
-        aabbDescTemplate.Flags = geometryFlags;
+        aabbDescTemplate.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_NONE;
 
         // One AABB primitive per geometry.
         geometryDescs[BottomLevelASType::AABB].resize(IntersectionShaderType::TotalPrimitiveCount, aabbDescTemplate);
@@ -1234,9 +1239,14 @@ void D3D12RaytracingProceduralGeometry::OnMouseMove(UINT x, UINT y) {
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
+    std::cout <<"Yaw before " <<  yaw << std::endl;
 
     yaw += xoffset;
-    pitch += yoffset;
+    std::cout << "Yaw after " << yaw << std::endl;
+
+    std::cout << "Pitch before " << pitch << std::endl;
+   // pitch += yoffset;
+    std::cout << "Pitch after " << pitch << std::endl;
 
     if (pitch > 89.0f) {
         pitch = 89.0f;
