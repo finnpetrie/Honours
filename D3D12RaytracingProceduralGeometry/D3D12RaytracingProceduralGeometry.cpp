@@ -29,6 +29,12 @@ const wchar_t* D3D12RaytracingProceduralGeometry::c_closestHitShaderNames[] =
     L"MyClosestHitShader_Triangle",
     L"MyClosestHitShader_AABB",
 };
+
+const wchar_t* D3D12RaytracingProceduralGeometry::c_anyHitShaderNames[] =
+{
+        L"AnyHit_Triangle",
+    L"AnyHit_AnalyticPrimitive",
+};
 const wchar_t* D3D12RaytracingProceduralGeometry::c_missShaderNames[] =
 {
     L"MyMissShader", L"MyMissShader_ShadowRay"
@@ -273,6 +279,7 @@ void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float anim
     
     XMMATRIX mScale15y = XMMatrixScaling(1, 1.5, 1);
     XMMATRIX mScale15 = XMMatrixScaling(1.5, 1.5, 1.5);
+    XMMATRIX mScaleHalf = XMMatrixScaling(0.2, 0.2, 0.2);
     XMMATRIX mScale2 = XMMatrixScaling(2, 2, 2);
     XMMATRIX mScale3 = XMMatrixScaling(3, 3, 3);
 
@@ -297,9 +304,14 @@ void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float anim
     // Analytic primitives.
     {
         using namespace AnalyticPrimitive;
+        for (Primitive& p : sceneObjects) {
+            SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
+        }
         SetTransformForAABB(offset + AABB, mScale15y, mIdentity);
         SetTransformForAABB(offset + Spheres, mScale15, mRotation);
-        SetTransformForAABB(offset + Cone, mScale15, mRotation);
+        SetTransformForAABB(offset + Cone, mScaleHalf, mRotation);
+        SetTransformForAABB(offset + Hyperboloid, mScaleHalf, mRotation);
+        SetTransformForAABB(offset + Ellipsoid, mScale15, mRotation);
 
         offset += AnalyticPrimitive::Count;
     }
@@ -307,11 +319,33 @@ void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float anim
  
 }
 
+void D3D12RaytracingProceduralGeometry::CreateGeometry() {
+        XMMATRIX nullQ  = XMMatrixIdentity();
+
+        XMMATRIX Q_Ellipse (1.0f / 1.5f, 0.0f, 0.0f,0.0f,
+                 0.0f, 1.0f, 0.0f, 0.0f,
+                  0.0f, 0.0f, 1.0f / 2.0f , 0.0f,
+                  0.0f, 0.0f, 0.0f, -1.0f );
+
+        PrimitiveConstantBuffer t = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 1, 0, 1, 0.4f, 50, 1, nullQ};
+        Primitive sphere(AnalyticPrimitive::Enum::Spheres, t, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        PrimitiveConstantBuffer h = {ChromiumReflectance, 1, 0, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 , Q_Ellipse};
+
+        Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, h, XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT3(4, 4, 4));
+        Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, e, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(5, 5, 5));
+        Primitive AABB(AnalyticPrimitive::AABB, t, XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        Primitive Cylinder(AnalyticPrimitive::Cylinder, t, XMFLOAT3(0.0f, 2.0f, 0.0f), XMFLOAT3(3, 3, 3));
+
+        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB, Cylinder };
+        
+}
+
 // Initialize scene rendering parameters.
 void D3D12RaytracingProceduralGeometry::InitializeScene()
 {
     auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
-
+    CreateGeometry();
     // Setup materials.
     {
         auto SetAttributes = [&](
@@ -322,7 +356,9 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
             float diffuseCoef = 0.9f,
             float specularCoef = 0.7f,
             float specularPower = 50.0f,
-            float stepScale = 1.0f )
+            float stepScale = 1.0f
+           // const XMMATRIX &quadricCoeff
+            )
         {
             auto& attributes = m_aabbMaterialCB[primitiveIndex];
             attributes.albedo = albedo;
@@ -331,6 +367,8 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
             attributes.diffuseCoef = diffuseCoef;
             attributes.specularCoef = specularCoef;
             attributes.specularPower = specularPower;
+            //attributes.quadricCoeffs = quadricCoeff;
+
             attributes.stepScale = stepScale;
         };
 
@@ -346,9 +384,18 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
         // Analytic primitives.
         {
             using namespace AnalyticPrimitive;
-            SetAttributes(offset + AABB, red);
-            SetAttributes(offset + Spheres, ChromiumReflectance, 0.1f, 0, 0.6f,0.0f, 1);
-            SetAttributes(offset + Cone, ChromiumReflectance, 0.1f, 0, 0.6f, 0.0f, 1);
+            for (Primitive& p : sceneObjects) {
+                PrimitiveConstantBuffer material = p.getMaterial();
+               // std::cout << p.getType() << std::endl;
+                SetAttributes(offset + p.getType(), material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
+            }
+            /*SetAttributes(offset + AABB, red);
+            SetAttributes(offset + Spheres, ChromiumReflectance, 0.1f, 1.5, 0.6f,0.0f, 1);
+            SetAttributes(offset + Cone, ChromiumReflectance, 0.1f, 1.5, 0.6, 0.0f, 1);
+            SetAttributes(offset + Hyperboloid, red, 0.1f, 1.5, 0.6f, 0.0f, 1);
+            SetAttributes(offset + Ellipsoid, ChromiumReflectance, 0.1f, 1.5, 0.6f, 0.0f, 1);
+            SetAttributes(offset + Cylinder, ChromiumReflectance, 0.1f, 0, 0.6f, 0.0f, 1);
+            */
 
             offset += AnalyticPrimitive::Count;
         }
@@ -542,6 +589,7 @@ void D3D12RaytracingProceduralGeometry::CreateHitGroupSubobjects(CD3DX12_STATE_O
             if (rayType == RayType::Radiance)
             {
                 hitGroup->SetClosestHitShaderImport(c_closestHitShaderNames[GeometryType::Triangle]);
+                hitGroup->SetAnyHitShaderImport(c_anyHitShaderNames[GeometryType::Triangle]);
             }
             hitGroup->SetHitGroupExport(c_hitGroupNames_TriangleGeometry[rayType]);
             hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
@@ -558,6 +606,7 @@ void D3D12RaytracingProceduralGeometry::CreateHitGroupSubobjects(CD3DX12_STATE_O
                 hitGroup->SetIntersectionShaderImport(c_intersectionShaderNames[t]);
                 if (rayType == RayType::Radiance)
                 {
+                    hitGroup->SetAnyHitShaderImport(c_anyHitShaderNames[GeometryType::AABB]);
                     hitGroup->SetClosestHitShaderImport(c_closestHitShaderNames[GeometryType::AABB]);
                 }
                 hitGroup->SetHitGroupExport(c_hitGroupNames_AABBGeometry[t][rayType]);
@@ -735,9 +784,16 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
         // Analytic primitives.
         {
             using namespace AnalyticPrimitive;
-            m_aabbs[offset + AABB] = InitializeAABB(XMINT3(3, 0, 1), XMFLOAT3(2, 3, 2));
-            m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(5.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
-            m_aabbs[offset + Cone] = InitializeAABB(XMFLOAT3(0, 0, 0), XMFLOAT3(5, 5, 5));
+            for (Primitive& p : sceneObjects) {
+                
+                m_aabbs[offset + p.getType()] = InitializeAABB(p.getIndex(), p.getSize());
+            }
+         /*   m_aabbs[offset + AABB] = InitializeAABB(XMINT3(3, 0, 1), XMFLOAT3(2, 3, 2));
+            m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(2.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
+            m_aabbs[offset + Hyperboloid] = InitializeAABB(XMFLOAT3(0, 1, 0), XMFLOAT3(4, 4, 4));
+           // m_aabbs[offset + Hyperboloid] = InitializeAABB(XMFLOAT3(0, -1, 0), XMFLOAT3(4, 4, 4));
+            m_aabbs[offset + Ellipsoid] = InitializeAABB(XMFLOAT3(0, 0, 0), XMFLOAT3(4, 4, 4));
+            */
             offset += AnalyticPrimitive::Count;
         }
 
@@ -1223,19 +1279,21 @@ void D3D12RaytracingProceduralGeometry::OnKeyDown(UINT8 key)
     }
 }
 
-void D3D12RaytracingProceduralGeometry::OnMouseMove(UINT x, UINT y) {
+void D3D12RaytracingProceduralGeometry::OnMouseMove(float dx, float dy) {
 
     if (firstMouse) // initially set to true
     {
-        lastX = x;
-        lastY = y;
+        lastX = dx;
+        lastY = dy;
         firstMouse = false;
     }
-    float xoffset = x - lastX;
-    float yoffset = lastY - y;
-    lastX = x;
-    lastY = y;
-    float sensitivity = 0.05;
+   // float xoffset = float(x) - lastX;
+   // float yoffset = lastY - float(y);
+    lastX = dx;
+    lastY = dy;
+    float xoffset = (dx);
+    float yoffset = -(dy);
+    float sensitivity = 0.05f;
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
@@ -1243,7 +1301,7 @@ void D3D12RaytracingProceduralGeometry::OnMouseMove(UINT x, UINT y) {
 
     yaw += xoffset;
     std::cout << "Yaw after " << yaw << std::endl;
-
+    pitch += yoffset;
     std::cout << "Pitch before " << pitch << std::endl;
    // pitch += yoffset;
     std::cout << "Pitch after " << pitch << std::endl;

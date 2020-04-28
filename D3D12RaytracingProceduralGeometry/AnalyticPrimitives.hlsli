@@ -110,22 +110,19 @@ bool SolveRayQuadricInteresection(in Ray ray, out float tmin, out float tmax, in
     return SolveQuadraticEqn(a, b, c, tmin, tmax);
 }
 
-bool QuadricRayIntersectionTest(in Ray r, out float thit, out ProceduralPrimitiveAttributes attr) {
-    float4x4 Q = {1, 0, 0,0,
-                   0, 1, 0, 0,
-                    0, 0, 1 , 0,
-                    0, 0, 0, -1}; 
+bool QuadricRayIntersectionTest(in Ray r, in float4x4 Q, out float thit, out ProceduralPrimitiveAttributes attr) {
+ 
     float tmin, tmax;
     float n_x, n_y, n_z;
     if (!SolveRayQuadricInteresection(r, tmin, tmax, Q)) {
         return false;
     }
-    if (tmin < 0) {
-        if (tmax < 0) {
+    if (tmin < RayTMin()) {
+        if (tmax < RayTMin()) {
             return false;
         }
         thit = tmax;
-     }
+    }
     else {
 
         thit = tmin;
@@ -139,9 +136,16 @@ bool QuadricRayIntersectionTest(in Ray r, out float thit, out ProceduralPrimitiv
     n_x = dot(float4(2, 0, 0, 0), Q_X);
     n_y = dot(float4(0, 2, 0, 0), Q_X);
     n_z = dot(float4(0, 0, 2, 0), Q_X);
-    float3 norm = float3(n_x, n_y, n_z);
-    
-    attr.normal = normalize(norm);
+    float3 norm = normalize(float3(n_x, n_y, n_z));
+    if (dot(norm, r.direction) < 0) {
+       // norm = -norm;
+    }
+    attr.normal = norm;
+
+    if (abs(intersectionPoint.x) > 10) {
+       return false;
+   }
+    //norm = CalculateNormalForARaySphereHit(r, thit, float3(0, 0, 0));
     if (IsAValidHit(r, thit, attr.normal)) {
         return true;
     }
@@ -150,87 +154,6 @@ bool QuadricRayIntersectionTest(in Ray r, out float thit, out ProceduralPrimitiv
     }
 }
 
-bool RayConeIntersectionTest(in Ray r, out float thit,out ProceduralPrimitiveAttributes attr) {
-    float3 tip = float3(0, 0, 0);
-    float3 axis = float3(0, 1, 0);
-    float3 co = r.origin - tip;
-    float cosa = 0.95;
-    float a = dot(r.direction, axis) * dot(r.direction, axis) - cosa * cosa;
-    float b = 2. * (dot(r.direction, axis) * dot(co, axis) - dot(r.direction, co) * cosa * cosa);
-    float c = dot(co, axis) * dot(co, axis) - dot(co, co) * cosa * cosa;
-
-    float det = b * b - 4. * a * c;
-    if (det < 0.) return false;
-
-    det = sqrt(det);
-    float t1 = (-b - det) / (2. * a);
-    float t2 = (-b + det) / (2. * a);
-
-    // This is a bit messy; there ought to be a more elegant solution.
-    float t = t1;
-    if (t < 0. || (t2 > 0.&& t2 < t) )t = t2;
-    if (t < 0.) return false;
-
-    float3 cp = r.origin + t * r.direction - tip;
-    float h = dot(cp, axis);
-    if (h < 0. || h > 1) return false;
-
-    float3 n = normalize(cp * dot(axis, cp) / dot(cp, cp) - axis);
-    thit = t;
-    attr.normal = n;
-    return true;
-    /*float t0, t1;
-    float tmax;
-    if (!SolveRayConeIntersection (ray, t0, t1, float3(0, 0, 0), float3(0, 1, 0), 45)) return false;
-    if (t0 < 0 || (t1 > 0  && t1 < t0)) {
-        t0 = t1;
-   }
-    if (t0 < 0) {
-        return false;
-   }
-    float3 v = float3(0, 1, 0);
-    float3 cp = ray.origin + t0 * ray.direction;
-    float h = dot(cp, v);
-    if (h < 0 || 0 > 1) {
-        return false;
-    }
-
-    float3 norm = CalculateNormalForRayConeHit(ray, t0, float3(0, 0, 0), float3(0, 1, 0));
-    attr.normal = norm;
-    thit = t0;
-    return true;
-    /**(tmax = t1;
-    if (t0 < RayTMin()) {
-        if (t1 < RayTMin()) {
-            return false;
-      }
-        if (IsAValidHit(ray, t1, attr.normal)) {
-            thit = t1;
-            attr.normal = CalculateNormalForRayConeHit(ray, thit, float3(0, 0, 0), float3(0, 1, 0));
-
-            return true;
-        }
-    }
-    else
-    {
-        if (IsAValidHit(ray, t0, attr.normal))
-        {
-            thit = t0;
-            attr.normal = CalculateNormalForRayConeHit(ray, thit, float3(0, 0, 0), float3(0, 1, 0));
-
-            return true;
-        }
-
-        if (IsAValidHit(ray, t1, attr.normal))
-        {
-            thit = t1;
-            attr.normal = CalculateNormalForRayConeHit(ray, thit, float3(0, 0, 0), float3(0, 1, 0));
-
-            return true;
-        }
-    }
-    return false;*/
-}
 // Test if a ray with RayFlags and segment <RayTMin(), RayTCurrent()> intersects a hollow sphere.
 bool RaySphereIntersectionTest(in Ray ray, out float thit, out float tmax, out ProceduralPrimitiveAttributes attr, in float3 center = float3(0, 0, 0), in float radius = 1)
 {

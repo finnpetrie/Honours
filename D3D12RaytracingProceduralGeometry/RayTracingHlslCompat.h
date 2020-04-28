@@ -49,7 +49,7 @@ typedef UINT16 Index;
 
 // PERFORMANCE TIP: Set max recursion depth as low as needed
 // as drivers may apply optimization strategies for low recursion depths.
-#define MAX_RAY_RECURSION_DEPTH 10    // ~ primary rays + reflections + shadow rays from reflected geometry.
+#define MAX_RAY_RECURSION_DEPTH 5    // ~ primary rays + reflections + shadow rays from reflected geometry.
 
 
 struct ProceduralPrimitiveAttributes
@@ -66,6 +66,7 @@ struct RayPayload
 struct ShadowRayPayload
 {
     bool hit;
+
 };
 
 struct SceneConstantBuffer
@@ -89,6 +90,7 @@ struct PrimitiveConstantBuffer
     float specularCoef;
     float specularPower;
     float stepScale;                      // Step scale for ray marching of signed distance primitives. 
+    XMMATRIX quadricCoeffs;
                                           // - Some object transformations don't preserve the distances and 
                                           //   thus require shorter steps.
     XMFLOAT3 padding;
@@ -155,6 +157,10 @@ namespace AnalyticPrimitive {
         AABB = 0,
         Spheres,
         Cone,
+        Ellipsoid,
+        Hyperboloid,
+        Cylinder,
+        Paraboloid,
         Count
     };
 }

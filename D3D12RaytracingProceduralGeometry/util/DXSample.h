@@ -31,7 +31,7 @@ public:
     virtual void OnKeyDown(UINT8 /*key*/) {}
     virtual void OnKeyUp(UINT8 /*key*/) {}
     virtual void OnWindowMoved(int /*x*/, int /*y*/) {}
-    virtual void OnMouseMove(UINT /*x*/, UINT /*y*/) {}
+    virtual void OnMouseMove(float /*x*/, float /*y*/) {}
     virtual void OnLeftButtonDown(UINT /*x*/, UINT /*y*/) {}
     virtual void OnLeftButtonUp(UINT /*x*/, UINT /*y*/) {}
     virtual void OnDisplayChanged() {}

@@ -84,7 +84,7 @@ float PhongLighting(float3 normal, bool shadowHit) {
 
     }
     else {
-        illum = 0;
+      //  illum = 0;
 
     }
     return illum;
@@ -106,7 +106,7 @@ float4 TraceRadianceRay(in Ray ray, in UINT currentRayRecursionDepth)
 {
     if (currentRayRecursionDepth >= MAX_RAY_RECURSION_DEPTH)
     {
-        return float4(0,0,0, 0);
+        return float4(1,1,1, 1);
     }
 
     // Set the ray's extents.
@@ -118,7 +118,7 @@ float4 TraceRadianceRay(in Ray ray, in UINT currentRayRecursionDepth)
     rayDesc.TMin = 0.0001;
     rayDesc.TMax = 10000;
     RayPayload rayPayload = { float4(0, 0, 0, 0), currentRayRecursionDepth + 1 };
-    TraceRay(g_scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_FORCE_NON_OPAQUE,
+    TraceRay(g_scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
         TraceRayParameters::InstanceMask,
         TraceRayParameters::HitGroup::Offset[RayType::Radiance],
         TraceRayParameters::HitGroup::GeometryStride,
@@ -141,7 +141,7 @@ float4 TraceRefractiveRay(in Ray ray, in RayPayload pay)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.01;
+    rayDesc.TMin = 0.0001f;
     rayDesc.TMax = 10000;
   //  RayPayload rayPayload = { float4(0, 0, 0, 0), currentRayRecursionDepth + 1 };
     pay.recursionDepth += 1;
@@ -175,8 +175,7 @@ bool ShadowRay(in Ray ray, in UINT currentRayRecursionDepth) {
 
     TraceRay(g_scene,
         RAY_FLAG_CULL_BACK_FACING_TRIANGLES
-        | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
-        | RAY_FLAG_FORCE_OPAQUE             // ~skip any hit shaders
+                   // ~skip any hit shaders
         | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // ~skip closest hit shaders,  
         TraceRayParameters::InstanceMask,
         TraceRayParameters::HitGroup::Offset[RayType::Shadow],
@@ -285,53 +284,50 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float4 reflectionColour = float4(0, 0, 0, 0);
         //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
      ambient += PhongLighting(float4(attr.normal, 0), shadowHit);
-  
-       
-       //assume refractive glass
-    float n1 = 1;
-    float n2 = 1.5;
-    float3 outwardNormal;
-    float3 dir = normalize(WorldRayDirection());
-    float index;
-    float3 refracted;
-    if (dot(dir, attr.normal) > 0) {
-        outwardNormal = -attr.normal;
-        index = n2;
-    }
-    else {
-        outwardNormal = attr.normal;
-        index = n1 / n2;
-    }
-    float4 refractionColour = float4(0, 0, 0, 1);
-      if (refractTest(dir, outwardNormal, index, refracted)) {
-            Ray r = { pos, refracted };
-           //refraction is nosiy, huh?
-          // refractionColour = float4(refracted, 1.0);
-           refractionColour = TraceRefractiveRay(r, rayPayload);
-      }
-      else {
-          Ray r = { pos, reflect(dir, attr.normal) };
-         // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
-      }
+     float4 refractionColour = float4(0, 0, 0, 1);
+     float3 dir = normalize(WorldRayDirection());
 
-      float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
-      if (l_materialCB.reflectanceCoef > 0.001) {
-          Ray r = { pos, reflect(dir, attr.normal) };
-          reflectionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
-      }
-     
-       /*float3 raf = refract(HitWorldPosition(), norm, index);
-       float3 rafe = normalize(raf);
-       Ray r = { HitWorldPosition(), rafe };
-
-      // Ray r = { HitWorldPosition(), ref };
-
-       refractionColour += TraceRadianceRay(r, rayPayload.recursionDepth);
       
-       // Ray refract = {HitWorldPosition(),r };
-    */
-     rayPayload.color = refractionColour + 0.1f*reflectionColour;
-      //rayPayload.color = ambient;
+     if (l_materialCB.refractiveCoef > 0) {
+         //assume refractive glass
+         float n1 = 1;
+         float n2 = l_materialCB.refractiveCoef;
+         float3 outwardNormal;
+         float index;
+         float3 refracted;
+         if (dot(dir, attr.normal) > 0) {
+             outwardNormal = -attr.normal;
+             index = n2;
+         }
+         else {
+             outwardNormal = attr.normal;
+             index = n1 / n2;
+         }
+         if (refractTest(dir, outwardNormal, index, refracted)) {
+             Ray r = { pos, refracted };
+             //refraction is nosiy, huh?
+            // refractionColour = float4(refracted, 1.0);
+             refractionColour = TraceRefractiveRay(r, rayPayload);
+         }
+         else {
+             Ray r = { pos, reflect(dir, attr.normal) };
+             // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
+         }
+         float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
+
+       
+     }
+     if (l_materialCB.reflectanceCoef >= 0.5f) {
+         Ray r = { pos, reflect(dir, attr.normal) };
+         reflectionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
+     }
+    
+    
+      //0.1f is a good coefficient for reflectioncolour.
+       // rayPayload.color += refractionColour + 0.1*reflectionColour;
+      
+          rayPayload.color = ambient + refractionColour + 0.1*reflectionColour;
+     //rayPayload.color =  float4(HitWorldPosition(), 1);
 }
 
 //***************************************************************************
@@ -348,10 +344,29 @@ void MyMissShader(inout RayPayload rayPayload)
 [shader("miss")]
 void MyMissShader_ShadowRay(inout ShadowRayPayload rayPayload)
 {
-   
+    
+
     rayPayload.hit = false;
 }
 
+
+[shader("anyhit")]
+void AnyHit_AnalyticPrimitive(inout RayPayload payload, in ProceduralPrimitiveAttributes attr) {
+    //IgnoreHit();
+    float3 pos = HitWorldPosition();
+    if (l_materialCB.refractiveCoef > 0) {
+        // payload.color = float4(1, 1, 0, 1);
+        
+         //IgnoreHit();
+    }
+   // payload.color = float4(1, 1, 0, 1);
+}
+
+[shader("anyhit")]
+void AnyHit_Triangle(inout RayPayload payload, in ProceduralPrimitiveAttributes attr) {
+    
+   IgnoreHit();
+}
 //***************************************************************************
 //*****************------ Intersection shaders-------************************
 //***************************************************************************

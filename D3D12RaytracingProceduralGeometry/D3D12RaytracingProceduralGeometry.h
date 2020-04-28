@@ -18,6 +18,7 @@
 #include "PerformanceTimers.h"
 #include <dxcapi.h>
 #include <fstream>
+#include "Primitive.h"
 class D3D12RaytracingProceduralGeometry : public DXSample
 {
 public:
@@ -37,7 +38,7 @@ public:
     virtual void OnRender();
     virtual void OnSizeChanged(UINT width, UINT height, bool minimized);
     virtual void OnDestroy();
-    virtual void OnMouseMove(UINT x, UINT y);
+    virtual void OnMouseMove(float x, float y);
     virtual IDXGISwapChain* GetSwapchain() { return m_deviceResources->GetSwapChain(); }
 
 private:
@@ -72,6 +73,8 @@ private:
     PrimitiveConstantBuffer m_aabbMaterialCB[IntersectionShaderType::TotalPrimitiveCount];
     IDxcBlob* m_rayGenLibrary;
     // Geometry
+    std::vector<Primitive> sceneObjects;
+
     D3DBuffer m_indexBuffer;
     D3DBuffer m_vertexBuffer;
     D3DBuffer m_aabbBuffer;
@@ -91,6 +94,8 @@ private:
     static const wchar_t* c_raygenShaderName;
     static const wchar_t* c_intersectionShaderNames[IntersectionShaderType::Count];
     static const wchar_t* c_closestHitShaderNames[GeometryType::Count];
+    static const wchar_t* c_anyHitShaderNames[GeometryType::Count];
+
     static const wchar_t* c_missShaderNames[RayType::Count];
 
     ComPtr<ID3D12Resource> m_missShaderTable;
@@ -111,6 +116,7 @@ private:
     float pitch = 0.0f;
     float yaw = -90.0f;
     bool firstMouse = true;
+
     XMVECTOR m_front;
     XMVECTOR m_eye;
     XMVECTOR m_at;
@@ -121,6 +127,7 @@ private:
 
     void UpdateCameraMatrices();
     void UpdateAABBPrimitiveAttributes(float animationTime);
+    void CreateGeometry();
     void InitializeScene();
     void RecreateD3D();
     void DoRaytracing();

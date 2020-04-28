@@ -36,12 +36,34 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
         float3(1,1,1)
     };
     float tmax;
+    float4x4 Q_1 = {1.0f/1.5f, 0.0f, 0.0f,0.0f,
+                 0.0f, 1.0f, 0.0f, 0.0f,
+                  0.0f, 0.0f, 1.0f/2.0f , 0.0f,
+                  0.0f, 0.0f, 0.0f, -1.0f};
+
+  float4x4 Q_2 = { 1.0f/2, 0.0f, 0.0f, 0.0f,
+                  0.0f, 0.0f, 0.0f,  -2.0f,
+                   0.0f, 0.0f, 1.0f/1.5f, 0.0f,
+                     0.0f, -2.0f, 0.0f, 0.0f };
+
+    float4x4 Q_3 = { -1.0f ,0.0f, 0.0f, 0.0f,
+                    0.0f, 1.0f, 0.0f,  0.0f,
+                     0.0f, 0.0f, 1.0f , 0.0f,
+                       0.0f, 0.0f, 0.0f, -1.0f };
+    float4x4 Q_4 = { 1.0f,0.0f, 0.0f, 0.0f,
+                0.0f, 1.0f, 0.0f,  0.0f,
+                 0.0f, 0.0f, 0.0f , 0.0f,
+                   0.0f, 0.0f, 0.0f, -1.0f };
 
     switch (analyticPrimitive)
     {
     case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);
     case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
-    case AnalyticPrimitive::Cone: return QuadricRayIntersectionTest(ray, thit, attr);
+    case AnalyticPrimitive::Hyperboloid: return QuadricRayIntersectionTest(ray, Q_3, thit, attr);
+    case AnalyticPrimitive::Ellipsoid: return QuadricRayIntersectionTest(ray, Q_1, thit, attr);
+    case AnalyticPrimitive::Paraboloid: return QuadricRayIntersectionTest(ray, Q_2, thit, attr);
+    case AnalyticPrimitive::Cylinder: return QuadricRayIntersectionTest(ray, Q_4, thit, attr);
+
     default: return false;
     }
 }

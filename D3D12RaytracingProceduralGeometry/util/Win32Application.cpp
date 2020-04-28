@@ -41,7 +41,8 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
 
         RECT windowRect = { 0, 0, static_cast<LONG>(pSample->GetWidth()), static_cast<LONG>(pSample->GetHeight()) };
         AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
-
+        ShowCursor(false);
+        ClipCursor(&windowRect);
         // Create the window and store a handle to it.
         m_hwnd = CreateWindow(
             windowClass.lpszClassName,
@@ -60,6 +61,7 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
         pSample->OnInit();
 
         ShowWindow(m_hwnd, nCmdShow);
+      //  SetCapture(m_hwnd);
 
         // Main sample loop.
         MSG msg = {};
@@ -185,6 +187,7 @@ void Win32Application::SetWindowZorderToTopMost(bool setToTopMost)
 // Main message handler for the sample.
 LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+
     DXSample* pSample = reinterpret_cast<DXSample*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
     switch (message)
@@ -266,13 +269,25 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
         return 0;
 
     case WM_MOUSEMOVE:
-        if (pSample && static_cast<UINT8>(wParam) == MK_LBUTTON)
+        if (pSample)
         {
+            RECT windowRect = {};
+            GetWindowRect(hWnd, &windowRect);
+            int width = windowRect.right - windowRect.left;
+            int height = windowRect.bottom - windowRect.top;
+          //  SetCapture(hWnd);
+            POINT cursorPos;
+            GetCursorPos(&cursorPos);
+
             float xPos = GET_X_LPARAM(lParam);
             float yPos = GET_Y_LPARAM(lParam);
             UINT x = LOWORD(lParam);
             UINT y = HIWORD(lParam);
-            pSample->OnMouseMove(x, y);
+            float dx = cursorPos.x - width / 2;
+            float dy = cursorPos.y - height / 2;
+            pSample->OnMouseMove(dx, dy);
+            SetCursorPos(width / 2, height / 2);
+
         }
         return 0;
 

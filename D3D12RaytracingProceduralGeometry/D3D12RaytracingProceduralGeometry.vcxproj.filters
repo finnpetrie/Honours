@@ -84,6 +84,12 @@
     <ClInclude Include="Solvers.h">
       <Filter>Assets\Shaders\ProceduralPrimitives</Filter>
     </ClInclude>
+    <ClInclude Include="Primitive.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Quadric.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -106,6 +112,12 @@
     </ClCompile>
     <ClCompile Include="util\PerformanceTimers.cpp">
       <Filter>Source Files\Util</Filter>
+    </ClCompile>
+    <ClCompile Include="Primitive.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Quadric.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
