@@ -327,17 +327,22 @@ void D3D12RaytracingProceduralGeometry::CreateGeometry() {
                   0.0f, 0.0f, 1.0f / 2.0f , 0.0f,
                   0.0f, 0.0f, 0.0f, -1.0f );
 
-        PrimitiveConstantBuffer t = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 1, 0, 1, 0.4f, 50, 1, nullQ};
+        PrimitiveConstantBuffer t = { XMFLOAT4(0, 0.1, 0, 0), 1, 1.5f, 1, 0.4f, 50, 1, nullQ};
         Primitive sphere(AnalyticPrimitive::Enum::Spheres, t, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
-        PrimitiveConstantBuffer h = {ChromiumReflectance, 1, 0, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer h = { XMFLOAT4(0.1, 0.1, 0.0, 0), 1, 1, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer q = { XMFLOAT4(0.1, 0, 0, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer c = { XMFLOAT4(0.0, 0.0, 0.2, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+
         PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 , Q_Ellipse};
 
         Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, h, XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT3(4, 4, 4));
-        Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, e, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(5, 5, 5));
-        Primitive AABB(AnalyticPrimitive::AABB, t, XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
-        Primitive Cylinder(AnalyticPrimitive::Cylinder, t, XMFLOAT3(0.0f, 2.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, q, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(5, 5, 5));
+        Primitive AABB(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
 
-        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB, Cylinder };
+       // Primitive Cylinder(AnalyticPrimitive::Cylinder, h, XMFLOAT3(0.0f, 2.0f, 0.0f), XMFLOAT3(3, 3, 3));
+
+        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB};
         
 }
 
@@ -1291,7 +1296,7 @@ void D3D12RaytracingProceduralGeometry::OnMouseMove(float dx, float dy) {
    // float yoffset = lastY - float(y);
     lastX = dx;
     lastY = dy;
-    float xoffset = (dx);
+    float xoffset = -(dx);
     float yoffset = -(dy);
     float sensitivity = 0.05f;
     xoffset *= sensitivity;

@@ -84,7 +84,7 @@ float PhongLighting(float3 normal, bool shadowHit) {
 
     }
     else {
-      //  illum = 0;
+      //illum = 0;
 
     }
     return illum;
@@ -279,7 +279,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     Ray shadowRay = { pos, l_dir };
     float3 currentDir =    RayTCurrent() * WorldRayDirection();
     currentDir += WorldRayOrigin();
-    float4 ambient = float4(0, 0, 0, 0);
+    float4 ambient = l_materialCB.albedo;
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
     float4 reflectionColour = float4(0, 0, 0, 0);
         //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
@@ -325,8 +325,9 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     
       //0.1f is a good coefficient for reflectioncolour.
        // rayPayload.color += refractionColour + 0.1*reflectionColour;
-      
-          rayPayload.color = ambient + refractionColour + 0.1*reflectionColour;
+   //  rayPayload.color = refractionColour;
+     rayPayload.color = ambient + refractionColour;
+          //0.1*reflectionColour;
      //rayPayload.color =  float4(HitWorldPosition(), 1);
 }
 
@@ -356,8 +357,7 @@ void AnyHit_AnalyticPrimitive(inout RayPayload payload, in ProceduralPrimitiveAt
     float3 pos = HitWorldPosition();
     if (l_materialCB.refractiveCoef > 0) {
         // payload.color = float4(1, 1, 0, 1);
-        
-         //IgnoreHit();
+        //IgnoreHit();
     }
    // payload.color = float4(1, 1, 0, 1);
 }

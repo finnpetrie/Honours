@@ -138,7 +138,7 @@ bool QuadricRayIntersectionTest(in Ray r, in float4x4 Q, out float thit, out Pro
     n_z = dot(float4(0, 0, 2, 0), Q_X);
     float3 norm = normalize(float3(n_x, n_y, n_z));
     if (dot(norm, r.direction) < 0) {
-       // norm = -norm;
+       //norm = -norm;
     }
     attr.normal = norm;
 
