@@ -49,20 +49,20 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     float4x4 Q_3 = { -1.0f ,0.0f, 0.0f, 0.0f,
                     0.0f, 1.0f, 0.0f,  0.0f,
                      0.0f, 0.0f, 1.0f , 0.0f,
-                       0.0f, 0.0f, 0.0f, -1.0f };
-    float4x4 Q_4 = { 1.0f,0.0f, 0.0f, 0.0f,
+                       0.0f, 0.0f, 0.0f, -0.09f };
+    float4x4 Q_4 = { 0.0f,0.0f, 0.0f, 0.0f,
                 0.0f, 1.0f, 0.0f,  0.0f,
-                 0.0f, 0.0f, 0.0f , 0.0f,
-                   0.0f, 0.0f, 0.0f, -1.0f };
+                 0.0f, 0.0f, 1.0f   , 0.0f,
+                   0.0f, 0.0f, 0.0f, -0.5f };
 
     switch (analyticPrimitive)
     {
     case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);
     case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
-    case AnalyticPrimitive::Hyperboloid: return QuadricRayIntersectionTest(ray, Q_3, thit, attr);
-    case AnalyticPrimitive::Ellipsoid: return QuadricRayIntersectionTest(ray, Q_1, thit, attr);
-    case AnalyticPrimitive::Paraboloid: return QuadricRayIntersectionTest(ray, Q_2, thit, attr);
-    case AnalyticPrimitive::Cylinder: return QuadricRayIntersectionTest(ray, Q_4, thit, attr);
+    case AnalyticPrimitive::Hyperboloid: return QuadricRayIntersectionTest(ray, Q_3, thit, attr, analyticPrimitive);
+    case AnalyticPrimitive::Ellipsoid: return QuadricRayIntersectionTest(ray, Q_1, thit, attr, analyticPrimitive);
+    case AnalyticPrimitive::Paraboloid: return QuadricRayIntersectionTest(ray, Q_2, thit, attr, analyticPrimitive);
+    case AnalyticPrimitive::Cylinder: return QuadricRayIntersectionTest(ray, Q_4, thit, attr, analyticPrimitive);
 
     default: return false;
     }

@@ -307,11 +307,12 @@ void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float anim
         for (Primitive& p : sceneObjects) {
             SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
         }
-        SetTransformForAABB(offset + AABB, mScale15y, mIdentity);
+    /*   SetTransformForAABB(offset + AABB, mScale15y, mIdentity);
         SetTransformForAABB(offset + Spheres, mScale15, mRotation);
         SetTransformForAABB(offset + Cone, mScaleHalf, mRotation);
         SetTransformForAABB(offset + Hyperboloid, mScaleHalf, mRotation);
         SetTransformForAABB(offset + Ellipsoid, mScale15, mRotation);
+        */
 
         offset += AnalyticPrimitive::Count;
     }
@@ -327,22 +328,24 @@ void D3D12RaytracingProceduralGeometry::CreateGeometry() {
                   0.0f, 0.0f, 1.0f / 2.0f , 0.0f,
                   0.0f, 0.0f, 0.0f, -1.0f );
 
-        PrimitiveConstantBuffer t = { XMFLOAT4(0, 0.1, 0, 0), 1, 1.5f, 1, 0.4f, 50, 1, nullQ};
-        Primitive sphere(AnalyticPrimitive::Enum::Spheres, t, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
-        PrimitiveConstantBuffer h = { XMFLOAT4(0.1, 0.1, 0.0, 0), 1, 1, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer q = { XMFLOAT4(0.1, 0, 0, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer c = { XMFLOAT4(0.0, 0.0, 0.2, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.1, 0.0, 0), 1, 1.01f, 1, 0.4f, 50, 1, nullQ};
+        Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 1.f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0.1, 0.0, 0, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer cylin_b= { XMFLOAT4(0.2, 0.0, 0.2, 0), 1, 0, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.1, 0.1, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
 
         PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 , Q_Ellipse};
 
-        Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, h, XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT3(4, 4, 4));
-        Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, q, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(5, 5, 5));
-        Primitive AABB(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(6, 6, 6));
+        Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+        Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
         //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
+        Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(3.0f, 0.0, 2.0f), XMFLOAT3(6, 6, 6));
 
-       // Primitive Cylinder(AnalyticPrimitive::Cylinder, h, XMFLOAT3(0.0f, 2.0f, 0.0f), XMFLOAT3(3, 3, 3));
-
-        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB};
+        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB, Cylinder, Paraboloid};
         
 }
 
@@ -1253,7 +1256,7 @@ void D3D12RaytracingProceduralGeometry::BuildShaderTables()
 void D3D12RaytracingProceduralGeometry::OnKeyDown(UINT8 key)
 {
 
-    float speed = 0.1f;
+    float speed = 0.2f;
     XMVECTOR perp_Pos = XMVector3Normalize(XMVector3Cross(m_front, m_up));
 
     switch (key)

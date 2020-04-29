@@ -67,29 +67,6 @@ bool SolveRaySphereIntersectionEquation(in Ray ray, out float tmin, out float tm
 }
 
 
-bool AltRayCone(in Ray ray, out float tmin, out float tmax, in float3 tip, in float3 axis, in float theta) {
-    float3 co = ray.origin - tip;
-    float cosa = 0.95;
-    float a = dot(ray.direction, axis) * dot(ray.direction, axis) - cosa * cosa; 
-    float b = 2 * (dot(ray.direction, axis) * dot(co, axis) - dot(ray.direction, co) * cosa * cosa);
-    float c = dot(co, axis) * dot(co, axis) - dot(co, co) * cosa * cosa;
-    return SolveQuadraticEqn(a, b, c, tmin, tmax);
-}
-bool SolveRayConeIntersection(in Ray ray, out float tmin, out float tmax, in float3 tip, in float3 axis, in float theta) {
-    float dv = dot(ray.direction, axis);
-    float3 co = ray.origin - tip;
-    float dcoV = dot(co, axis);
-    float dco = dot(co, co);
-    float dirCo = dot(ray.direction, co);
-    float cosTheta = cos(theta);
-
-
-    float a = dv * dv - cosTheta * cosTheta;
-    float b = 2 * (dv * dcoV - dirCo * cosTheta * cosTheta);
-    float c = (dcoV * dcoV - dirCo * cosTheta * cosTheta);
-
-    return SolveQuadraticEqn(a, b, c, tmin, tmax);
-}
 
 
 bool SolveRayQuadricInteresection(in Ray ray, out float tmin, out float tmax, in float4x4 Q) {
@@ -100,7 +77,7 @@ bool SolveRayQuadricInteresection(in Ray ray, out float tmin, out float tmax, in
     float a = dot(float4(ray.direction, 0), AD);
     float b = dot(float4(ray.origin, 1), AD) + dot(float4(ray.direction, 0), AC);
     float c = dot(float4(ray.origin, 1), AC);
-    if (abs(a) < (0.0001f)) {
+    if (abs(a) == 0) {
         float t = -c / b;
         tmin = t;
         tmax = t;
@@ -110,13 +87,15 @@ bool SolveRayQuadricInteresection(in Ray ray, out float tmin, out float tmax, in
     return SolveQuadraticEqn(a, b, c, tmin, tmax);
 }
 
-bool QuadricRayIntersectionTest(in Ray r, in float4x4 Q, out float thit, out ProceduralPrimitiveAttributes attr) {
+bool QuadricRayIntersectionTest(in Ray r, in float4x4 Q, out float thit, out ProceduralPrimitiveAttributes attr, in AnalyticPrimitive::Enum analyticPrimitive) {
  
     float tmin, tmax;
     float n_x, n_y, n_z;
+
     if (!SolveRayQuadricInteresection(r, tmin, tmax, Q)) {
         return false;
     }
+
     if (tmin < RayTMin()) {
         if (tmax < RayTMin()) {
             return false;
@@ -124,34 +103,48 @@ bool QuadricRayIntersectionTest(in Ray r, in float4x4 Q, out float thit, out Pro
         thit = tmax;
     }
     else {
-
         thit = tmin;
     }
-    float3 intersectionPoint = r.origin + thit * r.direction;
-    float r_x = intersectionPoint.x;
-    float r_y = intersectionPoint.y;
-    float r_z = intersectionPoint.z;
 
+    float3 intersectionPoint = r.origin + thit * r.direction;
+
+    if (abs(intersectionPoint.x) > 2) {
+        thit = tmax;
+    }
+    
+    if (analyticPrimitive == AnalyticPrimitive::Paraboloid) {
+        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2)) {
+            thit = tmax;
+        }
+    }
+
+    intersectionPoint = r.origin + thit * r.direction;
+   
+    float3 dir = normalize(r.direction);
     float4 Q_X = mul(Q, float4(intersectionPoint, 1));
     n_x = dot(float4(2, 0, 0, 0), Q_X);
     n_y = dot(float4(0, 2, 0, 0), Q_X);
     n_z = dot(float4(0, 0, 2, 0), Q_X);
     float3 norm = normalize(float3(n_x, n_y, n_z));
-    if (dot(norm, r.direction) < 0) {
-       //norm = -norm;
+    
+    if (dot(norm, dir) > 0) {
+     norm = -norm;
     }
-    attr.normal = norm;
 
-    if (abs(intersectionPoint.x) > 10) {
-       return false;
-   }
-    //norm = CalculateNormalForARaySphereHit(r, thit, float3(0, 0, 0));
-    if (IsAValidHit(r, thit, attr.normal)) {
-        return true;
-    }
-    else {
+    attr.normal = norm;
+    //bound along x-axis
+    if (abs(intersectionPoint.x) > 2) {
         return false;
     }
+    
+    //bound paraboloid in all axes
+    if (analyticPrimitive == AnalyticPrimitive::Paraboloid) {
+        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 // Test if a ray with RayFlags and segment <RayTMin(), RayTCurrent()> intersects a hollow sphere.
@@ -193,6 +186,8 @@ bool RaySphereIntersectionTest(in Ray ray, out float thit, out float tmax, out P
     return false;
 }
 
+
+
 // Test if a ray segment <RayTMin(), RayTCurrent()> intersects a solid sphere.
 // Limitation: this test does not take RayFlags into consideration and does not calculate a surface normal.
 bool RaySolidSphereIntersectionTest(in Ray ray, out float thit, out float tmax, in float3 center = float3(0, 0, 0), in float radius = 1)
@@ -209,6 +204,15 @@ bool RaySolidSphereIntersectionTest(in Ray ray, out float thit, out float tmax, 
     return true;
 }
 
+bool ConstructiveSolidGeometry(in Ray ray, out float thit, out ProceduralPrimitiveAttributes attr) {
+    //get intersections for both AABB, and sphere.
+    float s_tmin, s_tmax;
+    float b_tmin, b_tmax;
+    ProceduralPrimitiveAttributes s_attr;
+    ProceduralPrimitiveAttributes b_attr;
+    RaySphereIntersectionTest(ray, s_tmin, s_tmax, s_attr);
+
+}
 // Test if a ray with RayFlags and segment <RayTMin(), RayTCurrent()> intersects multiple hollow spheres.
 bool RaySpheresIntersectionTest(in Ray ray, out float thit, out ProceduralPrimitiveAttributes attr)
 {
@@ -265,10 +269,11 @@ bool RayAABBIntersectionTest(Ray ray, float3 aabb[2], out float tmin, out float 
     //  that a ray direction is parallel to. In that case
     //  0 * INF => NaN
     const float FLT_INFINITY = 1.#INF;
+   //float3 invRayDirection = 1/ray.direction;
     float3 invRayDirection = ray.direction != 0 
                            ? 1 / ray.direction 
                            : (ray.direction > 0) ? FLT_INFINITY : -FLT_INFINITY;
-
+                         
     tmin3.x = (aabb[1 - sign3.x].x - ray.origin.x) * invRayDirection.x;
     tmax3.x = (aabb[sign3.x].x - ray.origin.x) * invRayDirection.x;
 
@@ -281,7 +286,11 @@ bool RayAABBIntersectionTest(Ray ray, float3 aabb[2], out float tmin, out float 
     tmin = max(max(tmin3.x, tmin3.y), tmin3.z);
     tmax = min(min(tmax3.x, tmax3.y), tmax3.z);
     
-    return tmax > tmin && tmax >= RayTMin() && tmin <= RayTCurrent();
+    return tmax > tmin;
+}
+
+bool RayAABBTest(Ray ray, float3 aabb[2], inout float tmin, inout  float tmax) {
+
 }
 
 // Test if a ray with RayFlags and segment <RayTMin(), RayTCurrent()> intersects a hollow AABB.
@@ -291,7 +300,7 @@ bool RayAABBIntersectionTest(Ray ray, float3 aabb[2], out float thit, out Proced
     if (RayAABBIntersectionTest(ray, aabb, tmin, tmax))
     {
         // Only consider intersections crossing the surface from the outside.
-        if (tmin < RayTMin() || tmin > RayTCurrent())
+        if (tmin < RayTMin() || tmin > RayTCurrent() )
             return false;
 
         thit = tmin;
@@ -310,7 +319,11 @@ bool RayAABBIntersectionTest(Ray ray, float3 aabb[2], out float thit, out Proced
         else if (distanceToBounds[1].y < eps) attr.normal = float3(0, 1, 0);
         else if (distanceToBounds[1].z < eps) attr.normal = float3(0, 0, 1);
 
-        return IsAValidHit(ray, thit, attr.normal);
+        if (dot(ray.direction, attr.normal) > 0) {
+            attr.normal = -attr.normal;
+        }
+        return true;
+       //return IsAValidHit(ray, thit, attr.normal);
     }
     return false;
 }

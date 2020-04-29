@@ -118,7 +118,7 @@ float4 TraceRadianceRay(in Ray ray, in UINT currentRayRecursionDepth)
     rayDesc.TMin = 0.0001;
     rayDesc.TMax = 10000;
     RayPayload rayPayload = { float4(0, 0, 0, 0), currentRayRecursionDepth + 1 };
-    TraceRay(g_scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+    TraceRay(g_scene, RAY_FLAG_NONE,
         TraceRayParameters::InstanceMask,
         TraceRayParameters::HitGroup::Offset[RayType::Radiance],
         TraceRayParameters::HitGroup::GeometryStride,
@@ -282,11 +282,12 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float4 ambient = l_materialCB.albedo;
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
     float4 reflectionColour = float4(0, 0, 0, 0);
-        //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
+    
+    //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
      ambient += PhongLighting(float4(attr.normal, 0), shadowHit);
      float4 refractionColour = float4(0, 0, 0, 1);
      float3 dir = normalize(WorldRayDirection());
-
+    // float3 worldNormal = mul(attr.normal, (float3x3)ObjectToWorld3x4());
       
      if (l_materialCB.refractiveCoef > 0) {
          //assume refractive glass
@@ -314,10 +315,8 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
              // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
          }
          float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
-
-       
      }
-     if (l_materialCB.reflectanceCoef >= 0.5f) {
+     if (l_materialCB.reflectanceCoef >= 0.1f) {
          Ray r = { pos, reflect(dir, attr.normal) };
          reflectionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
      }
@@ -326,7 +325,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
       //0.1f is a good coefficient for reflectioncolour.
        // rayPayload.color += refractionColour + 0.1*reflectionColour;
    //  rayPayload.color = refractionColour;
-     rayPayload.color = ambient + refractionColour;
+     rayPayload.color = ambient + refractionColour + 0.1 * reflectionColour;
           //0.1*reflectionColour;
      //rayPayload.color =  float4(HitWorldPosition(), 1);
 }
@@ -351,11 +350,15 @@ void MyMissShader_ShadowRay(inout ShadowRayPayload rayPayload)
 }
 
 
+//***************************************************************************
+//**********************------ Any Hit Shaders -------**************************
+//***************************************************************************
 [shader("anyhit")]
 void AnyHit_AnalyticPrimitive(inout RayPayload payload, in ProceduralPrimitiveAttributes attr) {
     //IgnoreHit();
     float3 pos = HitWorldPosition();
     if (l_materialCB.refractiveCoef > 0) {
+       //  if(ShadowRay(payload)){}
         // payload.color = float4(1, 1, 0, 1);
         //IgnoreHit();
     }
@@ -363,9 +366,9 @@ void AnyHit_AnalyticPrimitive(inout RayPayload payload, in ProceduralPrimitiveAt
 }
 
 [shader("anyhit")]
-void AnyHit_Triangle(inout RayPayload payload, in ProceduralPrimitiveAttributes attr) {
-    
-   IgnoreHit();
+void AnyHit_Triangle(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
+   // payload.color = float4(0, 0, 0, 1);
+   //IgnoreHit();
 }
 //***************************************************************************
 //*****************------ Intersection shaders-------************************
