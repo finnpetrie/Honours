@@ -66,8 +66,10 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     {
     case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);
     //case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
-    case AnalyticPrimitive::Spheres: return ConstructiveSolidGeometry_D(ray, thit, attr);
-
+    case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
+    case AnalyticPrimitive::CSG_Difference:  return ConstructiveSolidGeometry_D(ray, thit, attr);
+    case AnalyticPrimitive::CSG_Union: return ConstructiveSolidGeometry(ray, thit, attr);
+    case AnalyticPrimitive::CSG_Intersection: return ConstructiveSolidGeometry_I(ray, thit, attr);
     case AnalyticPrimitive::Hyperboloid: return  RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::Ellipsoid: return  RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::Paraboloid: return RayQuadric(ray, thit, attr, analyticPrimitive);

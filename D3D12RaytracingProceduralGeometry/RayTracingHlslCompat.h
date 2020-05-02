@@ -160,6 +160,9 @@ namespace AnalyticPrimitive {
         Hyperboloid,
         Cylinder,
         Paraboloid,
+        CSG_Difference,
+        CSG_Intersection,
+        CSG_Union,
         Count
     };
 }

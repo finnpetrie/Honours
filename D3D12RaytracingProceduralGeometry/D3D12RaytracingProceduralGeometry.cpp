@@ -349,14 +349,15 @@ void D3D12RaytracingProceduralGeometry::CreateGeometry() {
                        0.0f, 0.0f, 0.0f, -0.5f };
         
 
-        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.1, 0.0, 0), 0, 0, 1, 0.4f, 50, 1};
+        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.1, 0.0, 0), 1, 1.5f, 1, 0.4f, 50, 1};
         Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-        PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 0.0f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0.1, 0.1, 0.1, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer cylin_b= { XMFLOAT4(0.2, 0.0, 0.2, 0), 1, 0.0f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.1, 0.1, 0.1, 0), 0, 1.0f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.0, 0.0, 0.0, 0), 1, 0, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0.01, 0.01, 0.01, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer cylin_b= { XMFLOAT4(0.1, 0.0, 0.1, 0), 1, 0, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.0, 0.0, 0.05, 0), 1.0f, 1.333f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 1, 0.0, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 1, 0, 1, 0.4f, 50, 1 };
 
         PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
@@ -367,8 +368,12 @@ void D3D12RaytracingProceduralGeometry::CreateGeometry() {
         //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
         Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
         Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(3.0f, 0.0, 2.0f), XMFLOAT3(6, 6, 6));
+        Primitive difference(AnalyticPrimitive::Enum::CSG_Difference, CSG, XMFLOAT3(0.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
+        Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(-6.0f, 0.0f, -2.0f), XMFLOAT3(10, 10, 10));
+        Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(-1, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
 
-        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB, Cylinder, Paraboloid, Cone};
+
+        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB, Cylinder, Paraboloid, Cone, difference, csg_union, intersection };
         
 }
 
@@ -401,7 +406,7 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
         };
 
 
-        m_planeMaterialCB = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 0.25f, 0,  1, 0.4f, 50, 1};
+        m_planeMaterialCB = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 1, 0,  1, 0.4f, 50, 1};
 
         // Albedos
         XMFLOAT4 green = XMFLOAT4(0.1f, 1.0f, 0.5f, 1.0f);

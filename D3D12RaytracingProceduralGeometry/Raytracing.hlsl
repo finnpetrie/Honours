@@ -84,7 +84,7 @@ float PhongLighting(float3 normal, bool shadowHit) {
 
     }
     else {
-      illum = 0;
+        illum = 0;
 
     }
     return illum;
@@ -235,7 +235,8 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
     //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
     ambient += PhongLighting(float4(triangleNormal, 0), shadowHit);
-    float n1 = 1;
+   
+    /* float n1 = 1;
     float n2 = 1.5;
     float index;
     float3 refracted;
@@ -259,8 +260,20 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     else {
         Ray r = { pos, reflect(dir, triangleNormal) };
         refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
+    }*/
+
+      if(l_materialCB.reflectanceCoef > 0){
+        Ray r = { HitWorldPosition(), reflect(WorldRayDirection(), triangleNormal) };
+        reflectionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
+
     }
-    rayPayload.color =  ambient + reflectionColour;
+
+    float4 color = ambient + 0.15*reflectionColour;
+    float t = RayTCurrent();
+    color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
+
+    rayPayload.color = color;
+
 
 }
 
@@ -325,9 +338,13 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
       //0.1f is a good coefficient for reflectioncolour.
        // rayPayload.color += refractionColour + 0.1*reflectionColour;
    //  rayPayload.color = refractionColour;
-     rayPayload.color = ambient + refractionColour + 0.1 * reflectionColour;
+     float4 color = ambient + refractionColour + 0.1 * reflectionColour;
           //0.1*reflectionColour;
      //rayPayload.color =  float4(HitWorldPosition(), 1);
+     float t = RayTCurrent();
+     color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
+
+     rayPayload.color = color;
 }
 
 //***************************************************************************
