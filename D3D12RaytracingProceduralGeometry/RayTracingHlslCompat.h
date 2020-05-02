@@ -90,7 +90,6 @@ struct PrimitiveConstantBuffer
     float specularCoef;
     float specularPower;
     float stepScale;                      // Step scale for ray marching of signed distance primitives. 
-    XMMATRIX quadricCoeffs;
                                           // - Some object transformations don't preserve the distances and 
                                           //   thus require shorter steps.
     XMFLOAT3 padding;

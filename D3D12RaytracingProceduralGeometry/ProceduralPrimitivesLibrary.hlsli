@@ -35,16 +35,23 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
         float3(-1,-1,-1),
         float3(1,1,1)
     };
-    float tmax;
+    float t_min;
+    float t_max;
+    
     float4x4 Q_1 = {1.0f/1.5f, 0.0f, 0.0f,0.0f,
                  0.0f, 1.0f, 0.0f, 0.0f,
                   0.0f, 0.0f, 1.0f/2.0f , 0.0f,
                   0.0f, 0.0f, 0.0f, -1.0f};
 
   float4x4 Q_2 = { 1.0f/2, 0.0f, 0.0f, 0.0f,
-                  0.0f, 0.0f, 0.0f,  -2.0f,
+                  0.0f, 0.0f, 0.0f,  -0.1f,
                    0.0f, 0.0f, 1.0f/1.5f, 0.0f,
-                     0.0f, -2.0f, 0.0f, 0.0f };
+                     0.0f, -0.1f, 0.0f, 0.0f };
+
+  float4x4 Q_cone = { -1.0f, 0.0f, 0.0f, 0.0f,
+                            0.0f, 1.0f, 0.0f, 0.0f,
+                            0.0f, 0.0f, -1.0f, 0.0f,
+                            0.0f, 0.0f, 0.0f, 0.0f };
 
     float4x4 Q_3 = { -1.0f ,0.0f, 0.0f, 0.0f,
                     0.0f, 1.0f, 0.0f,  0.0f,
@@ -54,15 +61,19 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
                 0.0f, 1.0f, 0.0f,  0.0f,
                  0.0f, 0.0f, 1.0f   , 0.0f,
                    0.0f, 0.0f, 0.0f, -0.5f };
-
+                   
     switch (analyticPrimitive)
     {
     case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);
-    case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
-    case AnalyticPrimitive::Hyperboloid: return QuadricRayIntersectionTest(ray, Q_3, thit, attr, analyticPrimitive);
-    case AnalyticPrimitive::Ellipsoid: return QuadricRayIntersectionTest(ray, Q_1, thit, attr, analyticPrimitive);
-    case AnalyticPrimitive::Paraboloid: return QuadricRayIntersectionTest(ray, Q_2, thit, attr, analyticPrimitive);
-    case AnalyticPrimitive::Cylinder: return QuadricRayIntersectionTest(ray, Q_4, thit, attr, analyticPrimitive);
+    //case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
+    case AnalyticPrimitive::Spheres: return ConstructiveSolidGeometry_D(ray, thit, attr);
+
+    case AnalyticPrimitive::Hyperboloid: return  RayQuadric(ray, thit, attr, analyticPrimitive);
+    case AnalyticPrimitive::Ellipsoid: return  RayQuadric(ray, thit, attr, analyticPrimitive);
+    case AnalyticPrimitive::Paraboloid: return RayQuadric(ray, thit, attr, analyticPrimitive);
+    case AnalyticPrimitive::Cylinder: return RayQuadric(ray, thit, attr, analyticPrimitive);
+    case AnalyticPrimitive::Cone: return  RayQuadric(ray, thit, attr, analyticPrimitive);
+
 
     default: return false;
     }

@@ -328,24 +328,47 @@ void D3D12RaytracingProceduralGeometry::CreateGeometry() {
                   0.0f, 0.0f, 1.0f / 2.0f , 0.0f,
                   0.0f, 0.0f, 0.0f, -1.0f );
 
-        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.1, 0.0, 0), 1, 1.01f, 1, 0.4f, 50, 1, nullQ};
-        Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
-        PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 1.f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0.1, 0.0, 0, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer cylin_b= { XMFLOAT4(0.2, 0.0, 0.2, 0), 1, 0, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.1, 0.1, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
 
-        PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 , Q_Ellipse};
+        XMMATRIX Q_paraboloid = { 1.0f / 2, 0.0f, 0.0f, 0.0f,
+                        0.0f, 0.0f, 0.0f,  -0.1f,
+                         0.0f, 0.0f, 1.0f / 1.5f, 0.0f,
+                           0.0f, -0.1f, 0.0f, 0.0f };
+
+        XMMATRIX Q_cone = { -1.0f, 0.0f, 0.0f, 0.0f,
+                                  0.0f, 1.0f, 0.0f, 0.0f,
+                                  0.0f, 0.0f, -1.0f, 0.0f,
+                                  0.0f, 0.0f, 0.0f, 0.0f };
+
+        XMMATRIX Q_hyperboloid = { -1.0f ,0.0f, 0.0f, 0.0f,
+                        0.0f, 1.0f, 0.0f,  0.0f,
+                         0.0f, 0.0f, 1.0f , 0.0f,
+                           0.0f, 0.0f, 0.0f, -0.09f };
+        XMMATRIX Q_cylinder = { 0.0f,0.0f, 0.0f, 0.0f,
+                    0.0f, 1.0f, 0.0f,  0.0f,
+                     0.0f, 0.0f, 1.0f   , 0.0f,
+                       0.0f, 0.0f, 0.0f, -0.5f };
+        
+
+        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.1, 0.0, 0), 0, 0, 1, 0.4f, 50, 1};
+        Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+        PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 0.0f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0.1, 0.1, 0.1, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer cylin_b= { XMFLOAT4(0.2, 0.0, 0.2, 0), 1, 0.0f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.1, 0.1, 0.1, 0), 0, 1.0f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.0, 0.0, 0.0, 0), 1, 0, 1, 0.4f, 50, 1 };
+
+        PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
         Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(6, 6, 6));
-        Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-        Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1  , 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+        Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(3, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+        Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(4, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
         //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
         Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
         Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(3.0f, 0.0, 2.0f), XMFLOAT3(6, 6, 6));
 
-        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB, Cylinder, Paraboloid};
+        sceneObjects = { sphere, hyperboloid, ellipsoid, AABB, Cylinder, Paraboloid, Cone};
         
 }
 
@@ -365,7 +388,6 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
             float specularCoef = 0.7f,
             float specularPower = 50.0f,
             float stepScale = 1.0f
-           // const XMMATRIX &quadricCoeff
             )
         {
             auto& attributes = m_aabbMaterialCB[primitiveIndex];
@@ -375,8 +397,6 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
             attributes.diffuseCoef = diffuseCoef;
             attributes.specularCoef = specularCoef;
             attributes.specularPower = specularPower;
-            //attributes.quadricCoeffs = quadricCoeff;
-
             attributes.stepScale = stepScale;
         };
 
@@ -395,7 +415,8 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
             for (Primitive& p : sceneObjects) {
                 PrimitiveConstantBuffer material = p.getMaterial();
                // std::cout << p.getType() << std::endl;
-                SetAttributes(offset + p.getType(), material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
+                //SetAttributes(offset + p.getType(),material.albedo, material.reflectanceCoef, material.refractiveCoef,  )
+               SetAttributes(offset + p.getType(), material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
             }
             /*SetAttributes(offset + AABB, red);
             SetAttributes(offset + Spheres, ChromiumReflectance, 0.1f, 1.5, 0.6f,0.0f, 1);

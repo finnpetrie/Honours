@@ -84,7 +84,7 @@ float PhongLighting(float3 normal, bool shadowHit) {
 
     }
     else {
-      //illum = 0;
+      illum = 0;
 
     }
     return illum;
@@ -168,7 +168,7 @@ bool ShadowRay(in Ray ray, in UINT currentRayRecursionDepth) {
     RayDesc rayDesc;
     rayDesc.Origin = ray.origin;
     rayDesc.Direction = ray.direction;
-    rayDesc.TMin = 0;
+    rayDesc.TMin = 0.001;
     rayDesc.TMax = 10000;
 
     ShadowRayPayload shadow = { true };
