@@ -110,6 +110,46 @@ float3 HitAttribute(float3 vertexAttribute[3], float2 barycentrics)
         barycentrics.y * (vertexAttribute[2] - vertexAttribute[0]);
 }
 
+float rnd(inout uint seed)
+{
+    seed = (1664525u * seed + 1013904223u);
+    return ((float)(seed & 0x00FFFFFF) / (float)0x01000000);
+}
+
+float3 sample_hemisphere_cos(inout uint seed)
+{
+    float3 sampleDir;
+
+    float param1 = rnd(seed);
+    float param2 = rnd(seed);
+
+    // Uniformly sample disk.
+    float r = sqrt(param1);
+    float phi = 2.0f * M_PI* param2;
+    sampleDir.x = r * cos(phi);
+    sampleDir.y = r * sin(phi);
+
+    // Project up to hemisphere.
+    sampleDir.z = sqrt(max(0.0f, 1.0f - r * r));
+
+    return sampleDir;
+}
+
+uint getNewSeed(uint param1, uint param2, uint numPermutation)
+{
+    uint s0 = 0;
+    uint v0 = param1;
+    uint v1 = param2;
+
+    for (uint perm = 0; perm < numPermutation; perm++)
+    {
+        s0 += 0x9e3779b9;
+        v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);
+        v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);
+    }
+
+    return v0;
+}
 // Generate a ray in world space for a camera pixel corresponding to an index from the dispatched 2D grid.
 inline Ray GenerateCameraRay(uint2 index, in float3 cameraPosition, in float4x4 projectionToWorld)
 {

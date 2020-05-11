@@ -61,6 +61,7 @@ struct RayPayload
 {
     XMFLOAT4 color;
     UINT   recursionDepth;
+    UINT seed;
 };
 
 struct ShadowRayPayload
@@ -76,6 +77,7 @@ struct SceneConstantBuffer
     XMVECTOR lightPosition;
     XMVECTOR lightAmbientColor;
     XMVECTOR lightDiffuseColor;
+    UINT accumulatedFrames;
     float    reflectance;
     float    elapsedTime;                 // Elapsed application time.
 };
@@ -148,7 +150,9 @@ namespace TraceRayParameters
 // From: http://blog.selfshadow.com/publications/s2015-shading-course/hoffman/s2015_pbs_physics_math_slides.pdf
 static const XMFLOAT4 ChromiumReflectance = XMFLOAT4(0.549f, 0.556f, 0.554f, 1.0f);
 
-static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
+//static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
+static const XMFLOAT4 BackgroundColor = XMFLOAT4(0, 0, 0, 1.0f);
+
 static const float InShadowRadiance = 0.35f;
 
 namespace AnalyticPrimitive {

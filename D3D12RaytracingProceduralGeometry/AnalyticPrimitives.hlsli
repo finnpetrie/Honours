@@ -324,13 +324,18 @@ bool ConstructiveSolidGeometry(in Ray ray, out float thit, out ProceduralPrimiti
     float t_hit;
     ProceduralPrimitiveAttributes s_attr;
     ProceduralPrimitiveAttributes b_attr;
-    float4x4 Q = float4x4(-1.0f, 0.0f, 0.0f, 0.0f,
+  /*float4x4 Q = float4x4(-1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, -0.9f);
+        */
+    float4x4 Q = float4x4 (-1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, -1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f);
 
    bool sphere_hit = RaySphereIntersectionTest(ray, s_tmin, s_tmax, s_attr);
-   bool hyp_hit = QuadricRayIntersectionTest(ray, b_tmin, b_tmax, t_hit, b_attr, AnalyticPrimitive::Enum::Hyperboloid, Q);
+   bool hyp_hit = QuadricRayIntersectionTest(ray, b_tmin, b_tmax, t_hit, b_attr, AnalyticPrimitive::Enum::Cone, Q);
     if (sphere_hit || hyp_hit) {
         if (sphere_hit && hyp_hit) {
             float2 diffs;

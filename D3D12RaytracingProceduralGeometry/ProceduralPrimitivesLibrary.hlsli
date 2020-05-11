@@ -127,8 +127,8 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
     case SignedDistancePrimitive::FractalPyramid: 
          // Let pyramid have a base at y == -1 of AABB => position + float3(0,1,0) 
          // Pyramid: 63.435 degrees at base, height 2
-         return sdFractalPyramid(position + float3(0, 1, 0), float3(0.894, 0.447, 2.0), 2.0f);
-    
+        // return sdQuaternionJuliaSet(position + float3(0, 1, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
+        //return sdGyroid(position);
     default: return 0;
     }
 }

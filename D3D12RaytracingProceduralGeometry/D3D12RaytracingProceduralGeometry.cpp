@@ -13,6 +13,7 @@
 #include "D3D12RaytracingProceduralGeometry.h"
 #include "CompiledShaders\Raytracing.hlsl.h"
 #include <iostream>
+
 using namespace std;
 using namespace DX;
 
@@ -320,6 +321,20 @@ void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float anim
  
 }
 
+
+void D3D12RaytracingProceduralGeometry::CreateSpheres() {
+    float X = 1.0f;
+    for (int i = 0; i < 3; i++) {
+        float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+        float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+        float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(x, y, z, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+
+        Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0, 0, 0), XMFLOAT3(3, 3, 3));
+        sceneObjects.push_back(sphere);
+    }
+}
+
 void D3D12RaytracingProceduralGeometry::CreateGeometry() {
         XMMATRIX nullQ  = XMMatrixIdentity();
 
@@ -354,7 +369,7 @@ void D3D12RaytracingProceduralGeometry::CreateGeometry() {
         PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
         PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0.01, 0.01, 0.01, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
         PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
-        PrimitiveConstantBuffer cylin_b= { XMFLOAT4(0.1, 0.0, 0.1, 0), 1, 0, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer cylin_b= { XMFLOAT4(0.1, 0.0, 0.1, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
         PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.0, 0.0, 0.05, 0), 1.0f, 1.333f, 1, 0.4f, 50, 1 };
         PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 1, 0.0, 1, 0.4f, 50, 1 };
         PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 1, 0, 1, 0.4f, 50, 1 };
@@ -369,7 +384,7 @@ void D3D12RaytracingProceduralGeometry::CreateGeometry() {
         Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
         Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(3.0f, 0.0, 2.0f), XMFLOAT3(6, 6, 6));
         Primitive difference(AnalyticPrimitive::Enum::CSG_Difference, CSG, XMFLOAT3(0.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
-        Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(-6.0f, 0.0f, -2.0f), XMFLOAT3(10, 10, 10));
+        Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(-2.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
         Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(-1, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
 
 
@@ -381,7 +396,8 @@ void D3D12RaytracingProceduralGeometry::CreateGeometry() {
 void D3D12RaytracingProceduralGeometry::InitializeScene()
 {
     auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
-    CreateGeometry();
+    //CreateGeometry();
+    CreateSpheres();
     // Setup materials.
     {
         auto SetAttributes = [&](
@@ -416,12 +432,23 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
         UINT offset = 0;
         // Analytic primitives.
         {
+            float X = 1.0f;
             using namespace AnalyticPrimitive;
             for (Primitive& p : sceneObjects) {
                 PrimitiveConstantBuffer material = p.getMaterial();
-               // std::cout << p.getType() << std::endl;
-                //SetAttributes(offset + p.getType(),material.albedo, material.reflectanceCoef, material.refractiveCoef,  )
-               SetAttributes(offset + p.getType(), material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
+                 float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+                float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+                float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+                if (x < 0.1) {
+                    x = 0;
+                }
+                else if (y < 0.1) {
+                    y = 0;
+                }
+                XMFLOAT4 alb =  XMFLOAT4(x, y, z, 0);
+               // std::cout << p.getType() << std::endl; 
+             SetAttributes(offset + p.getType(), alb, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
+             // SetAttributes(offset + Spheres, material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
             }
             /*SetAttributes(offset + AABB, red);
             SetAttributes(offset + Spheres, ChromiumReflectance, 0.1f, 1.5, 0.6f,0.0f, 1);
@@ -430,10 +457,15 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
             SetAttributes(offset + Ellipsoid, ChromiumReflectance, 0.1f, 1.5, 0.6f, 0.0f, 1);
             SetAttributes(offset + Cylinder, ChromiumReflectance, 0.1f, 0, 0.6f, 0.0f, 1);
             */
-
-            offset += AnalyticPrimitive::Count;
+            
+           // offset += AnalyticPrimitive::Count;
         }
 
+
+        {
+            using namespace SignedDistancePrimitive;
+            //SetAttributes(offset + SignedDistancePrimitive::FractalPyramid, ChromiumReflectance, 0.0f, 0.0f, 1.0f, 0.0f, 1);
+        }
        
     }
 
@@ -482,6 +514,7 @@ void D3D12RaytracingProceduralGeometry::CreateConstantBuffers()
     auto frameCount = m_deviceResources->GetBackBufferCount();
 
     m_sceneCB.Create(device, frameCount, L"Scene Constant Buffer");
+    m_sceneCB->accumulatedFrames = 0;
 }
 
 // Create AABB primitive attributes buffers.
@@ -506,7 +539,8 @@ void D3D12RaytracingProceduralGeometry::CreateDeviceDependentResources()
     CreateRootSignatures();
 
     // Create a raytracing pipeline state object which defines the binding of shaders, state and resources to be used during raytracing.
-    createRayTracingPipeline_Two();
+    CreateRaytracingPipelineStateObject();
+    // createRayTracingPipeline_Two();
 
     // Create a heap for descriptors.
     CreateDescriptorHeap();
@@ -812,15 +846,17 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
                 basePosition.z + offsetIndex.z * stride.z + size.z,
             };
         };
-        m_aabbs.resize(IntersectionShaderType::TotalPrimitiveCount);
+        m_aabbs.resize(NUM_BLAS + 1);
         UINT offset = 0;
 
         // Analytic primitives.
         {
             using namespace AnalyticPrimitive;
             for (Primitive& p : sceneObjects) {
-                
-                m_aabbs[offset + p.getType()] = InitializeAABB(p.getIndex(), p.getSize());
+                //m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(rand() % 2, 1, rand() % 2), XMFLOAT3(6, 6, 6));
+                //offset++;
+               m_aabbs[offset + p.getType()] = InitializeAABB(p.getIndex(), p.getSize());
+               offset += 1;
             }
          /*   m_aabbs[offset + AABB] = InitializeAABB(XMINT3(3, 0, 1), XMFLOAT3(2, 3, 2));
             m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(2.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
@@ -828,7 +864,13 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
            // m_aabbs[offset + Hyperboloid] = InitializeAABB(XMFLOAT3(0, -1, 0), XMFLOAT3(4, 4, 4));
             m_aabbs[offset + Ellipsoid] = InitializeAABB(XMFLOAT3(0, 0, 0), XMFLOAT3(4, 4, 4));
             */
-            offset += AnalyticPrimitive::Count;
+          //  offset += AnalyticPrimitive::Count;
+        }
+        {
+            using namespace SignedDistancePrimitive;
+
+          //  m_aabbs[offset + FractalPyramid] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(6, 6, 6));
+
         }
 
      
@@ -1008,21 +1050,25 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
         XMMATRIX mTransform = mScale * mTranslation;  
         XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTransform);
     }
-
+    float X  = 10000;
     // Create instanced bottom-level AS with procedural geometry AABBs.
     // Instances share all the data, except for a transform.
     {
-        auto& instanceDesc = instanceDescs[BottomLevelASType::AABB];
-        instanceDesc = {};
-        instanceDesc.InstanceMask = 1;
-        
-        // Set hit group offset to beyond the shader records for the triangle AABB.
-        instanceDesc.InstanceContributionToHitGroupIndex = BottomLevelASType::AABB * RayType::Count;
-        instanceDesc.AccelerationStructure = bottomLevelASaddresses[BottomLevelASType::AABB];
+        for (int i = 0; i < NUM_BLAS - 1; i++) {
+            auto& instanceDesc = instanceDescs[BottomLevelASType::AABB + i];
+            instanceDesc = {};
+            instanceDesc.InstanceMask = 1;
 
-        // Move all AABBS above the ground plane.
-        XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(0, c_aabbWidth/2, 0)));
-        XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTranslation);
+            // Set hit group offset to beyond the shader records for the triangle AABB.
+            instanceDesc.InstanceContributionToHitGroupIndex = BottomLevelASType::AABB * RayType::Count;
+            instanceDesc.AccelerationStructure = bottomLevelASaddresses[(BottomLevelASType::AABB)];
+            float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+            float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+            float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+            // Move all AABBS above the ground plane.
+            XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(x, c_aabbWidth / 2,z)));
+            XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTranslation);
+        }
     }
     UINT64 bufferSize = static_cast<UINT64>(instanceDescs.size() * sizeof(instanceDescs[0]));
     AllocateUploadBuffer(device, instanceDescs.data(), bufferSize, &(*instanceDescsResource), L"InstanceDescs");
@@ -1282,7 +1328,6 @@ void D3D12RaytracingProceduralGeometry::BuildShaderTables()
 void D3D12RaytracingProceduralGeometry::OnKeyDown(UINT8 key)
 {
 
-    float speed = 0.2f;
     XMVECTOR perp_Pos = XMVector3Normalize(XMVector3Cross(m_front, m_up));
 
     switch (key)
@@ -1309,6 +1354,15 @@ void D3D12RaytracingProceduralGeometry::OnKeyDown(UINT8 key)
         break;
     case 'L': 
         m_animateLight = !m_animateLight;
+        break;
+    case 'I':
+        speed += 10.0f;
+        break;
+    case 'O':
+        speed -= 1;
+        if (speed < 0) {
+            speed = 0.1;
+        }
         break;
     }
 }

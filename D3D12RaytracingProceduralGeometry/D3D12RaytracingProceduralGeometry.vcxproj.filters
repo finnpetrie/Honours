@@ -128,8 +128,5 @@
     <FxCompile Include="Raytracing.hlsl">
       <Filter>Assets\Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Raytracing_Two.hlsl">
-      <Filter>Assets\Shaders\Util</Filter>
-    </FxCompile>
   </ItemGroup>
 </Project>

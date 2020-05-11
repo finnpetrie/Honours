@@ -19,6 +19,8 @@
 #include <dxcapi.h>
 #include <fstream>
 #include "Primitive.h"
+#include <tiny_obj_loader.h>
+
 class D3D12RaytracingProceduralGeometry : public DXSample
 {
 public:
@@ -45,10 +47,10 @@ private:
     static const UINT FrameCount = 3;
 
     // Constants.
-    const UINT NUM_BLAS = 2;          // Triangle + AABB bottom-level AS.
+    const UINT NUM_BLAS = 2000;          // Triangle + AABB bottom-level AS.
     const float c_aabbWidth = 2;      // AABB width.
     const float c_aabbDistance = 2;   // Distance between AABBs.
-    
+    float speed = 0.2f;
     // DirectX Raytracing (DXR) attributes
     ComPtr<ID3D12Device5> m_dxrDevice;
     ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList;
@@ -74,7 +76,6 @@ private:
     IDxcBlob* m_rayGenLibrary;
     // Geometry
     std::vector<Primitive> sceneObjects;
-
     D3DBuffer m_indexBuffer;
     D3DBuffer m_vertexBuffer;
     D3DBuffer m_aabbBuffer;
@@ -127,7 +128,8 @@ private:
 
     void UpdateCameraMatrices();
     void UpdateAABBPrimitiveAttributes(float animationTime);
-    void CreateGeometry();
+	void CreateSpheres();
+	void CreateGeometry();
     void InitializeScene();
     void RecreateD3D();
     void DoRaytracing();
