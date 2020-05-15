@@ -168,9 +168,9 @@ void D3D12RaytracingProceduralGeometry::createRayTracingPipeline_Two() {
     CD3DX12_STATE_OBJECT_DESC raytracingPipeline{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
     CreateDxilLibrarySubobject(&raytracingPipeline);
 
-    //auto lib = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+   auto lib = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
 
-    CComPtr<IDxcBlob> shader = compileShaders(L"RayTracing_Two.hlsl");
+    CComPtr<IDxcBlob> shader = compileShaders(L"Raytracing.hlsl");
 
 
 
@@ -181,7 +181,7 @@ void D3D12RaytracingProceduralGeometry::createRayTracingPipeline_Two() {
    // m_rayGenLibrary->Release();
 
 
-   //lib->SetDXILLibrary(&rayGenByte);
+   lib->SetDXILLibrary(&rayGenByte);
     //lib->SetDXILLibrary(&missByte);
     //lib->SetDXILLibrary(&hitByte);
     
@@ -281,6 +281,8 @@ void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float anim
     XMMATRIX mScale15y = XMMatrixScaling(1, 1.5, 1);
     XMMATRIX mScale15 = XMMatrixScaling(1.5, 1.5, 1.5);
     XMMATRIX mScaleHalf = XMMatrixScaling(0.2, 0.2, 0.2);
+    XMMATRIX mScaleTiny = XMMatrixScaling(0.05, 0.05, 0.05);
+
     XMMATRIX mScale2 = XMMatrixScaling(2, 2, 2);
     XMMATRIX mScale3 = XMMatrixScaling(3, 3, 3);
 
@@ -306,7 +308,7 @@ void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float anim
     {
         using namespace AnalyticPrimitive;
         for (Primitive& p : sceneObjects) {
-            SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
+            SetTransformForAABB(offset + p.getType(), mScaleTiny, mRotation);
         }
     /*   SetTransformForAABB(offset + AABB, mScale15y, mIdentity);
         SetTransformForAABB(offset + Spheres, mScale15, mRotation);
@@ -328,9 +330,12 @@ void D3D12RaytracingProceduralGeometry::CreateSpheres() {
         float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
         float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
         float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(x, y, z, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(x, y, z, 0), 1.5f, 1.5f, 1, 0.4f, 50, 1 };
 
-        Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0, 0, 0), XMFLOAT3(3, 3, 3));
+        Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0, 0, 0), XMFLOAT3(0.5
+            , 0.5
+            , 0.5
+        ));
         sceneObjects.push_back(sphere);
     }
 }
@@ -397,7 +402,15 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
 {
     auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
     //CreateGeometry();
-    CreateSpheres();
+   CreateSpheres();
+    //CreateGeometry();
+    cooridnates = new PlyFile("/Models/Head_AM/AM_Head.ply");
+   // cooridnates->translateToOrigin(cooridnates->centroid());
+    //because triangle geometry can't be stored in the procedural geometry BLAS, we add +1
+    NUM_BLAS = cooridnates->size() + 1;
+    //CreateSpheres();
+   
+
     // Setup materials.
     {
         auto SetAttributes = [&](
@@ -445,9 +458,9 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
                 else if (y < 0.1) {
                     y = 0;
                 }
-                XMFLOAT4 alb =  XMFLOAT4(x, y, z, 0);
+               // XMFLOAT4 alb =  XMFLOAT4(x, y, z, 0);
                // std::cout << p.getType() << std::endl; 
-             SetAttributes(offset + p.getType(), alb, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
+             SetAttributes(offset + p.getType(), material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
              // SetAttributes(offset + Spheres, material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
             }
             /*SetAttributes(offset + AABB, red);
@@ -540,7 +553,7 @@ void D3D12RaytracingProceduralGeometry::CreateDeviceDependentResources()
 
     // Create a raytracing pipeline state object which defines the binding of shaders, state and resources to be used during raytracing.
     CreateRaytracingPipelineStateObject();
-    // createRayTracingPipeline_Two();
+     //createRayTracingPipeline_Two();
 
     // Create a heap for descriptors.
     CreateDescriptorHeap();
@@ -846,7 +859,8 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
                 basePosition.z + offsetIndex.z * stride.z + size.z,
             };
         };
-        m_aabbs.resize(NUM_BLAS + 1);
+        //resize to number of actual geometry in the bottom level acceleration structure
+        m_aabbs.resize(20);
         UINT offset = 0;
 
         // Analytic primitives.
@@ -856,7 +870,7 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
                 //m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(rand() % 2, 1, rand() % 2), XMFLOAT3(6, 6, 6));
                 //offset++;
                m_aabbs[offset + p.getType()] = InitializeAABB(p.getIndex(), p.getSize());
-               offset += 1;
+               offset++;
             }
          /*   m_aabbs[offset + AABB] = InitializeAABB(XMINT3(3, 0, 1), XMFLOAT3(2, 3, 2));
             m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(2.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
@@ -864,10 +878,10 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
            // m_aabbs[offset + Hyperboloid] = InitializeAABB(XMFLOAT3(0, -1, 0), XMFLOAT3(4, 4, 4));
             m_aabbs[offset + Ellipsoid] = InitializeAABB(XMFLOAT3(0, 0, 0), XMFLOAT3(4, 4, 4));
             */
-          //  offset += AnalyticPrimitive::Count;
+          // offset += AnalyticPrimitive::Count;
         }
         {
-            using namespace SignedDistancePrimitive;
+           // using namespace SignedDistancePrimitive;
 
           //  m_aabbs[offset + FractalPyramid] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(6, 6, 6));
 
@@ -876,13 +890,209 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
      
         AllocateUploadBuffer(device, m_aabbs.data(), m_aabbs.size()*sizeof(m_aabbs[0]), &m_aabbBuffer.resource);
     }
+}/*
+* Create the vertex buffer.
+*
+void Create_Vertex_Buffer(D3D12Global& d3d, D3D12Resources& resources, Model& model)
+{
+    // Create the vertex buffer resource
+    D3D12BufferCreateInfo info(((UINT)model.vertices.size() * sizeof(Vertex)), D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ);
+    Create_Buffer(d3d, info, &resources.vertexBuffer);
+#if NAME_D3D_RESOURCES
+    resources.vertexBuffer->SetName(L"Vertex Buffer");
+#endif
+
+    // Copy the vertex data to the vertex buffer
+    UINT8* pVertexDataBegin;
+    D3D12_RANGE readRange = {};
+    HRESULT hr = resources.vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin));
+    Utils::Validate(hr, L"Error: failed to map vertex buffer!");
+
+    memcpy(pVertexDataBegin, model.vertices.data(), info.size);
+    resources.vertexBuffer->Unmap(0, nullptr);
+
+    // Initialize the vertex buffer view
+    resources.vertexBufferView.BufferLocation = resources.vertexBuffer->GetGPUVirtualAddress();
+    resources.vertexBufferView.StrideInBytes = sizeof(Vertex);
+    resources.vertexBufferView.SizeInBytes = static_cast<UINT>(info.size);
+}*/
+
+
+
+void D3D12RaytracingProceduralGeometry::Create_Vertex_Buffer(ID3D12Resource** ppResource) {
+
+    UINT size = static_cast<UINT>(mesh->vertices.size() * sizeof(Vertex));
+    auto device = m_deviceResources->GetD3DDevice();
+    D3D12_HEAP_PROPERTIES heapDesc = {};
+    heapDesc.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapDesc.CreationNodeMask = 1;
+    heapDesc.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Height = 1;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDesc.Width = size;
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    ThrowIfFailed(device->CreateCommittedResource(&heapDesc, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(ppResource)));
+    (*ppResource)->SetName(L"Vertex Buffer");
+    UINT8* pVertexDataBegin;
+    D3D12_RANGE readRange = {};
+    ThrowIfFailed((*ppResource)->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
+    memcpy(pVertexDataBegin, mesh->vertices.data(), size);
+    (*ppResource)->Unmap(0, nullptr);
+
+    D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
+    vertexBufferView.BufferLocation = (*ppResource)->GetGPUVirtualAddress();
+    vertexBufferView.StrideInBytes = sizeof(Vertex);
+    vertexBufferView.SizeInBytes = size;
+
+
+}
+
+/**
+inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, ID3D12Resource** ppResource, const wchar_t* resourceName = nullptr)
+{
+    auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(datasize);
+    ThrowIfFailed(pDevice->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(ppResource)));
+    if (resourceName)
+    {
+        (*ppResource)->SetName(resourceName);
+    }
+    void* pMappedData;
+    (*ppResource)->Map(0, nullptr, &pMappedData);
+    memcpy(pMappedData, pData, datasize);
+    (*ppResource)->Unmap(0, nullptr);
+}*/
+
+
+void D3D12RaytracingProceduralGeometry::Create_Index_Buffer(ID3D12Resource **ppResource) {
+    UINT size = static_cast<UINT>(mesh->indices.size() * sizeof(UINT));
+    auto device = m_deviceResources->GetD3DDevice();
+    D3D12_HEAP_PROPERTIES heapDesc = {};
+    heapDesc.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapDesc.CreationNodeMask = 1;
+    heapDesc.VisibleNodeMask = 1;
+
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Height = 1;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDesc.Width = size;
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    ThrowIfFailed(device->CreateCommittedResource(&heapDesc, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(ppResource)));
+    (*ppResource)->SetName(L"Index Buffer");
+
+    UINT8* pIndexDataBegin;
+    D3D12_RANGE readRange = {};
+    HRESULT hr = (*ppResource)->Map(0, &readRange, reinterpret_cast<void**>(&pIndexDataBegin));
+    ThrowIfFailed(hr);
+    memcpy(pIndexDataBegin, mesh->indices.data(), size);
+    (*ppResource)->Unmap(0, nullptr);
+    
+    indexBufferView = {};
+    indexBufferView.BufferLocation = (*ppResource)->GetGPUVirtualAddress();
+    indexBufferView.SizeInBytes = static_cast<UINT>(size);
+    indexBufferView.Format = DXGI_FORMAT_R32_UINT;   
+    
+    }
+
+void D3D12RaytracingProceduralGeometry::BuildMeshes() {
+    auto device = m_deviceResources->GetD3DDevice();
+    mesh = new ObjFile("/Models/cube.obj");
+    //Vertex 
+    
+  /*  Create_Vertex_Buffer(&m_vertexBuffer.resource);
+    Create_Index_Buffer(&m_indexBuffer.resource);
+
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = m_descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+    UINT handleIncrement = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC indexSRVDesc;
+    indexSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    indexSRVDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+    indexSRVDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+    indexSRVDesc.Buffer.StructureByteStride = 0;
+    indexSRVDesc.Buffer.FirstElement = 0;
+    indexSRVDesc.Buffer.NumElements = (static_cast<UINT>(mesh->indices.size()) * sizeof(UINT)) / sizeof(float);
+    indexSRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    
+    handle.ptr += handleIncrement;
+    device->CreateShaderResourceView(m_indexBuffer.resource.Get(), &indexSRVDesc, handle);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC vertexSRVDesc;
+    vertexSRVDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    vertexSRVDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+    vertexSRVDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+    vertexSRVDesc.Buffer.StructureByteStride = 0;
+    vertexSRVDesc.Buffer.FirstElement = 0;
+    vertexSRVDesc.Buffer.NumElements = (static_cast<UINT>(mesh->vertices.size()) * sizeof(Vertex)) / sizeof(float);
+    vertexSRVDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    handle.ptr += handleIncrement;
+    device->CreateShaderResourceView(m_vertexBuffer.resource.Get(), &vertexSRVDesc, handle);
+    */
+
+    /*
+    std::vector<Vertex_Index> index =
+    {
+        3,1,0,
+        2,1,3,
+
+    };
+    std::vector<Vertex> v = {
+        { XMFLOAT3(0.0f, -5.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, -5.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, -5.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(0.0f, -5.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+    };
+
+
+    UINT size = static_cast<UINT>(v.size() * sizeof(Vertex));
+    UINT i_size = static_cast<UINT>(index.size()) * sizeof(UINT);
+    AllocateUploadBuffer(device, index.data(), i_size, &m_indexBuffer.resource);
+    AllocateUploadBuffer(device, v.data(), size, &m_vertexBuffer.resource);
+    // Vertex buffer is passed to the shader along with index buffer as a descriptor range.
+    UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, i_size/sizeof(float), 0);
+    UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, v.size(), sizeof(v[0]));
+    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
+    */ 
+    
+    UINT size = static_cast<UINT>(mesh->vertices.size() * sizeof(Vertex));
+    UINT i_size = static_cast<UINT>(mesh->indices.size()) * sizeof(UINT);
+    AllocateUploadBuffer(device, mesh->indices.data(), i_size, &m_indexBuffer.resource);
+    AllocateUploadBuffer(device, mesh->vertices.data(), size, &m_vertexBuffer.resource);
+    // Vertex buffer is passed to the shader along with index buffer as a descriptor range.
+    UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, mesh->indices.size(), 0);
+    UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, mesh->vertices.size(), sizeof(mesh->vertices[0]));
+    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
 }
 
 void D3D12RaytracingProceduralGeometry::BuildPlaneGeometry()
 {
     auto device = m_deviceResources->GetD3DDevice();
     // Plane indices.
-    Index indices[] =
+    Vertex_Index indices[] =
     {
         3,1,0,
         2,1,3,
@@ -892,10 +1102,10 @@ void D3D12RaytracingProceduralGeometry::BuildPlaneGeometry()
     // Cube vertices positions and corresponding triangle normals.
     Vertex vertices[] =
     {
-        { XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, 0.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(0.0f, 0.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(0.0f, -5.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, -5.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, -5.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(0.0f, -5.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
     };
 
     AllocateUploadBuffer(device, indices, sizeof(indices), &m_indexBuffer.resource);
@@ -904,14 +1114,15 @@ void D3D12RaytracingProceduralGeometry::BuildPlaneGeometry()
     // Vertex buffer is passed to the shader along with index buffer as a descriptor range.
     UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, sizeof(indices) / 4, 0);
     UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, ARRAYSIZE(vertices), sizeof(vertices[0]));
-    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Index Buffer descriptor index");
+    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
 }
 
 // Build geometry used in the sample.
 void D3D12RaytracingProceduralGeometry::BuildGeometry()
 {
     BuildProceduralGeometryAABBs();
-    BuildPlaneGeometry();
+   BuildMeshes();
+    // BuildPlaneGeometry();
 }
 
 // Build geometry descs for bottom-level AS.
@@ -933,13 +1144,15 @@ void D3D12RaytracingProceduralGeometry::BuildGeometryDescsForBottomLevelAS(array
         geometryDesc = {};
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
         geometryDesc.Triangles.IndexBuffer = m_indexBuffer.resource->GetGPUVirtualAddress();
-        geometryDesc.Triangles.IndexCount = static_cast<UINT>(m_indexBuffer.resource->GetDesc().Width) / sizeof(Index);
+        geometryDesc.Triangles.IndexCount = static_cast<UINT>(m_indexBuffer.resource->GetDesc().Width) / sizeof(Vertex_Index);
         geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
         geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
         geometryDesc.Triangles.VertexCount = static_cast<UINT>(m_vertexBuffer.resource->GetDesc().Width) / sizeof(Vertex);
         geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer.resource->GetGPUVirtualAddress();
         geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
         geometryDesc.Flags = geometryFlags;
+
+        //Loaded mesh geometry
     }
 
     // AABB geometry desc
@@ -1021,7 +1234,7 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
     auto device = m_deviceResources->GetD3DDevice();
     
     vector<InstanceDescType> instanceDescs;
-    instanceDescs.resize(NUM_BLAS);
+    instanceDescs.resize(NUM_BLAS + 1);
 
     // Width of a bottom-level AS geometry.
     // Make the plane a little larger than the actual number of primitives in each dimension.
@@ -1045,15 +1258,18 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
         const XMVECTOR vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 0.0f, -0.35f));
         
         // Scale in XZ dimensions.
-        XMMATRIX mScale = XMMatrixScaling(fWidth.x, fWidth.y, fWidth.z);
-        XMMATRIX mTranslation = XMMatrixTranslationFromVector(vBasePosition);
-        XMMATRIX mTransform = mScale * mTranslation;  
+       // XMMATRIX mScale = XMMatrixScaling(fWidth.x, fWidth.y, fWidth.z);
+        XMMATRIX mScale = XMMatrixScaling(1, 1, 1);
+
+        //XMMATRIX mTranslation = XMMatrixTranslationFromVector(vBasePosition);
+        XMMATRIX mTransform = mScale;  
         XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTransform);
     }
-    float X  = 10000;
+    float X  = 10;
     // Create instanced bottom-level AS with procedural geometry AABBs.
     // Instances share all the data, except for a transform.
     {
+        //we only iterate over the n-1 bottom level acc. structs, since triangle geomtry is a struct of its own.
         for (int i = 0; i < NUM_BLAS - 1; i++) {
             auto& instanceDesc = instanceDescs[BottomLevelASType::AABB + i];
             instanceDesc = {};
@@ -1062,11 +1278,18 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
             // Set hit group offset to beyond the shader records for the triangle AABB.
             instanceDesc.InstanceContributionToHitGroupIndex = BottomLevelASType::AABB * RayType::Count;
             instanceDesc.AccelerationStructure = bottomLevelASaddresses[(BottomLevelASType::AABB)];
-            float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+           /*float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
             float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-            float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+            float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));*/
+           
+           Vertex_Ply coord = cooridnates->getPointAt(i);
+           
+           float x = 100*coord.location.x();
+           float y = 100*coord.location.y();
+           float z = 100*coord.location.z();
+            
             // Move all AABBS above the ground plane.
-            XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(x, c_aabbWidth / 2,z)));
+            XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(x, y, z)));
             XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTranslation);
         }
     }
@@ -1356,10 +1579,10 @@ void D3D12RaytracingProceduralGeometry::OnKeyDown(UINT8 key)
         m_animateLight = !m_animateLight;
         break;
     case 'I':
-        speed += 10.0f;
+        speed += 1.0f;
         break;
     case 'O':
-        speed -= 1;
+        speed -= 1.0f;
         if (speed < 0) {
             speed = 0.1;
         }
@@ -1697,7 +1920,7 @@ UINT D3D12RaytracingProceduralGeometry::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_
 }
 
 // Create a SRV for a buffer.
-UINT D3D12RaytracingProceduralGeometry::CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize)
+UINT D3D12RaytracingProceduralGeometry::CreateBufferSRV(D3DBuffer* buffer, uint32_t numElements, UINT elementSize)
 {
     auto device = m_deviceResources->GetD3DDevice();
 

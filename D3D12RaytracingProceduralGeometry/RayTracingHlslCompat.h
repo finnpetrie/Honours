@@ -1,13 +1,3 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
 
 #ifndef RAYTRACINGHLSLCOMPAT_H
 #define RAYTRACINGHLSLCOMPAT_H
@@ -26,7 +16,7 @@
 using namespace DirectX;
 
 // Shader will use byte encoding to access vertex indices.
-typedef UINT16 Index;
+typedef UINT16 Vertex_Index;
 #endif
 
 // Number of metaballs to use within an AABB.
@@ -151,7 +141,7 @@ namespace TraceRayParameters
 static const XMFLOAT4 ChromiumReflectance = XMFLOAT4(0.549f, 0.556f, 0.554f, 1.0f);
 
 //static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
-static const XMFLOAT4 BackgroundColor = XMFLOAT4(0, 0, 0, 1.0f);
+static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
 
 static const float InShadowRadiance = 0.35f;
 

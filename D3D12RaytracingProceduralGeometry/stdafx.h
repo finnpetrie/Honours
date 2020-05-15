@@ -45,9 +45,9 @@
 
 #include <DirectXMath.h>
 
-#ifdef _DEBUG
+//#ifdef _DEBUG
 #include <dxgidebug.h>
-#endif
+//#endif
 
 #include "DXSampleHelper.h"
 #include "DeviceResources.h"

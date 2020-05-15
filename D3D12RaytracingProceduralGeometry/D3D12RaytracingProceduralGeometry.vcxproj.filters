@@ -90,6 +90,15 @@
     <ClInclude Include="Quadric.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ObjFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PlyFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -119,14 +128,24 @@
     <ClCompile Include="D3D12RaytracingProceduralGeometry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="readme.md" />
-    <None Include="packages.config" />
+    <ClCompile Include="ObjFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PlyFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Raytracing.hlsl">
       <Filter>Assets\Shaders</Filter>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="PathTracing.hlsl">
+      <Filter>Assets\Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
