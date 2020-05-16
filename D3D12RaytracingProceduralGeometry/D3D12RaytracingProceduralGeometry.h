@@ -19,7 +19,7 @@
 #include <dxcapi.h>
 #include <fstream>
 #include "Primitive.h"
-#include "ObjFile.h"
+
 #include "PlyFile.h"
 class D3D12RaytracingProceduralGeometry : public DXSample
 {
@@ -76,11 +76,13 @@ private:
     IDxcBlob* m_rayGenLibrary;
     // Geometry
     PlyFile* cooridnates;
-    ObjFile* mesh;
+    //ObjFile* mesh;
     std::vector<Primitive> sceneObjects;
     D3DBuffer m_indexBuffer;
     D3DBuffer m_vertexBuffer;
     D3DBuffer m_aabbBuffer;
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
     D3D12_INDEX_BUFFER_VIEW indexBufferView;
 
 

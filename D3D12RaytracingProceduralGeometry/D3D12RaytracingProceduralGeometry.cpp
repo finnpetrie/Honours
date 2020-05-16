@@ -13,7 +13,8 @@
 #include "D3D12RaytracingProceduralGeometry.h"
 #include "CompiledShaders\Raytracing.hlsl.h"
 #include <iostream>
-
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
 using namespace std;
 using namespace DX;
 
@@ -920,7 +921,7 @@ void Create_Vertex_Buffer(D3D12Global& d3d, D3D12Resources& resources, Model& mo
 
 
 void D3D12RaytracingProceduralGeometry::Create_Vertex_Buffer(ID3D12Resource** ppResource) {
-
+/**
     UINT size = static_cast<UINT>(mesh->vertices.size() * sizeof(Vertex));
     auto device = m_deviceResources->GetD3DDevice();
     D3D12_HEAP_PROPERTIES heapDesc = {};
@@ -954,7 +955,7 @@ void D3D12RaytracingProceduralGeometry::Create_Vertex_Buffer(ID3D12Resource** pp
     vertexBufferView.StrideInBytes = sizeof(Vertex);
     vertexBufferView.SizeInBytes = size;
 
-
+    */
 }
 
 /**
@@ -981,7 +982,7 @@ inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 data
 
 
 void D3D12RaytracingProceduralGeometry::Create_Index_Buffer(ID3D12Resource **ppResource) {
-    UINT size = static_cast<UINT>(mesh->indices.size() * sizeof(UINT));
+  /*  UINT size = static_cast<UINT>(mesh->indices.size() * sizeof(UINT));
     auto device = m_deviceResources->GetD3DDevice();
     D3D12_HEAP_PROPERTIES heapDesc = {};
     heapDesc.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -1015,12 +1016,44 @@ void D3D12RaytracingProceduralGeometry::Create_Index_Buffer(ID3D12Resource **ppR
     indexBufferView.BufferLocation = (*ppResource)->GetGPUVirtualAddress();
     indexBufferView.SizeInBytes = static_cast<UINT>(size);
     indexBufferView.Format = DXGI_FORMAT_R32_UINT;   
-    
+    */
     }
 
+void LoadModel(std::string filepath, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) {
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string err, warn;
+
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filepath.c_str()))
+    {
+        throw std::runtime_error(err);
+    }
+    uint32_t i = 0;
+    for (const auto &shape : shapes) {
+        for (const auto& index : shape.mesh.indices) {
+            Vertex v{};
+            v.position = {
+                attrib.vertices[3 * index.vertex_index + 0],
+                attrib.vertices[3 * index.vertex_index + 1],
+                attrib.vertices[3 * index.vertex_index + 2]
+            };
+            v.normal = {
+                attrib.normals[3 * index.normal_index + 0],
+                attrib.normals[3 * index.normal_index + 1],
+                attrib.normals[3 * index.normal_index + 2]
+            };
+            vertices.push_back(v);
+            indices.push_back(i);
+            i++;
+        }
+    }
+}
 void D3D12RaytracingProceduralGeometry::BuildMeshes() {
     auto device = m_deviceResources->GetD3DDevice();
-    mesh = new ObjFile("/Models/cube.obj");
+
+    LoadModel("/Models/cube.obj", vertices, indices);
+   // mesh = new ObjFile("\Models\\cube.obj");
     //Vertex 
     
   /*  Create_Vertex_Buffer(&m_vertexBuffer.resource);
@@ -1076,17 +1109,18 @@ void D3D12RaytracingProceduralGeometry::BuildMeshes() {
     UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, i_size/sizeof(float), 0);
     UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, v.size(), sizeof(v[0]));
     ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
-    */ 
+    */
     
-    UINT size = static_cast<UINT>(mesh->vertices.size() * sizeof(Vertex));
-    UINT i_size = static_cast<UINT>(mesh->indices.size()) * sizeof(UINT);
-    AllocateUploadBuffer(device, mesh->indices.data(), i_size, &m_indexBuffer.resource);
-    AllocateUploadBuffer(device, mesh->vertices.data(), size, &m_vertexBuffer.resource);
+    UINT size = static_cast<UINT>(vertices.size() * sizeof(Vertex));
+    UINT i_size = static_cast<UINT>(indices.size()) * sizeof(UINT32);
+    AllocateUploadBuffer(device,indices.data(), i_size, &m_indexBuffer.resource);
+    AllocateUploadBuffer(device, vertices.data(), size, &m_vertexBuffer.resource);
     // Vertex buffer is passed to the shader along with index buffer as a descriptor range.
-    UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, mesh->indices.size(), 0);
-    UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, mesh->vertices.size(), sizeof(mesh->vertices[0]));
+    UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, indices.size(), 0);
+    UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, vertices.size(), sizeof(vertices[0]));
     ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
-}
+    
+    }
 
 void D3D12RaytracingProceduralGeometry::BuildPlaneGeometry()
 {
@@ -1121,7 +1155,7 @@ void D3D12RaytracingProceduralGeometry::BuildPlaneGeometry()
 void D3D12RaytracingProceduralGeometry::BuildGeometry()
 {
     BuildProceduralGeometryAABBs();
-   BuildMeshes();
+    BuildMeshes();
     // BuildPlaneGeometry();
 }
 
@@ -1145,7 +1179,7 @@ void D3D12RaytracingProceduralGeometry::BuildGeometryDescsForBottomLevelAS(array
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
         geometryDesc.Triangles.IndexBuffer = m_indexBuffer.resource->GetGPUVirtualAddress();
         geometryDesc.Triangles.IndexCount = static_cast<UINT>(m_indexBuffer.resource->GetDesc().Width) / sizeof(Vertex_Index);
-        geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
+        geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
         geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
         geometryDesc.Triangles.VertexCount = static_cast<UINT>(m_vertexBuffer.resource->GetDesc().Width) / sizeof(Vertex);
         geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer.resource->GetGPUVirtualAddress();

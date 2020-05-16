@@ -2,6 +2,7 @@
 #include "ObjFile.h"
 #include <iostream>
 #include <unordered_map>
+#define TINYOBJLOADER_IMPLEMENTATION
 
 
 
@@ -18,11 +19,21 @@ ObjFile::ObjFile(std::string path) : MODEL_PATH(path)
 
 	for (const auto& shape : shapes) {
 		for (const auto& index : shape.mesh.indices) {
-			size_t i = (size_t)3 * index.vertex_index;
-			XMFLOAT3 vertex = XMFLOAT3(attrib.vertices[i + 0], attrib.vertices[i + 1], attrib.vertices[i + 2]);
-			XMFLOAT3 normal = XMFLOAT3(attrib.normals[i + 0], attrib.normals[i + 1], attrib.normals[i + 2]);
-			Vertex v = { vertex, normal };
-			vertices.push_back(v);
+			Vertex vertex{};
+			vertex.position = {
+			attrib.vertices[3 * index.vertex_index + 2],
+			attrib.vertices[3 * index.vertex_index + 1],
+			attrib.vertices[3 * index.vertex_index + 0]
+			};
+			vertex.normal = {
+				attrib.normals[3 * index.normal_index + 2],
+				attrib.normals[3 * index.normal_index + 1],
+				attrib.normals[3 * index.normal_index + 0]
+			};
+			//XMFLOAT3 vertex = XMFLOAT3(attrib.vertices[3*index.vertex_index + 0], attrib.vertices[3*index.vertex_index + 1], attrib.vertices[3*index.vertex_index + 2]);
+			
+			//Vertex v = { vertex, normal };
+			vertices.push_back(vertex);
 			indices.push_back(indices.size());
 
 		}

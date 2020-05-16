@@ -163,7 +163,6 @@
     <ClInclude Include="AnalyticPrimitives.hlsli" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="DirectXRaytracingHelper.h" />
-    <ClInclude Include="ObjFile.h" />
     <ClInclude Include="PlyFile.h" />
     <ClInclude Include="Primitive.h" />
     <ClInclude Include="Quadric.h" />
@@ -178,6 +177,7 @@
     <ClInclude Include="SignedDistanceFractals.hlsli" />
     <ClInclude Include="SignedDistancePrimitives.hlsli" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="tiny_obj_loader.h" />
     <ClInclude Include="util\DeviceResources.h" />
     <ClInclude Include="util\DXSample.h" />
     <ClInclude Include="util\DXSampleHelper.h" />
@@ -191,7 +191,6 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="D3D12RaytracingProceduralGeometry.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="ObjFile.cpp" />
     <ClCompile Include="PlyFile.cpp" />
     <ClCompile Include="Primitive.cpp" />
     <ClCompile Include="Quadric.cpp" />

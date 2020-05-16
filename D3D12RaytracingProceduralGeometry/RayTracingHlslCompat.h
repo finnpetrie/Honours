@@ -16,7 +16,7 @@
 using namespace DirectX;
 
 // Shader will use byte encoding to access vertex indices.
-typedef UINT16 Vertex_Index;
+typedef UINT32 Vertex_Index;
 #endif
 
 // Number of metaballs to use within an AABB.
@@ -140,8 +140,8 @@ namespace TraceRayParameters
 // From: http://blog.selfshadow.com/publications/s2015-shading-course/hoffman/s2015_pbs_physics_math_slides.pdf
 static const XMFLOAT4 ChromiumReflectance = XMFLOAT4(0.549f, 0.556f, 0.554f, 1.0f);
 
-//static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
-static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
+static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
+//static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
 
 static const float InShadowRadiance = 0.35f;
 
