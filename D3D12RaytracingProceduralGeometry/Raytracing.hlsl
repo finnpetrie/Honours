@@ -320,7 +320,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     }
   
 
-      if(l_materialCB.reflectanceCoef < 0){
+      if(l_materialCB.reflectanceCoef > 0){
         Ray r = { HitWorldPosition(), reflect(WorldRayDirection(), triangleNormal) };
         reflectionColour = TraceRadianceRay(r, rayPayload);
 

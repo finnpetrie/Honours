@@ -21,6 +21,7 @@
 #include "Primitive.h"
 #include "Camera.h"
 #include "PlyFile.h"
+#include "Scene.h"
 class D3D12RaytracingProceduralGeometry : public DXSample
 {
 public:
@@ -50,7 +51,6 @@ private:
     UINT NUM_BLAS = 100000;          // Triangle + AABB bottom-level AS.
     const float c_aabbWidth = 2;      // AABB width.
     const float c_aabbDistance = 2;   // Distance between AABBs.
-    float speed = 0.2f;
 
     Camera* camera;
     // DirectX Raytracing (DXR) attributes
@@ -78,6 +78,8 @@ private:
     IDxcBlob* m_rayGenLibrary;
     // Geometry
     PlyFile* cooridnates;
+
+    Scene* scene;
     //ObjFile* mesh;
     std::vector<Primitive> sceneObjects;
     D3DBuffer m_indexBuffer;
@@ -148,8 +150,7 @@ private:
     void CreateRaytracingOutputResource();
     void BuildProceduralGeometryAABBs();
     void BuildGeometry();
-    void Create_Vertex_Buffer(ID3D12Resource** ppResource);
-    void Create_Index_Buffer(ID3D12Resource** ppResource);
+    
     void BuildMeshes();
     void BuildPlaneGeometry();
     void BuildGeometryDescsForBottomLevelAS(std::array<std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>, BottomLevelASType::Count>& geometryDescs);

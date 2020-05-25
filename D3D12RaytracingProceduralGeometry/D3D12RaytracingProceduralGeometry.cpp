@@ -244,8 +244,9 @@ void D3D12RaytracingProceduralGeometry::OnInit()
     m_deviceResources->CreateDeviceResources();
     m_deviceResources->CreateWindowSizeDependentResources();
 
-    InitializeScene();
-
+    //InitializeScene();
+    scene = new Scene(m_deviceResources);
+    scene->Init(m_aspectRatio);
     CreateDeviceDependentResources();
     CreateWindowSizeDependentResources();
 
@@ -533,14 +534,16 @@ void D3D12RaytracingProceduralGeometry::CreateDeviceDependentResources()
     // Build geometry to be used in the sample.
     BuildGeometry();
 
+
     // Build raytracing acceleration structures from the generated geometry.
     BuildAccelerationStructures();
 
     // Create constant buffers for the geometry and the scene.
-    CreateConstantBuffers();
+    //CreateConstantBuffers();
 
     // Create AABB primitive attribute buffers.
-    CreateAABBPrimitiveAttributesBuffers();
+    scene->CreateAABBPrimitiveAttributesBuffers(m_deviceResources);
+    // CreateAABBPrimitiveAttributesBuffers();
 
     // Build shader tables, which define shaders and their local root arguments.
     BuildShaderTables();
@@ -862,133 +865,8 @@ void D3D12RaytracingProceduralGeometry::BuildProceduralGeometryAABBs()
      
         AllocateUploadBuffer(device, m_aabbs.data(), m_aabbs.size()*sizeof(m_aabbs[0]), &m_aabbBuffer.resource);
     }
-}/*
-* Create the vertex buffer.
-*
-void Create_Vertex_Buffer(D3D12Global& d3d, D3D12Resources& resources, Model& model)
-{
-    // Create the vertex buffer resource
-    D3D12BufferCreateInfo info(((UINT)model.vertices.size() * sizeof(Vertex)), D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ);
-    Create_Buffer(d3d, info, &resources.vertexBuffer);
-#if NAME_D3D_RESOURCES
-    resources.vertexBuffer->SetName(L"Vertex Buffer");
-#endif
-
-    // Copy the vertex data to the vertex buffer
-    UINT8* pVertexDataBegin;
-    D3D12_RANGE readRange = {};
-    HRESULT hr = resources.vertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin));
-    Utils::Validate(hr, L"Error: failed to map vertex buffer!");
-
-    memcpy(pVertexDataBegin, model.vertices.data(), info.size);
-    resources.vertexBuffer->Unmap(0, nullptr);
-
-    // Initialize the vertex buffer view
-    resources.vertexBufferView.BufferLocation = resources.vertexBuffer->GetGPUVirtualAddress();
-    resources.vertexBufferView.StrideInBytes = sizeof(Vertex);
-    resources.vertexBufferView.SizeInBytes = static_cast<UINT>(info.size);
-}*/
-
-
-
-void D3D12RaytracingProceduralGeometry::Create_Vertex_Buffer(ID3D12Resource** ppResource) {
-/**
-    UINT size = static_cast<UINT>(mesh->vertices.size() * sizeof(Vertex));
-    auto device = m_deviceResources->GetD3DDevice();
-    D3D12_HEAP_PROPERTIES heapDesc = {};
-    heapDesc.Type = D3D12_HEAP_TYPE_UPLOAD;
-    heapDesc.CreationNodeMask = 1;
-    heapDesc.VisibleNodeMask = 1;
-
-    D3D12_RESOURCE_DESC resourceDesc = {};
-    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resourceDesc.Alignment = 0;
-    resourceDesc.Height = 1;
-    resourceDesc.DepthOrArraySize = 1;
-    resourceDesc.MipLevels = 1;
-    resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-    resourceDesc.SampleDesc.Count = 1;
-    resourceDesc.SampleDesc.Quality = 0;
-    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    resourceDesc.Width = size;
-    resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    ThrowIfFailed(device->CreateCommittedResource(&heapDesc, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(ppResource)));
-    (*ppResource)->SetName(L"Vertex Buffer");
-    UINT8* pVertexDataBegin;
-    D3D12_RANGE readRange = {};
-    ThrowIfFailed((*ppResource)->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
-    memcpy(pVertexDataBegin, mesh->vertices.data(), size);
-    (*ppResource)->Unmap(0, nullptr);
-
-    D3D12_VERTEX_BUFFER_VIEW vertexBufferView = {};
-    vertexBufferView.BufferLocation = (*ppResource)->GetGPUVirtualAddress();
-    vertexBufferView.StrideInBytes = sizeof(Vertex);
-    vertexBufferView.SizeInBytes = size;
-
-    */
 }
 
-/**
-inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, ID3D12Resource** ppResource, const wchar_t* resourceName = nullptr)
-{
-    auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-    auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(datasize);
-    ThrowIfFailed(pDevice->CreateCommittedResource(
-        &uploadHeapProperties,
-        D3D12_HEAP_FLAG_NONE,
-        &bufferDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ,
-        nullptr,
-        IID_PPV_ARGS(ppResource)));
-    if (resourceName)
-    {
-        (*ppResource)->SetName(resourceName);
-    }
-    void* pMappedData;
-    (*ppResource)->Map(0, nullptr, &pMappedData);
-    memcpy(pMappedData, pData, datasize);
-    (*ppResource)->Unmap(0, nullptr);
-}*/
-
-
-void D3D12RaytracingProceduralGeometry::Create_Index_Buffer(ID3D12Resource **ppResource) {
-  /*  UINT size = static_cast<UINT>(mesh->indices.size() * sizeof(UINT));
-    auto device = m_deviceResources->GetD3DDevice();
-    D3D12_HEAP_PROPERTIES heapDesc = {};
-    heapDesc.Type = D3D12_HEAP_TYPE_UPLOAD;
-    heapDesc.CreationNodeMask = 1;
-    heapDesc.VisibleNodeMask = 1;
-
-    D3D12_RESOURCE_DESC resourceDesc = {};
-    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    resourceDesc.Alignment = 0;
-    resourceDesc.Height = 1;
-    resourceDesc.DepthOrArraySize = 1;
-    resourceDesc.MipLevels = 1;
-    resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
-    resourceDesc.SampleDesc.Count = 1;
-    resourceDesc.SampleDesc.Quality = 0;
-    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    resourceDesc.Width = size;
-    resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-    ThrowIfFailed(device->CreateCommittedResource(&heapDesc, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(ppResource)));
-    (*ppResource)->SetName(L"Index Buffer");
-
-    UINT8* pIndexDataBegin;
-    D3D12_RANGE readRange = {};
-    HRESULT hr = (*ppResource)->Map(0, &readRange, reinterpret_cast<void**>(&pIndexDataBegin));
-    ThrowIfFailed(hr);
-    memcpy(pIndexDataBegin, mesh->indices.data(), size);
-    (*ppResource)->Unmap(0, nullptr);
-    
-    indexBufferView = {};
-    indexBufferView.BufferLocation = (*ppResource)->GetGPUVirtualAddress();
-    indexBufferView.SizeInBytes = static_cast<UINT>(size);
-    indexBufferView.Format = DXGI_FORMAT_R32_UINT;   
-    */
-    }
 
 void LoadModel(std::string filepath, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) {
     tinyobj::attrib_t attrib;
@@ -1126,7 +1004,9 @@ void D3D12RaytracingProceduralGeometry::BuildPlaneGeometry()
 // Build geometry used in the sample.
 void D3D12RaytracingProceduralGeometry::BuildGeometry()
 {
-    BuildProceduralGeometryAABBs();
+
+    scene->BuildProceduralGeometryAABBs(m_deviceResources);
+  //  BuildProceduralGeometryAABBs();
     BuildMeshes();
     // BuildPlaneGeometry();
 }
@@ -1178,7 +1058,7 @@ void D3D12RaytracingProceduralGeometry::BuildGeometryDescsForBottomLevelAS(array
         for (UINT i = 0; i < IntersectionShaderType::TotalPrimitiveCount; i++)
         {
             auto& geometryDesc = geometryDescs[BottomLevelASType::AABB][i];
-            geometryDesc.AABBs.AABBs.StartAddress = m_aabbBuffer.resource->GetGPUVirtualAddress() + i * sizeof(D3D12_RAYTRACING_AABB);
+            geometryDesc.AABBs.AABBs.StartAddress = scene->getAABB()->resource->GetGPUVirtualAddress() + i * sizeof(D3D12_RAYTRACING_AABB);
         }
     }
 }
@@ -1240,7 +1120,7 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
     auto device = m_deviceResources->GetD3DDevice();
     
     vector<InstanceDescType> instanceDescs;
-    instanceDescs.resize(NUM_BLAS + 1);
+    instanceDescs.resize(scene->NUM_BLAS + 1);
 
     // Width of a bottom-level AS geometry.
     // Make the plane a little larger than the actual number of primitives in each dimension.
@@ -1276,7 +1156,7 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
     // Instances share all the data, except for a transform.
     {
         //we only iterate over the n-1 bottom level acc. structs, since triangle geomtry is a struct of its own.
-        for (int i = 0; i < NUM_BLAS - 1; i++) {
+        for (int i = 0; i < scene->NUM_BLAS - 1; i++) {
             auto& instanceDesc = instanceDescs[BottomLevelASType::AABB + i];
             instanceDesc = {};
             instanceDesc.InstanceMask = 1;
@@ -1288,7 +1168,7 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
             float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
             float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));*/
            
-           Vertex_Ply coord = cooridnates->getPointAt(i);
+           Vertex_Ply coord = scene->coordinates->getPointAt(i);
            
            float x = 100*coord.location.x();
            float y = 100*coord.location.y();
@@ -1316,7 +1196,7 @@ AccelerationStructureBuffers D3D12RaytracingProceduralGeometry::BuildTopLevelAS(
     topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
     topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     topLevelInputs.Flags = buildFlags;
-    topLevelInputs.NumDescs = NUM_BLAS;
+    topLevelInputs.NumDescs = scene->NUM_BLAS;
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
     m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
@@ -1514,7 +1394,7 @@ void D3D12RaytracingProceduralGeometry::BuildShaderTables()
         // Triangle geometry hit groups.
         {
             LocalRootSignature::Triangle::RootArguments rootArgs;
-            rootArgs.materialCb = m_planeMaterialCB;
+            rootArgs.materialCb = scene->m_planeMaterialCB;
 
             for (auto& hitGroupShaderID : hitGroupShaderIDs_TriangleGeometry)
             {
@@ -1535,7 +1415,8 @@ void D3D12RaytracingProceduralGeometry::BuildShaderTables()
                 // Primitives for each intersection shader.
                 for (UINT primitiveIndex = 0; primitiveIndex < numPrimitiveTypes; primitiveIndex++, instanceIndex++)
                 {
-                    rootArgs.materialCb = m_aabbMaterialCB[instanceIndex];
+                //    rootArgs.materialCb = m_aabbMaterialCB[instanceIndex];
+                    rootArgs.materialCb =  scene->m_aabbMaterialCB[instanceIndex];
                     rootArgs.aabbCB.instanceIndex = instanceIndex;
                     rootArgs.aabbCB.primitiveType = primitiveIndex;
                     
@@ -1556,8 +1437,8 @@ void D3D12RaytracingProceduralGeometry::BuildShaderTables()
 
 void D3D12RaytracingProceduralGeometry::OnKeyDown(UINT8 key)
 {
-
-    camera->OnKeyDown(key);
+    scene->keyPress(key);
+   // camera->OnKeyDown(key);
 
     switch(key){
     case 'G':
@@ -1571,7 +1452,8 @@ void D3D12RaytracingProceduralGeometry::OnKeyDown(UINT8 key)
 
 void D3D12RaytracingProceduralGeometry::OnMouseMove(float dx, float dy) {
     //pass to camera to handle mouse movement
-    camera->OnMouseMove(dx, dy);
+    scene->mouseMove(dx, dy);
+    // camera->OnMouseMove(dx, dy);
 }
 
 // Update frame-based values.
@@ -1584,25 +1466,22 @@ void D3D12RaytracingProceduralGeometry::OnUpdate()
     auto prevFrameIndex = m_deviceResources->GetPreviousFrameIndex();
 
     // Rotate the camera around Y axis.
-  
+    ///ConstantBuffer<SceneConstantBuffer>* m_scene = scene->getSceneBuffer();
 
     // Rotate the second light around Y axis.
-    if (m_animateLight)
-    {
-        float secondsToRotateAround = 8.0f;
-        float angleToRotateBy = -360.0f * (elapsedTime / secondsToRotateAround);
-        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
-        const XMVECTOR& prevLightPosition = m_sceneCB->lightPosition;
-        m_sceneCB->lightPosition = XMVector3Transform(prevLightPosition, rotate);
-    }
-    camera->Update(m_sceneCB);
+    
+
+    scene->sceneUpdates(m_animateGeometryTime, m_deviceResources, m_animateLight, elapsedTime);
+    //camera->Update(m_sceneCB);
     // Transform the procedural geometry.
     if (false)
     {
         m_animateGeometryTime += elapsedTime;
     }
-    UpdateAABBPrimitiveAttributes(m_animateGeometryTime);
-    m_sceneCB->elapsedTime = m_animateGeometryTime;
+   // UpdateAABBPrimitiveAttributes(m_animateGeometryTime);
+   // scene->getSceneBuffer()
+    //scene->updateTime(m_animateGeometry);
+   // m_sceneCB->elapsedTime = m_animateGeometryTime;
 }
 
 void D3D12RaytracingProceduralGeometry::DoRaytracing()
@@ -1642,11 +1521,13 @@ void D3D12RaytracingProceduralGeometry::DoRaytracing()
 
     // Copy dynamic buffers to GPU.
     {
-        m_sceneCB.CopyStagingToGpu(frameIndex);
-        commandList->SetComputeRootConstantBufferView(GlobalRootSignature::Slot::SceneConstant, m_sceneCB.GpuVirtualAddress(frameIndex));
-
-        m_aabbPrimitiveAttributeBuffer.CopyStagingToGpu(frameIndex);
-        commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::AABBattributeBuffer, m_aabbPrimitiveAttributeBuffer.GpuVirtualAddress(frameIndex));
+        scene->getSceneBuffer()->CopyStagingToGpu(frameIndex);
+       // commandList->SetComputeRootConstantBufferView(GlobalRootSignature::Slot::SceneConstant, m_sceneCB.GpuVirtualAddress(frameIndex));
+        commandList->SetComputeRootConstantBufferView(GlobalRootSignature::Slot::SceneConstant, scene->getSceneBuffer()->GpuVirtualAddress(frameIndex));
+        scene->getPrimitiveAttributes()->CopyStagingToGpu(frameIndex);
+        commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::AABBattributeBuffer, scene->getPrimitiveAttributes()->GpuVirtualAddress(frameIndex));
+       // m_aabbPrimitiveAttributeBuffer.CopyStagingToGpu(frameIndex);
+      //  commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::AABBattributeBuffer, m_aabbPrimitiveAttributeBuffer.GpuVirtualAddress(frameIndex));
     }
 
     // Bind the heaps, acceleration structure and dispatch rays.  
@@ -1686,7 +1567,8 @@ void D3D12RaytracingProceduralGeometry::CopyRaytracingOutputToBackbuffer()
 void D3D12RaytracingProceduralGeometry::CreateWindowSizeDependentResources()
 {
     CreateRaytracingOutputResource();
-    camera->Update(m_sceneCB);  
+    scene->sceneUpdates(0, m_deviceResources);
+    //camera->Update(m_sceneCB);  
     //UpdateCameraMatrices();
 }
 
