@@ -19,7 +19,7 @@
 #include <dxcapi.h>
 #include <fstream>
 #include "Primitive.h"
-
+#include "Camera.h"
 #include "PlyFile.h"
 class D3D12RaytracingProceduralGeometry : public DXSample
 {
@@ -51,6 +51,8 @@ private:
     const float c_aabbWidth = 2;      // AABB width.
     const float c_aabbDistance = 2;   // Distance between AABBs.
     float speed = 0.2f;
+
+    Camera* camera;
     // DirectX Raytracing (DXR) attributes
     ComPtr<ID3D12Device5> m_dxrDevice;
     ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList;
@@ -116,23 +118,12 @@ private:
     StepTimer m_timer;
     float m_animateGeometryTime;
     bool m_animateGeometry;
-    bool m_animateCamera;
     bool m_animateLight;
-    UINT lastX = 400;
-    UINT lastY = 300;
-    float pitch = 0.0f;
-    float yaw = -90.0f;
-    bool firstMouse = true;
-
-    XMVECTOR m_front;
-    XMVECTOR m_eye;
-    XMVECTOR m_at;
-    XMVECTOR m_up;
-    XMVECTOR m_right;
-    XMVECTOR m_direction;
+ 
 
 
-    void UpdateCameraMatrices();
+
+
     void UpdateAABBPrimitiveAttributes(float animationTime);
 	void CreateSpheres();
 	void CreateGeometry();

@@ -60,7 +60,6 @@ D3D12RaytracingProceduralGeometry::D3D12RaytracingProceduralGeometry(UINT width,
     DXSample(width, height, name),
     m_raytracingOutputResourceUAVDescriptorHeapIndex(UINT_MAX),
     m_animateGeometryTime(0.0f),
-    m_animateCamera(false),
     m_animateGeometry(true),
     m_animateLight(false),
     m_descriptorsAllocated(0),
@@ -252,25 +251,7 @@ void D3D12RaytracingProceduralGeometry::OnInit()
 
 }
 
-// Update camera matrices passed into the shader.
-void D3D12RaytracingProceduralGeometry::UpdateCameraMatrices()
-{   
-    m_at = XMVectorAdd(m_eye, m_front);
 
-    m_direction = XMVector4Normalize(m_at - m_eye);
-   // m_up = XMVector3Normalize(XMVector3Cross(m_direction, m_right));
-    float speed = 0.5f;
-    auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
-    //m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(speed * trans));
-
-    m_sceneCB->cameraPosition = m_eye;
-
-    float fovAngleY = 45.0f;
-    XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-    XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), m_aspectRatio, 0.01f, 125.0f);
-    XMMATRIX viewProj = view * proj;
-    m_sceneCB->projectionToWorld = XMMatrixInverse(nullptr, viewProj);
-}
 
 // Update AABB primite attributes buffers passed into the shader.
 void D3D12RaytracingProceduralGeometry::UpdateAABBPrimitiveAttributes(float animationTime)
@@ -486,20 +467,10 @@ void D3D12RaytracingProceduralGeometry::InitializeScene()
     // Setup camera.
     {
         // Initialize the view and projection inverse matrices.
-       // m_eye = { 0.0f, 5.3f, -17.0f, 1.0f }; 
-        m_eye = { 0.0f, 5.3f, -10.0f, 0.0f };
-        //m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
-        m_front = { 0.0f, 0.0f, 1.0f, 0.0f };
-
-        m_at = XMVectorAdd(m_front, m_eye);
-        m_right = { 1.0f, 0.0f, 0.0f, 0.0f };
-
-        m_direction = XMVector4Normalize(m_at - m_eye);
-        m_up = XMVector3Normalize(XMVector3Cross(m_direction, m_right));
 
         // Rotate camera around Y axis.
-        
-        UpdateCameraMatrices();
+        camera = new Camera(m_aspectRatio);
+       // UpdateCameraMatrices();
     }
 
     // Setup lights.
@@ -1033,18 +1004,19 @@ void LoadModel(std::string filepath, std::vector<Vertex> &vertices, std::vector<
     for (const auto &shape : shapes) {
         for (const auto& index : shape.mesh.indices) {
             Vertex v{};
-            v.position = {
-                attrib.vertices[3 * index.vertex_index + 0],
-                attrib.vertices[3 * index.vertex_index + 1],
-                attrib.vertices[3 * index.vertex_index + 2]
-            };
-            v.normal = {
-                attrib.normals[3 * index.normal_index + 0],
-                attrib.normals[3 * index.normal_index + 1],
-                attrib.normals[3 * index.normal_index + 2]
-            };
+                v.position = {
+                    attrib.vertices[3 * (float)index.vertex_index + 2],
+                    attrib.vertices[3 * (float)index.vertex_index + 1],
+                    attrib.vertices[3 * (float)index.vertex_index + 0]
+                };
+                v.normal = {
+                    attrib.normals[3 * (float)index.normal_index + 2],
+                    attrib.normals[3 * (float)index.normal_index + 1],
+                    attrib.normals[3 * (float)index.normal_index + 0]
+                };
+        
             vertices.push_back(v);
-            indices.push_back(i);
+            indices.push_back(indices.size());
             i++;
         }
     }
@@ -1052,7 +1024,7 @@ void LoadModel(std::string filepath, std::vector<Vertex> &vertices, std::vector<
 void D3D12RaytracingProceduralGeometry::BuildMeshes() {
     auto device = m_deviceResources->GetD3DDevice();
 
-    LoadModel("/Models/cube.obj", vertices, indices);
+    LoadModel("/Models/torus.obj", vertices, indices);
    // mesh = new ObjFile("\Models\\cube.obj");
     //Vertex 
     
@@ -1585,83 +1557,21 @@ void D3D12RaytracingProceduralGeometry::BuildShaderTables()
 void D3D12RaytracingProceduralGeometry::OnKeyDown(UINT8 key)
 {
 
-    XMVECTOR perp_Pos = XMVector3Normalize(XMVector3Cross(m_front, m_up));
+    camera->OnKeyDown(key);
 
-    switch (key)
-    {
-    case 'A':
-        m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(speed * perp_Pos));
-        //::cout << m_eye << std::endl;
-      break;
-    case 'S':
-        m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(-speed * m_front));
-        break;
-    case 'W':
-
-        m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(speed * m_front));
-        break;
-    case 'D':
-        m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(-speed * perp_Pos));
-        break;
-    case 'C':
-        m_animateCamera = !m_animateCamera;
-        break;
+    switch(key){
     case 'G':
         m_animateGeometry = !m_animateGeometry;
         break;
     case 'L': 
         m_animateLight = !m_animateLight;
         break;
-    case 'I':
-        speed += 1.0f;
-        break;
-    case 'O':
-        speed -= 1.0f;
-        if (speed < 0) {
-            speed = 0.1;
-        }
-        break;
     }
 }
 
 void D3D12RaytracingProceduralGeometry::OnMouseMove(float dx, float dy) {
-
-    if (firstMouse) // initially set to true
-    {
-        lastX = dx;
-        lastY = dy;
-        firstMouse = false;
-    }
-   // float xoffset = float(x) - lastX;
-   // float yoffset = lastY - float(y);
-    lastX = dx;
-    lastY = dy;
-    float xoffset = -(dx);
-    float yoffset = -(dy);
-    float sensitivity = 0.05f;
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
-
-    std::cout <<"Yaw before " <<  yaw << std::endl;
-
-    yaw += xoffset;
-    std::cout << "Yaw after " << yaw << std::endl;
-    pitch += yoffset;
-    std::cout << "Pitch before " << pitch << std::endl;
-   // pitch += yoffset;
-    std::cout << "Pitch after " << pitch << std::endl;
-
-    if (pitch > 89.0f) {
-        pitch = 89.0f;
-    }
-
-    if (pitch < -89.0f) {
-        pitch = -89.0f;
-    }
-    float pitchRad = XMConvertToRadians(pitch);
-    float yawRad = XMConvertToRadians(yaw);
-    XMVECTOR new_Front = { cos(pitchRad) * cos(yawRad), sin(pitchRad), cos(pitchRad) * sin(yawRad) };
-    m_front = XMVector3Normalize(new_Front);
+    //pass to camera to handle mouse movement
+    camera->OnMouseMove(dx, dy);
 }
 
 // Update frame-based values.
@@ -1674,16 +1584,7 @@ void D3D12RaytracingProceduralGeometry::OnUpdate()
     auto prevFrameIndex = m_deviceResources->GetPreviousFrameIndex();
 
     // Rotate the camera around Y axis.
-    if (m_animateCamera)
-    {
-        float secondsToRotateAround = 48.0f;
-        float angleToRotateBy = 360.0f * (elapsedTime / secondsToRotateAround);
-        XMMATRIX rotate = XMMatrixRotationY(XMConvertToRadians(angleToRotateBy));
-        m_eye = XMVector3Transform(m_eye, rotate);
-        m_up = XMVector3Transform(m_up, rotate);
-        m_at = XMVector3Transform(m_at, rotate);
-        UpdateCameraMatrices();
-    }
+  
 
     // Rotate the second light around Y axis.
     if (m_animateLight)
@@ -1694,7 +1595,7 @@ void D3D12RaytracingProceduralGeometry::OnUpdate()
         const XMVECTOR& prevLightPosition = m_sceneCB->lightPosition;
         m_sceneCB->lightPosition = XMVector3Transform(prevLightPosition, rotate);
     }
-    UpdateCameraMatrices();
+    camera->Update(m_sceneCB);
     // Transform the procedural geometry.
     if (false)
     {
@@ -1785,7 +1686,8 @@ void D3D12RaytracingProceduralGeometry::CopyRaytracingOutputToBackbuffer()
 void D3D12RaytracingProceduralGeometry::CreateWindowSizeDependentResources()
 {
     CreateRaytracingOutputResource();
-    UpdateCameraMatrices();
+    camera->Update(m_sceneCB);  
+    //UpdateCameraMatrices();
 }
 
 // Release resources that are dependent on the size of the main window.

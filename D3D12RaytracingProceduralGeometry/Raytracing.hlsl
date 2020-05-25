@@ -276,7 +276,7 @@ void MyRaygenShader()
 [shader("closesthit")]
 void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangleIntersectionAttributes attr)
 {
-    uint indexSizeInBytes = 2;
+    uint indexSizeInBytes = 4;
     uint indicesPerTriangle = 3;
     uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
     uint baseIndex = PrimitiveIndex() * triangleIndexStride;
@@ -285,7 +285,13 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     const uint3 indices = Load3x16BitIndices(baseIndex, g_indices);
 
     // Retrieve corresponding vertex normals for the triangle vertices.
-    float3 triangleNormal = g_vertices[indices[0]].normal;
+    float3 triangleNormals[3] = { g_vertices[indices[0]].normal,
+                                   g_vertices[indices[1]].normal,
+                                    g_vertices[indices[2]].normal
+    };
+
+    float3 triangleNormal = HitAttribute(triangleNormals, attr.barycentrics);
+
     float4 ambient = float4(0.1, 0.1, 0.1, 1);
     float3 hitPos = HitWorldPosition();
     float3 pos = HitWorldPosition();

@@ -78,19 +78,20 @@ uint3 Load3x16BitIndices(uint offsetBytes, ByteAddressBuffer Indices)
     //  Not aligned: { - 0 | 1 2 }
     const uint dwordAlignedOffset = offsetBytes & ~3;
     const uint2 four16BitIndices = Indices.Load2(dwordAlignedOffset);
+    //        indices.y = (four16BitIndices.x >> 16) & 0xffff;
 
     // Aligned: { 0 1 | 2 - } => retrieve first three 16bit indices
     if (dwordAlignedOffset == offsetBytes)
     {
         indices.x = four16BitIndices.x & 0xffff;
-        indices.y = (four16BitIndices.x >> 16) & 0xffff;
+        indices.y = (four16BitIndices.x >> 32) & 0xffff;
         indices.z = four16BitIndices.y & 0xffff;
     }
     else // Not aligned: { - 0 | 1 2 } => retrieve last three 16bit indices
     {
-        indices.x = (four16BitIndices.x >> 16) & 0xffff;
+        indices.x = (four16BitIndices.x >> 32) & 0xffff;
         indices.y = four16BitIndices.y & 0xffff;
-        indices.z = (four16BitIndices.y >> 16) & 0xffff;
+        indices.z = (four16BitIndices.y >> 32) & 0xffff;
     }
 
     return indices;
