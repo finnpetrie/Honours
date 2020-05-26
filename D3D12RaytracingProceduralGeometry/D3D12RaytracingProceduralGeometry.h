@@ -67,10 +67,6 @@ private:
     UINT m_descriptorsAllocated;
     UINT m_descriptorSize;
 
-    // Raytracing scene
-    ConstantBuffer<SceneConstantBuffer> m_sceneCB;
-    StructuredBuffer<PrimitiveInstancePerFrameBuffer> m_aabbPrimitiveAttributeBuffer;
-    std::vector<D3D12_RAYTRACING_AABB> m_aabbs;
 
     // Root constants
     PrimitiveConstantBuffer m_planeMaterialCB;
@@ -81,10 +77,8 @@ private:
 
     Scene* scene;
     //ObjFile* mesh;
-    std::vector<Primitive> sceneObjects;
     D3DBuffer m_indexBuffer;
     D3DBuffer m_vertexBuffer;
-    D3DBuffer m_aabbBuffer;
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
     D3D12_INDEX_BUFFER_VIEW indexBufferView;

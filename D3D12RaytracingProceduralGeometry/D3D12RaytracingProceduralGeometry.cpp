@@ -552,92 +552,19 @@ void D3D12RaytracingProceduralGeometry::CreateDescriptorHeap()
 }
 
 
-
-void LoadModel(std::string filepath, std::vector<Vertex> &vertices, std::vector<uint32_t> &indices) {
-    tinyobj::attrib_t attrib;
-    std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
-    std::string err, warn;
-
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filepath.c_str()))
-    {
-        throw std::runtime_error(err);
-    }
-    uint32_t i = 0;
-    for (const auto &shape : shapes) {
-        for (const auto& index : shape.mesh.indices) {
-            Vertex v{};
-                v.position = {
-                    attrib.vertices[3 * (float)index.vertex_index + 2],
-                    attrib.vertices[3 * (float)index.vertex_index + 1],
-                    attrib.vertices[3 * (float)index.vertex_index + 0]
-                };
-                v.normal = {
-                    attrib.normals[3 * (float)index.normal_index + 2],
-                    attrib.normals[3 * (float)index.normal_index + 1],
-                    attrib.normals[3 * (float)index.normal_index + 0]
-                };
-        
-            vertices.push_back(v);
-            indices.push_back(i);
-            i++;
-        }
-    }
-}
-void D3D12RaytracingProceduralGeometry::BuildMeshes() {
-    auto device = m_deviceResources->GetD3DDevice();
-
-    LoadModel("/Models/torus.obj", vertices, indices);
-
-    
-    UINT size = static_cast<UINT>(vertices.size() * sizeof(Vertex));
-    UINT i_size = static_cast<UINT>(indices.size()) * sizeof(UINT32);
-    AllocateUploadBuffer(device,indices.data(), i_size, &m_indexBuffer.resource);
-    AllocateUploadBuffer(device, vertices.data(), size, &m_vertexBuffer.resource);
-    // Vertex buffer is passed to the shader along with index buffer as a descriptor range.
-    UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, indices.size(), 0);
-    UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, vertices.size(), sizeof(vertices[0]));
-    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
-    
-    }
-
-void D3D12RaytracingProceduralGeometry::BuildPlaneGeometry()
-{
-    auto device = m_deviceResources->GetD3DDevice();
-    // Plane indices.
-    Vertex_Index indices[] =
-    {
-        3,1,0,
-        2,1,3,
-
-    };
-
-    // Cube vertices positions and corresponding triangle normals.
-    Vertex vertices[] =
-    {
-        { XMFLOAT3(0.0f, -5.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, -5.0f, 0.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, -5.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(0.0f, -5.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-    };
-
-    AllocateUploadBuffer(device, indices, sizeof(indices), &m_indexBuffer.resource);
-    AllocateUploadBuffer(device, vertices, sizeof(vertices), &m_vertexBuffer.resource);
-
-    // Vertex buffer is passed to the shader along with index buffer as a descriptor range.
-    UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, sizeof(indices) / 4, 0);
-    UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, ARRAYSIZE(vertices), sizeof(vertices[0]));
-    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
-}
-
 // Build geometry used in the sample.
 void D3D12RaytracingProceduralGeometry::BuildGeometry()
 {
 
     scene->BuildProceduralGeometryAABBs(m_deviceResources);
-  //  BuildProceduralGeometryAABBs();
-  //  BuildMeshes();
-     BuildPlaneGeometry();
+    scene->BuildMeshes(m_deviceResources);
+
+    UINT descriptorIndexIB = CreateBufferSRV(&scene->m_indexBuffer, scene->totalIndices.size(), 0);
+    UINT descriptorIndexVB = CreateBufferSRV(&scene->m_vertexBuffer, scene->totalVertices.size(), sizeof(scene->totalVertices[0]));
+    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
+    //  BuildProceduralGeometryAABBs();
+    //  BuildMeshes();
+    //  BuildPlaneGeometry();
 }
 
 // Build geometry descs for bottom-level AS.
@@ -658,12 +585,21 @@ void D3D12RaytracingProceduralGeometry::BuildGeometryDescsForBottomLevelAS(array
         auto& geometryDesc = geometryDescs[BottomLevelASType::Triangle][0];
         geometryDesc = {};
         geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-        geometryDesc.Triangles.IndexBuffer = m_indexBuffer.resource->GetGPUVirtualAddress();
+    /*    geometryDesc.Triangles.IndexBuffer = m_indexBuffer.resource->GetGPUVirtualAddress();
         geometryDesc.Triangles.IndexCount = static_cast<UINT>(m_indexBuffer.resource->GetDesc().Width) / sizeof(Vertex_Index);
         geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
         geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
         geometryDesc.Triangles.VertexCount = static_cast<UINT>(m_vertexBuffer.resource->GetDesc().Width) / sizeof(Vertex);
         geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer.resource->GetGPUVirtualAddress();
+        geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
+        */
+
+        geometryDesc.Triangles.IndexBuffer = scene->m_indexBuffer.resource->GetGPUVirtualAddress();
+        geometryDesc.Triangles.IndexCount = static_cast<UINT>(scene->m_indexBuffer.resource->GetDesc().Width) / sizeof(uint32_t);
+        geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+        geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+        geometryDesc.Triangles.VertexCount = static_cast<UINT>(scene->m_vertexBuffer.resource->GetDesc().Width) / sizeof(Vertex);
+        geometryDesc.Triangles.VertexBuffer.StartAddress = scene->m_vertexBuffer.resource->GetGPUVirtualAddress();
         geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
         geometryDesc.Flags = geometryFlags;
 
@@ -772,16 +708,16 @@ void D3D12RaytracingProceduralGeometry::BuildBotomLevelASInstanceDescs(BLASPtrTy
         instanceDesc.AccelerationStructure = bottomLevelASaddresses[BottomLevelASType::Triangle];
 
         // Calculate transformation matrix.
-        const XMVECTOR vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 0.0f, -0.35f));
+        const XMVECTOR vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 7.35f, -0.35f));
         
         // Scale in XZ dimensions.
        XMMATRIX mScale = XMMatrixScaling(fWidth.x, fWidth.y, fWidth.z);
-        //XMMATRIX mScale = XMMatrixScaling(1, 1, 1);
+      //  XMMATRIX mScale = XMMatrixScaling(10, 10, 10);
 
-       XMMATRIX mTranslation = XMMatrixTranslationFromVector(vBasePosition);
+      XMMATRIX mTranslation = XMMatrixTranslationFromVector(vBasePosition);
 //       XMMATRIX mTransform = mScale;
 
-       XMMATRIX mTransform = mScale * mTranslation;  
+       XMMATRIX mTransform = mScale + mTranslation;  
         XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTransform);
     }
     float X  = 10;
@@ -1140,7 +1076,8 @@ void D3D12RaytracingProceduralGeometry::DoRaytracing()
     {
         descriptorSetCommandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
         // Set index and successive vertex buffer decriptor tables.
-        commandList->SetComputeRootDescriptorTable(GlobalRootSignature::Slot::VertexBuffers, m_indexBuffer.gpuDescriptorHandle);
+      //  commandList->SetComputeRootDescriptorTable(GlobalRootSignature::Slot::VertexBuffers, m_indexBuffer.gpuDescriptorHandle);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature::Slot::VertexBuffers, scene->m_indexBuffer.gpuDescriptorHandle);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
     };
 
@@ -1225,11 +1162,14 @@ void D3D12RaytracingProceduralGeometry::ReleaseDeviceDependentResources()
 
     m_descriptorHeap.Reset();
     m_descriptorsAllocated = 0;
-    m_sceneCB.Release();
-    m_aabbPrimitiveAttributeBuffer.Release();
-    m_indexBuffer.resource.Reset();
-    m_vertexBuffer.resource.Reset();
-    m_aabbBuffer.resource.Reset();
+    scene->getSceneBuffer()->Release();
+    scene->getPrimitiveAttributes()->Release();
+    scene->m_indexBuffer.resource.Reset();
+    scene->m_vertexBuffer.resource.Reset();
+    
+    // m_indexBuffer.resource.Reset();
+    //m_vertexBuffer.resource.Reset();
+    scene->getAABB()->resource.Reset();
 
     ResetComPtrArray(&m_bottomLevelAS);
     m_topLevelAS.Reset();

@@ -72,21 +72,7 @@ void Scene::Init(float m_aspectRatio)
         using namespace AnalyticPrimitive;
         for (Primitive& p : analyticalObjects) {
             PrimitiveConstantBuffer material = p.getMaterial();
-            
-            /*float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-            float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-            float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-            if (x < 0.1) {
-                x = 0;
-            }
-            else if (y < 0.1) {
-                y = 0;
-            }
-            */
-            // XMFLOAT4 alb =  XMFLOAT4(x, y, z, 0);
-            // std::cout << p.getType() << std::endl; 
             SetAttributes(offset + p.getType(), material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
-            // SetAttributes(offset + Spheres, material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
         }
         offset += AnalyticPrimitive::Count + 1;
     }
@@ -100,6 +86,16 @@ void Scene::Init(float m_aspectRatio)
     // Setup camera.
     {
         camera = new Camera(m_aspectRatio);
+    }
+
+    {
+       Geometry torus;
+        torus.LoadModel("/Models/torus.obj");
+        Geometry plane;
+        plane.initPlane();
+        
+        meshes = {  plane};
+
     }
 
 // Setup lights.
@@ -158,8 +154,13 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
         using namespace AnalyticPrimitive;
         for (Primitive& p : analyticalObjects) {
             //SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
-            SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
-          //  offset++; 
+            if (p.getType() != AnalyticPrimitive::Ellipsoid) {
+                SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
+                //  offset++; 
+            }
+            else {
+                SetTransformForAABB(offset + p.getType(), mScale3, mRotation);
+            }
         }
        
         offset += AnalyticPrimitive::Count + 1;
@@ -173,6 +174,38 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
 
 
 }
+
+void Scene::BuildMeshes(std::unique_ptr<DX::DeviceResources>& m_deviceResources) {
+    auto device = m_deviceResources->GetD3DDevice();
+   
+    uint32_t i = 0;
+    uint32_t offset = 0;
+
+    for (Geometry& g : meshes) {
+        std::vector<Vertex> vertexBuffer = g.getVertices();
+        std::vector<uint32_t> indexBuffer = g.getIndices();
+        //totalVertices.resize(g.getVertices().size() + offset);
+        offset = totalVertices.size();
+
+        totalVertices.insert(totalVertices.end(), vertexBuffer.begin(), vertexBuffer.end());
+        if (i > 0) {
+            g.updateIndicesOffset(offset);
+        }
+        totalIndices.insert(totalIndices.end(), indexBuffer.begin(), indexBuffer.end());
+        i++;
+    }
+
+    UINT size = static_cast<UINT>(totalVertices.size() * sizeof(Vertex));
+    UINT i_size = static_cast<UINT>(totalIndices.size()) * sizeof(UINT32);
+    AllocateUploadBuffer(device, totalIndices.data(), i_size, &m_indexBuffer.resource);
+    AllocateUploadBuffer(device, totalVertices.data(), size, &m_vertexBuffer.resource);
+    // Vertex buffer is passed to the shader along with index buffer as a descriptor range.
+    /*(UINT descriptorIndexIB = CreateBufferSRV(m_deviceResources, &m_indexBuffer, totalIndices.size(), 0);
+    UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, totalVertices.size(), sizeof(totalVertices[0]));
+    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");*/
+}
+
+
 void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m_deviceResources)
 {
     auto device = m_deviceResources->GetD3DDevice();
@@ -243,6 +276,7 @@ void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResource
 
     }
 }
+
 
 
 void Scene::CreateAABBPrimitiveAttributesBuffers(std::unique_ptr<DX::DeviceResources>& m_deviceResources)
@@ -326,7 +360,7 @@ void Scene::CreateGeometry() {
     PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
     Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(6, 6, 6));
-    Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 0.0f, 0.0f), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(3, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
@@ -340,3 +374,6 @@ void Scene::CreateGeometry() {
     analyticalObjects = { sphere, hyperboloid, ellipsoid, Cylinder, Paraboloid, Cone, csg_union, intersection };
 
 }
+
+//this should be contained in the Descriptor Heap object
+

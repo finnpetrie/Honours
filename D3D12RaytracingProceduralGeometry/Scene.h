@@ -10,11 +10,11 @@
 class Scene
 {
 private:
+
 		ConstantBuffer<SceneConstantBuffer> m_sceneCB;
 		StructuredBuffer<PrimitiveInstancePerFrameBuffer> m_aabbPrimitiveAttributeBuffer;
 		std::vector<D3D12_RAYTRACING_AABB> m_aabbs;
-
-		D3DBuffer m_aabbBuffer;
+		
 
 		std::vector<Geometry> meshes;
 		Camera* camera;
@@ -22,6 +22,17 @@ private:
 		
 
 public:
+
+
+	D3DBuffer m_aabbBuffer;
+	D3DBuffer m_vertexBuffer;
+	D3DBuffer m_indexBuffer;
+
+
+	std::vector<Vertex> totalVertices;
+	std::vector<uint32_t> totalIndices;
+
+
 	std::vector<Primitive> analyticalObjects;
 	bool instancing = false;
 	const float c_aabbWidth = 2;      // AABB width.
@@ -37,6 +48,7 @@ public:
 	Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
 	void Init(float m_aspectRatio);
 	void UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
+	void BuildMeshes(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
 
 	void sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources, bool m_animateLights = false, float time = 0);
@@ -51,5 +63,6 @@ public:
 	StructuredBuffer<PrimitiveInstancePerFrameBuffer>* getPrimitiveAttributes();
 	void CreateSpheres();
 	void CreateGeometry();
+	UINT CreateBufferSRV(std::unique_ptr<DX::DeviceResources> m_deviceResources, D3DBuffer* buffer, uint32_t numElements, UINT elementSize);
 };
 
