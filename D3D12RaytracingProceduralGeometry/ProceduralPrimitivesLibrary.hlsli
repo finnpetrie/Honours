@@ -124,10 +124,9 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
         return opI(sdCylinder(opRep(position + float3(1, 1, 1), float3(1, 2, 1)), float2(0.3, 2)),
                    sdBox(position + float3(1, 1, 1), float3(2, 2, 2)));
     
-    case SignedDistancePrimitive::FractalPyramid: 
-         // Let pyramid have a base at y == -1 of AABB => position + float3(0,1,0) 
-         // Pyramid: 63.435 degrees at base, height 2
-        // return sdQuaternionJuliaSet(position + float3(0, 1, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
+    case SignedDistancePrimitive::QuaternionJulia: 
+       
+         return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
         //return sdGyroid(position);
     default: return 0;
     }

@@ -28,12 +28,13 @@ Scene::Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources)
 void Scene::Init(float m_aspectRatio)
 {
 
-
-    CreateSpheres();
-    coordinates = new PlyFile("/Models/Head_AM/AM_Head.ply");
+    CreateGeometry();
+    NUM_BLAS = 2;
+   // CreateSpheres();
+    //coordinates = new PlyFile("/Models/Head_AM/AM_Head.ply");
     // cooridnates->translateToOrigin(cooridnates->centroid());
      //because triangle geometry can't be stored in the procedural geometry BLAS, we add +1
-    NUM_BLAS = coordinates->size() + 1;
+   // NUM_BLAS = coordinates->size() + 1;
         auto SetAttributes = [&](
             UINT primitiveIndex,
             const XMFLOAT4& albedo,
@@ -69,9 +70,10 @@ void Scene::Init(float m_aspectRatio)
     {
         float X = 1.0f;
         using namespace AnalyticPrimitive;
-        for (Primitive& p : sceneObjects) {
+        for (Primitive& p : analyticalObjects) {
             PrimitiveConstantBuffer material = p.getMaterial();
-            float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+            
+            /*float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
             float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
             float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
             if (x < 0.1) {
@@ -80,26 +82,19 @@ void Scene::Init(float m_aspectRatio)
             else if (y < 0.1) {
                 y = 0;
             }
+            */
             // XMFLOAT4 alb =  XMFLOAT4(x, y, z, 0);
             // std::cout << p.getType() << std::endl; 
             SetAttributes(offset + p.getType(), material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
             // SetAttributes(offset + Spheres, material.albedo, material.reflectanceCoef, material.refractiveCoef, material.diffuseCoef, material.specularCoef, material.specularPower, material.stepScale);
         }
-            /*SetAttributes(offset + AABB, red);
-            SetAttributes(offset + Spheres, ChromiumReflectance, 0.1f, 1.5, 0.6f,0.0f, 1);
-            SetAttributes(offset + Cone, ChromiumReflectance, 0.1f, 1.5, 0.6, 0.0f, 1);
-            SetAttributes(offset + Hyperboloid, red, 0.1f, 1.5, 0.6f, 0.0f, 1);
-            SetAttributes(offset + Ellipsoid, ChromiumReflectance, 0.1f, 1.5, 0.6f, 0.0f, 1);
-            SetAttributes(offset + Cylinder, ChromiumReflectance, 0.1f, 0, 0.6f, 0.0f, 1);
-            */
-
-            // offset += AnalyticPrimitive::Count;
+        offset += AnalyticPrimitive::Count + 1;
     }
 
 
     {
         using namespace SignedDistancePrimitive;
-        //SetAttributes(offset + SignedDistancePrimitive::FractalPyramid, ChromiumReflectance, 0.0f, 0.0f, 1.0f, 0.0f, 1);
+        SetAttributes(offset+  QuaternionJulia, red, 0, 0, 1.0f, 0.7f, 50, 1.0f);
     }
 
     // Setup camera.
@@ -161,17 +156,19 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
     // Analytic primitives.
     {
         using namespace AnalyticPrimitive;
-        for (Primitive& p : sceneObjects) {
-            SetTransformForAABB(offset + p.getType(), mScaleTiny, mRotation);
+        for (Primitive& p : analyticalObjects) {
+            //SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
+            SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
+          //  offset++; 
         }
-        /*   SetTransformForAABB(offset + AABB, mScale15y, mIdentity);
-            SetTransformForAABB(offset + Spheres, mScale15, mRotation);
-            SetTransformForAABB(offset + Cone, mScaleHalf, mRotation);
-            SetTransformForAABB(offset + Hyperboloid, mScaleHalf, mRotation);
-            SetTransformForAABB(offset + Ellipsoid, mScale15, mRotation);
-            */
+       
+        offset += AnalyticPrimitive::Count + 1;
+    }
 
-        offset += AnalyticPrimitive::Count;
+    {
+
+        using namespace SignedDistancePrimitive;
+        SetTransformForAABB(offset + SignedDistancePrimitive::QuaternionJulia, mScale3, mRotation);
     }
 
 
@@ -203,34 +200,29 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
             };
         };
         //resize to number of actual geometry in the bottom level acceleration structure
-        m_aabbs.resize(20);
+        m_aabbs.resize(IntersectionShaderType::TotalPrimitiveCount);
         UINT offset = 0;
 
         // Analytic primitives.
         {
             using namespace AnalyticPrimitive;
-            for (Primitive& p : sceneObjects) {
+            for (Primitive& p : analyticalObjects) {
                 //m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(rand() % 2, 1, rand() % 2), XMFLOAT3(6, 6, 6));
                 //offset++;
-                m_aabbs[offset + p.getType()] = InitializeAABB(p.getIndex(), p.getSize());
-                offset++;
+                m_aabbs[p.getType()] = InitializeAABB(p.getIndex(), p.getSize());
+
+               // m_aabbs[offset + p.getType()] = InitializeAABB(p.getIndex(), p.getSize());
+             
             }
-            /*   m_aabbs[offset + AABB] = InitializeAABB(XMINT3(3, 0, 1), XMFLOAT3(2, 3, 2));
-               m_aabbs[offset + Spheres] = InitializeAABB(XMFLOAT3(2.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
-               m_aabbs[offset + Hyperboloid] = InitializeAABB(XMFLOAT3(0, 1, 0), XMFLOAT3(4, 4, 4));
-              // m_aabbs[offset + Hyperboloid] = InitializeAABB(XMFLOAT3(0, -1, 0), XMFLOAT3(4, 4, 4));
-               m_aabbs[offset + Ellipsoid] = InitializeAABB(XMFLOAT3(0, 0, 0), XMFLOAT3(4, 4, 4));
-               */
-               // offset += AnalyticPrimitive::Count;
+            offset += AnalyticPrimitive::Count + 1;
         }
+        
         {
-            // using namespace SignedDistancePrimitive;
+            using namespace SignedDistancePrimitive;
 
-           //  m_aabbs[offset + FractalPyramid] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(6, 6, 6));
+             m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(8,8, 8));
 
         }
-
-
         AllocateUploadBuffer(device, m_aabbs.data(), m_aabbs.size() * sizeof(m_aabbs[0]), &m_aabbBuffer.resource);
     }
 }
@@ -288,7 +280,7 @@ void Scene::CreateSpheres() {
             , 0.5
             , 0.5
         ));
-        sceneObjects.push_back(sphere);
+        analyticalObjects.push_back(sphere);
     }
 }
 
@@ -335,16 +327,16 @@ void Scene::CreateGeometry() {
 
     Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(6, 6, 6));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(3, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
-    Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(4, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
+    Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(3, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+  //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
     Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
-    Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(3.0f, 0.0, 2.0f), XMFLOAT3(6, 6, 6));
+    Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(5.0f, 0.0, 2.0f), XMFLOAT3(6, 6, 6));
     Primitive difference(AnalyticPrimitive::Enum::CSG_Difference, CSG, XMFLOAT3(0.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
     Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(-2.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
     Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(-1, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
 
 
-    sceneObjects = { sphere, hyperboloid, ellipsoid, AABB, Cylinder, Paraboloid, Cone, difference, csg_union, intersection };
+    analyticalObjects = { sphere, hyperboloid, ellipsoid, Cylinder, Paraboloid, Cone, csg_union, intersection };
 
 }

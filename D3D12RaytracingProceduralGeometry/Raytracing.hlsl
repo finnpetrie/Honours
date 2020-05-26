@@ -320,7 +320,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     }
   
 
-      if(l_materialCB.reflectanceCoef > 0){
+      if(l_materialCB.reflectanceCoef < 0){
         Ray r = { HitWorldPosition(), reflect(WorldRayDirection(), triangleNormal) };
         reflectionColour = TraceRadianceRay(r, rayPayload);
 
@@ -328,7 +328,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
     float4 color = ambient + 0.15*reflectionColour + pathColour;
     float t = RayTCurrent();
-   // color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
+    color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
 
     rayPayload.color = color;
 
@@ -355,7 +355,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
     float4 reflectionColour = float4(0, 0, 0, 0);
     float4 pathColour = float4(0, 0, 0, 0);
-    float3 r_dir = randomDirection(HitWorldPosition().xy);
+    //float3 r_dir = randomDirection(HitWorldPosition().xy);
   
         //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
     if (!shadowHit) {
@@ -392,11 +392,11 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
          }
          float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
      }
-     /**
-     if (l_materialCB.reflectanceCoef  0.1f) {
+     
+     if (l_materialCB.reflectanceCoef  >0.1f) {
          Ray r = { pos, reflect(dir, attr.normal) };
-         reflectionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
-     }*/
+         reflectionColour = TraceRadianceRay(r, rayPayload);
+     }
     
     
       //0.1f is a good coefficient for reflectioncolour.
@@ -405,7 +405,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
      float4 color = ambient + refractionColour +  0.1*reflectionColour + pathColour;
      
      float t = RayTCurrent();
-     //color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
+     color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
 
      rayPayload.color = color;
 }

@@ -6,6 +6,7 @@
 #include "DeviceResources.h"
 #include "DirectXRaytracingHelper.h"
 #include "PlyFile.h"
+#include "Geometry.h"
 class Scene
 {
 private:
@@ -15,13 +16,16 @@ private:
 
 		D3DBuffer m_aabbBuffer;
 
-		std::vector<Primitive> sceneObjects;
+		std::vector<Geometry> meshes;
 		Camera* camera;
 
-		const float c_aabbWidth = 2;      // AABB width.
-		const float c_aabbDistance = 2;   // Distance between AABBs.
+		
 
 public:
+	std::vector<Primitive> analyticalObjects;
+	bool instancing = false;
+	const float c_aabbWidth = 2;      // AABB width.
+	const float c_aabbDistance = 2;   // Distance between AABBs.
 	uint32_t NUM_BLAS = 10;
 	PlyFile* coordinates;
 	PrimitiveConstantBuffer m_aabbMaterialCB[IntersectionShaderType::TotalPrimitiveCount];

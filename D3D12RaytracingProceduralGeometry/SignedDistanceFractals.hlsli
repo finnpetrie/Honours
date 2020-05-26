@@ -48,17 +48,17 @@ float sdGyroid(in float3 position) {
 }
 float sdQuaternionJuliaSet(in float3 position, float4 h, in float Scale = 2.0f) {
     float4 z = float4(position, 0.0);
-    float4 c = float4(0, 0, 0, 1);
+    float4 c = float4(1, 0,1, 0);
     float mag_z = dot(z, z);
     float4 z_prime = float4(1, 0, 0, 0);
-    int Iterations = 14;
+    int Iterations = 8;
     float4 mag_dz = 1;
     for (int i = 0; i < Iterations; i++) {
         z = quatSq(z) + c;
         z_prime = 2 * quatMult(z, z_prime);
         mag_dz = dot(z_prime, z_prime);
         mag_z = dot(z, z);
-        if (mag_z > 10) break;
+        if (mag_z > 4) break;
     }
 
     return sqrt(mag_z) / (2 * sqrt(mag_dz)) * log(dot(z, z));
