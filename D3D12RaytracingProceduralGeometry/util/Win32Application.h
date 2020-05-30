@@ -28,6 +28,7 @@ protected:
     static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 private:
+    static bool resetMouse;
     static HWND m_hwnd;
     static bool m_fullscreenMode;
     static const UINT m_windowStyle = WS_OVERLAPPEDWINDOW;

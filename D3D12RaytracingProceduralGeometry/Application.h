@@ -22,13 +22,15 @@
 #include "Camera.h"
 #include "PlyFile.h"
 #include "Scene.h"
-class D3D12RaytracingProceduralGeometry : public DXSample
+#include "AccelerationStructure.h"
+#include "Pipeline.h"
+class Application : public DXSample
 {
 public:
     CComPtr<IDxcBlob> compileShaders(LPCWSTR fileName);
     CComPtr<IDxcBlob> compileShaderTwo(LPCWSTR fileName);
     void createRayTracingPipeline_Two();
-    D3D12RaytracingProceduralGeometry(UINT width, UINT height, std::wstring name);
+    Application(UINT width, UINT height, std::wstring name);
 
     // IDeviceNotify
     virtual void OnDeviceLost() override;
@@ -46,7 +48,8 @@ public:
 
 private:
     static const UINT FrameCount = 3;
-
+    std::vector<float> fpsAverages;
+    bool testing = true;
     // Constants.
     UINT NUM_BLAS = 100000;          // Triangle + AABB bottom-level AS.
     const float c_aabbWidth = 2;      // AABB width.
@@ -69,24 +72,15 @@ private:
 
 
     // Root constants
-    PrimitiveConstantBuffer m_planeMaterialCB;
-    PrimitiveConstantBuffer m_aabbMaterialCB[IntersectionShaderType::TotalPrimitiveCount];
+   
     IDxcBlob* m_rayGenLibrary;
     // Geometry
-    PlyFile* cooridnates;
 
     Scene* scene;
-    //ObjFile* mesh;
-    D3DBuffer m_indexBuffer;
-    D3DBuffer m_vertexBuffer;
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
-    D3D12_INDEX_BUFFER_VIEW indexBufferView;
-
-
+    AccelerationStructure* acclerationStruct;
+    Pipeline* pipeline;
     // Acceleration structure
-    ComPtr<ID3D12Resource> m_bottomLevelAS[BottomLevelASType::Count];
-    ComPtr<ID3D12Resource> m_topLevelAS;
+    
 
     // Raytracing output
     ComPtr<ID3D12Resource> m_raytracingOutput;
@@ -115,19 +109,11 @@ private:
     float m_animateGeometryTime;
     bool m_animateGeometry;
     bool m_animateLight;
- 
 
-
-
-
-    void UpdateAABBPrimitiveAttributes(float animationTime);
-	void CreateSpheres();
-	void CreateGeometry();
-    void InitializeScene();
+	
     void RecreateD3D();
     void DoRaytracing();
-    void CreateConstantBuffers();
-    void CreateAABBPrimitiveAttributesBuffers();
+   
     void CreateDeviceDependentResources();
     void CreateWindowSizeDependentResources();
     void ReleaseDeviceDependentResources();
@@ -142,17 +128,10 @@ private:
     void CreateAuxilaryDeviceResources();
     void CreateDescriptorHeap();
     void CreateRaytracingOutputResource();
-    void BuildProceduralGeometryAABBs();
     void BuildGeometry();
     
-    void BuildMeshes();
-    void BuildPlaneGeometry();
-    void BuildGeometryDescsForBottomLevelAS(std::array<std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>, BottomLevelASType::Count>& geometryDescs);
-    template <class InstanceDescType, class BLASPtrType>
-    void BuildBotomLevelASInstanceDescs(BLASPtrType *bottomLevelASaddresses, ComPtr<ID3D12Resource>* instanceDescsResource);
-    AccelerationStructureBuffers BuildBottomLevelAS(const std::vector<D3D12_RAYTRACING_GEOMETRY_DESC>& geometryDesc, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE);
-    AccelerationStructureBuffers BuildTopLevelAS(AccelerationStructureBuffers bottomLevelAS[BottomLevelASType::Count], D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE);
-    void BuildAccelerationStructures();
+   
+   
     void BuildShaderTables();
     void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
     void CopyRaytracingOutputToBackbuffer();

@@ -18,6 +18,7 @@ HWND Win32Application::m_hwnd = nullptr;
 bool Win32Application::m_fullscreenMode = false;
 RECT Win32Application::m_windowRect;
 using Microsoft::WRL::ComPtr;
+bool Win32Application::resetMouse = true;
 
 int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
 {
@@ -201,19 +202,22 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
     return 0;
 
     case WM_KEYDOWN:
+        if (static_cast<UINT8>(wParam) == 'R') {
+            resetMouse = !resetMouse;
+        }
         if (pSample)
         {
             pSample->OnKeyDown(static_cast<UINT8>(wParam));
         }
         return 0;
 
-    case WM_KEYUP:
+    /*case WM_KEYUP:
         if (pSample)
         {
             pSample->OnKeyUp(static_cast<UINT8>(wParam));
         }
         return 0;
-
+        */
     case WM_SYSKEYDOWN:
         // Handle ALT+ENTER:
         if ((wParam == VK_RETURN) && (lParam & (1 << 29)))
@@ -269,7 +273,7 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
         return 0;
 
     case WM_MOUSEMOVE:
-        if (pSample)
+        if (pSample && resetMouse)
         {
             RECT windowRect = {};
             GetWindowRect(hWnd, &windowRect);

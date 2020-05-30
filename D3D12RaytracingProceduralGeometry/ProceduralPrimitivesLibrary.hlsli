@@ -1,19 +1,9 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
 
 //**********************************************************************************************
 //
 // ProceduralPrimitivesLibrary.hlsli
 //
-// An interface to call per geometry intersection tests based on as primitive type.
+// An interface to call per geometry intersection tests based on primitive type.
 //
 //**********************************************************************************************
 
@@ -126,7 +116,7 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
     
     case SignedDistancePrimitive::QuaternionJulia: 
        
-         return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
+        return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
         //return sdGyroid(position);
     default: return 0;
     }

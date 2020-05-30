@@ -34,7 +34,9 @@ public:
 
 
 	std::vector<Primitive> analyticalObjects;
-	bool instancing = false;
+	bool instancing = true;
+	bool quatJulia = false;
+	bool plane = true;
 	const float c_aabbWidth = 2;      // AABB width.
 	const float c_aabbDistance = 2;   // Distance between AABBs.
 	uint32_t NUM_BLAS = 10;
@@ -57,6 +59,8 @@ public:
 
 	void CreateAABBPrimitiveAttributesBuffers(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 
+
+	void releaseResources();
 
 	ConstantBuffer<SceneConstantBuffer>* getSceneBuffer();
 	D3DBuffer* getAABB();

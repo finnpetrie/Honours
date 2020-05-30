@@ -142,7 +142,7 @@ static const XMFLOAT4 ChromiumReflectance = XMFLOAT4(0.549f, 0.556f, 0.554f, 1.0
 
 //static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
 static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
-
+//static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.0, 0.0, 0.0, 1.0f);
 static const float InShadowRadiance = 0.35f;
 
 namespace AnalyticPrimitive {

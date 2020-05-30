@@ -356,58 +356,58 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float4 reflectionColour = float4(0, 0, 0, 0);
     float4 pathColour = float4(0, 0, 0, 0);
     //float3 r_dir = randomDirection(HitWorldPosition().xy);
-  
-        //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
-    if (!shadowHit) {
-        ambient += PhongLighting(float4(attr.normal, 0), shadowHit);
-    }
-     float4 refractionColour = float4(0, 0, 0, 1);
-     float3 dir = normalize(WorldRayDirection());
-    // float3 worldNormal = mul(attr.normal, (float3x3)ObjectToWorld3x4());
-      
-     if (l_materialCB.refractiveCoef > 0) {
-         //assume refractive glass
-         float n1 = 1;
-         float n2 = l_materialCB.refractiveCoef;
-         float3 outwardNormal;
-         float index;
-         float3 refracted;
-         if (dot(dir, attr.normal) > 0) {
-             outwardNormal = -attr.normal;
-             index = n2;
-         }
-         else {
-             outwardNormal = attr.normal;
-             index = n1 / n2;
-         }
-         if (refractTest(dir, outwardNormal, index, refracted)) {
-             Ray r = { pos, refracted };
-             //refraction is nosiy, huh?
-            // refractionColour = float4(refracted, 1.0);
-             refractionColour = TraceRadianceRay(r, rayPayload);
-         }
-         else {
-             Ray r = { pos, reflect(dir, attr.normal) };
-             // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
-         }
-         float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
-     }
-     
-     if (l_materialCB.reflectanceCoef  >0.1f) {
-         Ray r = { pos, reflect(dir, attr.normal) };
-         reflectionColour = TraceRadianceRay(r, rayPayload);
-     }
-    
-    
-      //0.1f is a good coefficient for reflectioncolour.
-       // rayPayload.color += refractionColour + 0.1*reflectionColour;
-   //  rayPayload.color = refractionColour;
-     float4 color = ambient + refractionColour +  0.1*reflectionColour + pathColour;
-     
-     float t = RayTCurrent();
-     color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
 
-     rayPayload.color = color;
+//float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
+if (!shadowHit) {
+    ambient += PhongLighting(float4(attr.normal, 0), shadowHit);
+}
+float4 refractionColour = float4(0, 0, 0, 1);
+float3 dir = normalize(WorldRayDirection());
+// float3 worldNormal = mul(attr.normal, (float3x3)ObjectToWorld3x4());
+
+if (l_materialCB.refractiveCoef > 0) {
+    //assume refractive glass
+    float n1 = 1;
+    float n2 = l_materialCB.refractiveCoef;
+    float3 outwardNormal;
+    float index;
+    float3 refracted;
+    if (dot(dir, attr.normal) > 0) {
+        outwardNormal = -attr.normal;
+        index = n2;
+    }
+    else {
+        outwardNormal = attr.normal;
+        index = n1 / n2;
+    }
+    if (refractTest(dir, outwardNormal, index, refracted)) {
+        Ray r = { pos, refracted };
+        //refraction is nosiy, huh?
+       // refractionColour = float4(refracted, 1.0);
+        refractionColour = TraceRadianceRay(r, rayPayload);
+    }
+    else {
+        Ray r = { pos, reflect(dir, attr.normal) };
+        // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
+    }
+    float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
+}
+
+if (l_materialCB.reflectanceCoef > 0.1f) {
+    Ray r = { pos, reflect(dir, attr.normal) };
+    reflectionColour = TraceRadianceRay(r, rayPayload);
+}
+
+
+//0.1f is a good coefficient for reflectioncolour.
+ // rayPayload.color += refractionColour + 0.1*reflectionColour;
+//  rayPayload.color = refractionColour;
+float4 color = ambient + refractionColour + 0.1 * reflectionColour + pathColour;
+
+float t = RayTCurrent();
+color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
+
+rayPayload.color = color;
 }
 
 //***************************************************************************
@@ -417,14 +417,17 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
 [shader("miss")]
 void MyMissShader(inout RayPayload rayPayload)
 {
-    float4 backgroundColor = float4(BackgroundColor);
-    rayPayload.color = backgroundColor;
-}  
+   // float transition = pow(smoothstep(0.02, .5, d.y), 0.4);
+//
+   // float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor);
+   // float4 backgroundColor = float4(BackgroundColor);
+    rayPayload.color = float4(BackgroundColor);
+}
 
 [shader("miss")]
 void MyMissShader_ShadowRay(inout ShadowRayPayload rayPayload)
 {
-    
+
 
     rayPayload.hit = false;
 }
@@ -438,22 +441,27 @@ void AnyHit_AnalyticPrimitive(inout RayPayload payload, in ProceduralPrimitiveAt
     //IgnoreHit();
     float3 pos = HitWorldPosition();
     if (l_materialCB.refractiveCoef > 0) {
-       //  if(ShadowRay(payload)){}
-        // payload.color = float4(1, 1, 0, 1);
-        //IgnoreHit();
+        //  if(ShadowRay(payload)){}
+         // payload.color = float4(1, 1, 0, 1);
+         //IgnoreHit();
     }
-   // payload.color = float4(1, 1, 0, 1);
+    // payload.color = float4(1, 1, 0, 1);
 }
 
 [shader("anyhit")]
 void AnyHit_Triangle(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
-   // payload.color = float4(0, 0, 0, 1);
-   //IgnoreHit();
+    // payload.color = float4(0, 0, 0, 1);
+    //IgnoreHit();
 }
 //***************************************************************************
 //*****************------ Intersection shaders-------************************
 //***************************************************************************
 
+
+/*[shader("closesthit")]
+void ClosestHit_CSG( inout RayPayload payload, in ProceduralPrimitiveAttributes attr){
+
+}*/
 // Get ray in AABB's local space.
 Ray GetRayInAABBPrimitiveLocalSpace()
 {
@@ -484,6 +492,16 @@ void MyIntersectionShader_AnalyticPrimitive()
         ReportHit(thit, /*hitKind*/ 0, attr);
     }
 }
+
+/*[shader("intersection")]
+void CSG_Intersection()
+{
+    Ray localRay = GetRayInAABBPrimitiveLocalSpace();
+    SignedDistancePrimitive::Enum primitiveType = (SignedDistancePrimitive::Enum) l_aabbCB.primitiveType;
+
+   
+
+}*/
 
 [shader("intersection")]
 void MyIntersectionShader_VolumetricPrimitive()

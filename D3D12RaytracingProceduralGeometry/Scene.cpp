@@ -28,13 +28,19 @@ Scene::Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources)
 void Scene::Init(float m_aspectRatio)
 {
 
-    CreateGeometry();
-    NUM_BLAS = 2;
-   // CreateSpheres();
-    //coordinates = new PlyFile("/Models/Head_AM/AM_Head.ply");
-    // cooridnates->translateToOrigin(cooridnates->centroid());
-     //because triangle geometry can't be stored in the procedural geometry BLAS, we add +1
-   // NUM_BLAS = coordinates->size() + 1;
+    if (!instancing) {
+        CreateGeometry();
+        NUM_BLAS = 2;
+    }
+    else {
+
+
+         CreateSpheres();
+         coordinates = new PlyFile("/Models/Head_AM/AM_Head.ply");
+         coordinates->translateToOrigin(coordinates->centroid());
+          //because triangle geometry can't be stored in the procedural geometry BLAS, we add +1
+        NUM_BLAS = coordinates->size() + 1;
+    }
         auto SetAttributes = [&](
             UINT primitiveIndex,
             const XMFLOAT4& albedo,
@@ -79,8 +85,10 @@ void Scene::Init(float m_aspectRatio)
 
 
     {
-        using namespace SignedDistancePrimitive;
-        SetAttributes(offset+  QuaternionJulia, red, 0, 0, 1.0f, 0.7f, 50, 1.0f);
+        if (quatJulia) {
+            using namespace SignedDistancePrimitive;
+            SetAttributes(offset + QuaternionJulia, red, 0, 0, 1.0f, 0.7f, 50, 1.0f);
+        }
     }
 
     // Setup camera.
@@ -90,7 +98,7 @@ void Scene::Init(float m_aspectRatio)
 
     {
        Geometry torus;
-        torus.LoadModel("/Models/torus.obj");
+        torus.LoadModel("/Models/Lachlan_Head_2/Head_2.obj");
         Geometry plane;
         plane.initPlane();
         
@@ -167,9 +175,10 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
     }
 
     {
-
-        using namespace SignedDistancePrimitive;
-        SetTransformForAABB(offset + SignedDistancePrimitive::QuaternionJulia, mScale3, mRotation);
+        if (quatJulia) {
+            using namespace SignedDistancePrimitive;
+            SetTransformForAABB(offset + SignedDistancePrimitive::QuaternionJulia, mScale3, mRotation);
+        }
     }
 
 
@@ -251,10 +260,12 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
         }
         
         {
-            using namespace SignedDistancePrimitive;
 
-             m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(8,8, 8));
+            if (quatJulia) {
+                using namespace SignedDistancePrimitive;
 
+                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(8, 8, 8));
+            }
         }
         AllocateUploadBuffer(device, m_aabbs.data(), m_aabbs.size() * sizeof(m_aabbs[0]), &m_aabbBuffer.resource);
     }
@@ -286,6 +297,14 @@ void Scene::CreateAABBPrimitiveAttributesBuffers(std::unique_ptr<DX::DeviceResou
     m_aabbPrimitiveAttributeBuffer.Create(device, IntersectionShaderType::TotalPrimitiveCount, frameCount, L"AABB primitive attributes");
 }
 
+
+void Scene::releaseResources() {
+   m_sceneCB.Release();
+   m_aabbPrimitiveAttributeBuffer.Release();
+   m_indexBuffer.resource.Reset();
+   m_vertexBuffer.resource.Reset();
+   m_aabbBuffer.resource.Reset();
+}
 
 ConstantBuffer<SceneConstantBuffer>* Scene::getSceneBuffer()
 {

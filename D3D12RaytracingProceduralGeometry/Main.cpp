@@ -10,11 +10,11 @@
 //*********************************************************
 
 #include "stdafx.h"
-#include "D3D12RaytracingProceduralGeometry.h"
+#include "Application.h"
 
 _Use_decl_annotations_
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-    D3D12RaytracingProceduralGeometry sample(1280, 720, L"D3D12 Raytracing - Procedural Geometry");
+    Application sample(1280, 720, L"Raytracing Honours");
     return Win32Application::Run(&sample, hInstance, nCmdShow);
 }
