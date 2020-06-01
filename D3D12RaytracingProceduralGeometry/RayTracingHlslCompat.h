@@ -51,6 +51,16 @@ struct RayPayload
 {
     XMFLOAT4 color;
     UINT   recursionDepth;
+    XMFLOAT4 intersections[MAX_RAY_RECURSION_DEPTH];
+
+
+    XMFLOAT4 depth_0;
+    XMFLOAT4 depth_1;
+    XMFLOAT4 depth_2;
+    XMFLOAT4 depth_3;
+    XMFLOAT4 depth_4;
+    XMFLOAT4 depth_5;
+
     UINT seed;
 };
 

@@ -32,7 +32,7 @@ namespace DX
         static const unsigned int c_AllowTearing = 0x1;
         static const unsigned int c_RequireTearingSupport = 0x2;
 
-        DeviceResources(DXGI_FORMAT backBufferFormat = DXGI_FORMAT_B8G8R8A8_UNORM,
+        DeviceResources(DXGI_FORMAT backBufferFormat = DXGI_FORMAT_R32G32B32A32_FLOAT,
             DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT,
             UINT backBufferCount = 2,
             D3D_FEATURE_LEVEL minFeatureLevel = D3D_FEATURE_LEVEL_11_0,

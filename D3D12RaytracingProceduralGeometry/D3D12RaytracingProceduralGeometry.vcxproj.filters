@@ -169,6 +169,9 @@
     <FxCompile Include="Raytracing.hlsl">
       <Filter>Assets\Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="Rasterisation.hlsl">
+      <Filter>Assets\Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="PathTracing.hlsl">

@@ -314,7 +314,7 @@ void Application::CreateRootSignatures()
     // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
     {
         CD3DX12_DESCRIPTOR_RANGE ranges[2]; // Perfomance TIP: Order from most frequent to least frequent.
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);  // 1 output texture
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1 + MAX_RAY_RECURSION_DEPTH, 0);  // 1 output texture
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
 
         CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignature::Slot::Count];
@@ -500,6 +500,38 @@ void Application::CreateRaytracingPipelineStateObject()
     ThrowIfFailed(m_dxrDevice->CreateStateObject(raytracingPipeline, IID_PPV_ARGS(&m_dxrStateObject)), L"Couldn't create DirectX Raytracing state object.\n");
 }
 
+void Application::CreateIntersectionBuffers() {
+    auto device = m_deviceResources->GetD3DDevice();
+    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
+
+    //want to have dimension = MAX_RAY_RECURSION
+    //format DXGI_FORMAT_R32G32B32A32_FLOAT
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    intersectionBuffers.clear();
+
+    for (int i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
+        IBuffer intersectionBuffer = {};
+
+        
+        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&intersectionBuffer.textureResource)));
+        NAME_D3D12_OBJECT(intersectionBuffer.textureResource);
+        intersectionBuffer.uavDescriptorHeapIndex = UINT_MAX;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        intersectionBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, intersectionBuffer.uavDescriptorHeapIndex);
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+        uavDesc.Texture2DArray.ArraySize = 1;
+        device->CreateUnorderedAccessView(intersectionBuffer.textureResource.Get(), nullptr, &uavDesc, uavDescriptorHandle);
+        intersectionBuffer.uavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), intersectionBuffer.uavDescriptorHeapIndex, m_descriptorSize);
+
+        intersectionBuffers.push_back(intersectionBuffer);
+
+    }
+
+}
 // Create a 2D output texture for raytracing.
 void Application::CreateRaytracingOutputResource()
 {
@@ -514,12 +546,15 @@ void Application::CreateRaytracingOutputResource()
         &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput)));
     NAME_D3D12_OBJECT(m_raytracingOutput);
 
+
     D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
     m_raytracingOutputResourceUAVDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, m_raytracingOutputResourceUAVDescriptorHeapIndex);
     D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
     UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
     m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), m_raytracingOutputResourceUAVDescriptorHeapIndex, m_descriptorSize);
+
+    
 }
 
 void Application::CreateAuxilaryDeviceResources()
@@ -538,10 +573,11 @@ void Application::CreateDescriptorHeap()
     auto device = m_deviceResources->GetD3DDevice();
 
     D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
-    // Allocate a heap for 6 descriptors:
+    // Allocate a heap for (3 + RAY_DEPTH) descriptors:
     // 2 - vertex and index  buffer SRVs
     // 1 - raytracing output texture SRV
-    descriptorHeapDesc.NumDescriptors = 3;
+    // n - Interesection Buffers
+    descriptorHeapDesc.NumDescriptors = 3 + MAX_RAY_RECURSION_DEPTH;
     descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     descriptorHeapDesc.NodeMask = 0;
@@ -783,12 +819,9 @@ void Application::DoRaytracing()
     // Copy dynamic buffers to GPU.
     {
         scene->getSceneBuffer()->CopyStagingToGpu(frameIndex);
-       // commandList->SetComputeRootConstantBufferView(GlobalRootSignature::Slot::SceneConstant, m_sceneCB.GpuVirtualAddress(frameIndex));
         commandList->SetComputeRootConstantBufferView(GlobalRootSignature::Slot::SceneConstant, scene->getSceneBuffer()->GpuVirtualAddress(frameIndex));
         scene->getPrimitiveAttributes()->CopyStagingToGpu(frameIndex);
         commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::AABBattributeBuffer, scene->getPrimitiveAttributes()->GpuVirtualAddress(frameIndex));
-       // m_aabbPrimitiveAttributeBuffer.CopyStagingToGpu(frameIndex);
-      //  commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::AABBattributeBuffer, m_aabbPrimitiveAttributeBuffer.GpuVirtualAddress(frameIndex));
     }
 
     // Bind the heaps, acceleration structure and dispatch rays.  
@@ -804,6 +837,29 @@ void Application::UpdateForSizeChange(UINT width, UINT height)
     DXSample::UpdateForSizeChange(width, height);
 }
 
+
+void Application::CopyIntersectionBufferToBackBuffer(UINT intersectionIndex) {
+
+
+    auto commandList = m_deviceResources->GetCommandList();
+    auto renderTarget = m_deviceResources->GetRenderTarget();
+
+    D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+    preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(intersectionBuffers[intersectionIndex].textureResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+
+    commandList->CopyResource(renderTarget, intersectionBuffers[intersectionIndex].textureResource.Get());
+
+    D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+    postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(intersectionBuffers[intersectionIndex].textureResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+
+
+  
+}
 // Copy the raytracing output to the backbuffer.
 void Application::CopyRaytracingOutputToBackbuffer()
 {
@@ -828,15 +884,18 @@ void Application::CopyRaytracingOutputToBackbuffer()
 void Application::CreateWindowSizeDependentResources()
 {
     CreateRaytracingOutputResource();
+    CreateIntersectionBuffers();
     scene->sceneUpdates(0, m_deviceResources);
-    //camera->Update(m_sceneCB);  
-    //UpdateCameraMatrices();
 }
 
 // Release resources that are dependent on the size of the main window.
 void Application::ReleaseWindowSizeDependentResources()
 {
     m_raytracingOutput.Reset();
+    for (auto& I : intersectionBuffers) {
+        I.textureResource.Reset();
+        I.uavDescriptorHeapIndex = UINT_MAX;
+    }
 }
 
 // Release all resources that depend on the device.
@@ -849,6 +908,7 @@ void Application::ReleaseDeviceDependentResources()
 
     m_raytracingGlobalRootSignature.Reset();
     ResetComPtrArray(&m_raytracingLocalRootSignature);
+       
 
     m_dxrDevice.Reset();
     m_dxrCommandList.Reset();
@@ -866,6 +926,11 @@ void Application::ReleaseDeviceDependentResources()
 
     m_raytracingOutput.Reset();
     m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
+
+    for (auto& I : intersectionBuffers) {
+        I.textureResource.Reset();
+        I.uavDescriptorHeapIndex = UINT_MAX;
+    }
     m_rayGenShaderTable.Reset();
     m_missShaderTable.Reset();
     m_hitGroupShaderTable.Reset();
@@ -904,8 +969,8 @@ void Application::OnRender()
     }
 
     DoRaytracing();
-    CopyRaytracingOutputToBackbuffer();
-
+   // CopyRaytracingOutputToBackbuffer();
+    CopyIntersectionBufferToBackBuffer(0);
     // End frame.
     for (auto& gpuTimer : m_gpuTimers)
     {
@@ -948,7 +1013,7 @@ void Application::CalculateFrameStats()
     if (totalTime >= 30.0f && testing) {
         std::ofstream output_file("/fps_stats.txt");
         for (const auto& e : fpsAverages) output_file << e << "\n";
-
+        
     }
     // Compute averages over one second period.
     if ((totalTime - prevTime) >= 1.0f)

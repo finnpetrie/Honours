@@ -177,9 +177,9 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
             if (scene->instancing) {
                 Vertex_Ply coord = scene->coordinates->getPointAt(i);
 
-                x = 100 * coord.location.x();
-                y = 100 * coord.location.y();
-                z = 100 * coord.location.z();
+                x = 1 * coord.location.x();
+                y = 1 * coord.location.y();
+                z = 1 * coord.location.z();
             }
             else {
                 x = 0;

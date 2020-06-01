@@ -28,6 +28,74 @@ ConstantBuffer<PrimitiveConstantBuffer> l_materialCB : register(b1);
 ConstantBuffer<PrimitiveInstanceConstantBuffer> l_aabbCB: register(b2);
 
 
+/**
+
+float pathTrace(float3 cameraPos, float3 rayDir, uint seed) {
+    float3 radiance = 0.0f;
+    float3 attenuation = 1.0f;
+
+    RayDesc ray;
+    ray.Origin = cameraPos;
+    ray.Direction = rayDir;
+    RayPayload payload;
+    payload.seed = seed;
+    payload.recursionDepth = 0;
+
+    while (payload.recursionDepth < MAX_RAY_RECURSION_DEPTH) {
+        //()
+          //  radiance +=r attenuation * prd.radiance;
+       // attenuation *= payload.attenuation;
+
+        /*if(prd.terminateRay)
+            break;*/
+
+            // ray.Origin = prd.hitPos;
+            // ray.Direction = prd.bounceDir;
+       /* ++payload.recursionDepth;
+    }
+
+    seed = payload.seed;
+
+    return radiance;
+
+
+}*/
+/**PathTracing Shaders */
+/**
+[shader("raygeneration")]
+void path_rayGen() {
+    uint2 launchIdx = DispatchRaysIndex().xy;
+    uint2 launchDim = DispatchRaysDimensions().xy;
+    uint bufferOffset = launchDim.x * launchIdx.y + launchIdx.x;
+    //get seed
+    uint seed = getNewSeed(bufferOffset, g_sceneCB.accumulatedFrames, 8);
+
+    float3 radiance = 0.0f;
+    for (uint i = 0; i < 5; i++) {
+        float2 screenCoord = float2(launchIdx)+float2(rnd(seed), rnd(seed));
+        float2 ndc = screenCoord / float2(launchDim) * 2.f - 1.f;
+        float3 rayDir = normalize(ndc.x * 90 * g_sceneCB.cameraPosition.x + ndc.y * 90 * g_sceneCB.cameraPosition.y + g_sceneCB.cameraPosition.z);
+
+        radiance += pathTrace(g_sceneCB.cameraPosition, rayDir, seed);
+    }
+
+    radiance *= 1.0f / 5;
+
+    float3 avRad;
+
+    if (g_sceneCB.accumulatedFrames == 0) {
+        avRad = radiance;
+    }
+    else {
+        avRad = lerp(g_renderTarget[launchIdx].xyz, radiance, 1.f / (g_sceneCB.accumulatedFrames + 1.0f));
+
+    }
+    g_renderTarget[launchIdx] = float4(avRad, 1.0f);
+    //test how many frames accumulated.
+    //otherwise linearly interpolate between radiances.
+
+    //add to the output buffer
+}*/
 float rand(in float2 uv) {
     float2 noise = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
     return abs(noise.x + noise.y) * 0.5;

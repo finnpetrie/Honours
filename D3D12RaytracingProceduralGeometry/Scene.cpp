@@ -27,7 +27,7 @@ Scene::Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources)
 
 void Scene::Init(float m_aspectRatio)
 {
-
+    instancing = false;
     if (!instancing) {
         CreateGeometry();
         NUM_BLAS = 2;
@@ -36,7 +36,7 @@ void Scene::Init(float m_aspectRatio)
 
 
          CreateSpheres();
-         coordinates = new PlyFile("/Models/Head_AM/AM_Head.ply");
+         coordinates = new PlyFile("/Models/Main_Room_Dense_Filtered_3_million_Verts.ply");
          coordinates->translateToOrigin(coordinates->centroid());
           //because triangle geometry can't be stored in the procedural geometry BLAS, we add +1
         NUM_BLAS = coordinates->size() + 1;
@@ -98,10 +98,10 @@ void Scene::Init(float m_aspectRatio)
 
     {
        Geometry torus;
-        torus.LoadModel("/Models/Lachlan_Head_2/Head_2.obj");
+        //torus.LoadModel("/Models/albany_mesh.obj");
         Geometry plane;
         plane.initPlane();
-        
+        this->plane = true;
         meshes = {  plane};
 
     }
@@ -160,14 +160,20 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
     // Analytic primitives.
     {
         using namespace AnalyticPrimitive;
+        
         for (Primitive& p : analyticalObjects) {
             //SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
-            if (p.getType() != AnalyticPrimitive::Ellipsoid) {
-                SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
-                //  offset++; 
+            if (!instancing) {
+                if (p.getType() != AnalyticPrimitive::Ellipsoid) {
+                    SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
+                    //  offset++; 
+                }
+                else {
+                    SetTransformForAABB(offset + p.getType(), mScale3, mRotation);
+                }
             }
             else {
-                SetTransformForAABB(offset + p.getType(), mScale3, mRotation);
+                SetTransformForAABB(offset + p.getType(), mScaleTiny, mRotation);
             }
         }
        
@@ -327,7 +333,7 @@ void Scene::CreateSpheres() {
         float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
         float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
         float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(x, y, z, 0), 1.5f, 1.5f, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(1, 0, 0, 0), 0, 0, 1, 0.4f, 50, 1 };
 
         Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0, 0, 0), XMFLOAT3(0.5
             , 0.5

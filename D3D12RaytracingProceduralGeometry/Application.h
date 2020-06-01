@@ -24,6 +24,15 @@
 #include "Scene.h"
 #include "AccelerationStructure.h"
 #include "Pipeline.h"
+
+//intersection buffers
+struct IBuffer
+{
+    ComPtr<ID3D12Resource> textureResource;
+    D3D12_GPU_DESCRIPTOR_HANDLE uavGPUDescriptor;
+    UINT uavDescriptorHeapIndex;
+};
+
 class Application : public DXSample
 {
 public:
@@ -49,13 +58,12 @@ public:
 private:
     static const UINT FrameCount = 3;
     std::vector<float> fpsAverages;
-    bool testing = true;
+    bool testing = false;
     // Constants.
     UINT NUM_BLAS = 100000;          // Triangle + AABB bottom-level AS.
     const float c_aabbWidth = 2;      // AABB width.
     const float c_aabbDistance = 2;   // Distance between AABBs.
 
-    Camera* camera;
     // DirectX Raytracing (DXR) attributes
     ComPtr<ID3D12Device5> m_dxrDevice;
     ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList;
@@ -69,23 +77,20 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
     UINT m_descriptorsAllocated;
     UINT m_descriptorSize;
-
-
-    // Root constants
-   
+    
     IDxcBlob* m_rayGenLibrary;
-    // Geometry
-
+    
     Scene* scene;
     AccelerationStructure* acclerationStruct;
     Pipeline* pipeline;
     // Acceleration structure
-    
 
     // Raytracing output
     ComPtr<ID3D12Resource> m_raytracingOutput;
     D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
     UINT m_raytracingOutputResourceUAVDescriptorHeapIndex;
+    //collection of intersection buffers for writing intersections.
+    std::vector<IBuffer> intersectionBuffers;
 
     // Shader tables
     static const wchar_t* c_hitGroupNames_TriangleGeometry[RayType::Count];
@@ -125,6 +130,7 @@ private:
     void CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateRaytracingPipelineStateObject();
+    void CreateIntersectionBuffers();
     void CreateAuxilaryDeviceResources();
     void CreateDescriptorHeap();
     void CreateRaytracingOutputResource();
@@ -134,7 +140,8 @@ private:
    
     void BuildShaderTables();
     void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
-    void CopyRaytracingOutputToBackbuffer();
+	void CopyIntersectionBufferToBackBuffer(UINT intersectionIndex);
+	void CopyRaytracingOutputToBackbuffer();
     void CalculateFrameStats();
     UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse = UINT_MAX);
     UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
