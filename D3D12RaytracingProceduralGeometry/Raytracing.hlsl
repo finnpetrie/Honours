@@ -99,6 +99,7 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
     if (payload.recursionDepth >= MAX_RAY_RECURSION_DEPTH)
     {
        payload.color = float4(1,1,1, 1);
+       payload.depth_5 = float4(0.5, 0.5, 1.0, 0);
        return payload;
     }
 
@@ -111,9 +112,8 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
     rayDesc.TMin = 0.0001;
     rayDesc.TMax = 10000;
   //  RayPayload rayPayload = { float4(0, 0, 0, 0), payload.recursionDepth + 1, payload.seed};
-   // float3 pos = HitWorldPosition();
-    payload.intersections[payload.recursionDepth] = float4(ray.origin, 1);
-    payload.recursionDepth += 1;
+    //float3 pos = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
+   /* payload.intersections[payload.recursionDepth] = float4(ray.origin, 1);
     switch (payload.recursionDepth) {
    case 0:
        payload.depth_0 = float4(ray.origin, 1);
@@ -136,8 +136,10 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
    case 5:
        payload.depth_5 = float4(ray.origin, 1);
        break;
-   }
-    TraceRay(g_scene, RAY_FLAG_NONE,
+   }*/
+    payload.recursionDepth += 1;
+
+    TraceRay(g_scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
         TraceRayParameters::InstanceMask,
         TraceRayParameters::HitGroup::Offset[RayType::Radiance],
         TraceRayParameters::HitGroup::GeometryStride,
@@ -191,6 +193,12 @@ void MyRaygenShader()
  
     // Cast a ray into the scene and retrieve a shaded color.
     UINT currentRecursionDepth = 0;
+
+    //zero out our intersection buffer
+    for (uint i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
+      
+    intersectionBuffer[i][DispatchRaysIndex().xy] = float4(0,0,0,0);
+    }
     RayPayload payload = { float4(0,0,0,0), 
     { float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0)},
         0,
@@ -201,12 +209,7 @@ void MyRaygenShader()
     // Write the raytraced color to the output texture.
     g_renderTarget[DispatchRaysIndex().xy] = payload.color;
     uint offset = 0;
-    for (uint i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
-        float4 intersection = traced.intersections[i];
 
-            // 
-        intersectionBuffer[i][DispatchRaysIndex().xy] = traced.depth_2;
-    }
     //if drawing rays, need to write the intersections for this ray into a 3D tensor.
 
 }
@@ -246,31 +249,9 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float3 pos_n =normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
+    intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
 
-    /*switch (depth) {
-    case 0:
-        rayPayload.depth_0 = float4(pos_n, 1);
-        break;
-    case 1:
-        rayPayload.depth_1 = float4(pos_n, 1);
-        rayPayload.intersections[1] = float4(pos_n, 1);
 
-        break;
-    case 2:
-        rayPayload.depth_2 = rayPayload.depth_1;
-        rayPayload.intersections[2] = float4(pos_n, 1);
-
-        break;
-    case 3:
-        rayPayload.depth_3 = float4(pos_n, 1);
-        break;
-    case 4:
-        rayPayload.depth_4 = float4(pos_n, 1);
-        break;
-    case 5:
-        rayPayload.depth_5 = float4(pos_n, 1);
-        break;
-    }*/
    float4 pathColour = float4(0, 0, 0, 0);
    /*f (true) {
         for (int i = 0; i < 1; i++) {
@@ -323,33 +304,8 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float3 pos_n = normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
-
-    /*rayPayload.intersections[depth] = float4(pos_n, 1);
-
-    switch (depth) {
-    case 0:
-        rayPayload.depth_0 = float4(pos_n, 1);
-        rayPayload.intersections[0] = float4(pos_n, 1);
-
-        break;
-    case 1:
-        rayPayload.depth_1 = float4(pos_n, 1);
-        rayPayload.intersections[1] = float4(pos_n, 1);
-
-        break;
-    case 2:
-        rayPayload.depth_2 = float4(pos_n, 1);
-        break;
-    case 3:
-        rayPayload.depth_3 = float4(pos_n, 1);
-        break;
-    case 4:
-        rayPayload.depth_4 = float4(pos_n, 1);
-        break;
-    case 5:
-        rayPayload.depth_5 = float4(pos_n, 1);
-        break;
-    }*/
+    intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
+ 
     float3 l_dir = normalize(g_sceneCB.lightPosition.xyz - pos);
     Ray shadowRay = { pos, l_dir };
     float3 currentDir =    RayTCurrent() * WorldRayDirection();
@@ -369,7 +325,7 @@ float4 refractionColour = float4(0, 0, 0, 1);
 float3 dir = normalize(WorldRayDirection());
 // float3 worldNormal = mul(attr.normal, (float3x3)ObjectToWorld3x4());
 
-if (l_materialCB.refractiveCoef > 0) {
+if (l_materialCB.refractiveCoef < 0) {
     //assume refractive glass
     float n1 = 1;
     float n2 = l_materialCB.refractiveCoef;
@@ -428,29 +384,8 @@ void MyMissShader(inout RayPayload rayPayload)
    // float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor);
    // float4 backgroundColor = float4(BackgroundColor);
     uint depth = rayPayload.recursionDepth;
-    switch (depth) {
-    case 0:
-        rayPayload.depth_0 = float4(BackgroundColor);
-        break;
-    case 1:
-        rayPayload.depth_1 = float4(BackgroundColor);
-        break;
-    case 2:
-        rayPayload.depth_2 = float4(BackgroundColor);
-        break;
-    case 3:
-        rayPayload.depth_3 = float4(BackgroundColor);
-        break;
-    case 4:
-        rayPayload.depth_4 = float4(BackgroundColor);
-        break;
-    case 5:
-        rayPayload.depth_5 = float4(BackgroundColor);
-        break;
-    }
-
     rayPayload.color = float4(BackgroundColor);
-    rayPayload.intersections[rayPayload.recursionDepth] = float4(BackgroundColor);
+   // intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(0,0,0,0);
 
 }
 
