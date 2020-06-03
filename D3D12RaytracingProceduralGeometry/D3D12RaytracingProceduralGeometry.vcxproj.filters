@@ -25,6 +25,12 @@
     <Filter Include="Assets\Shaders\ProceduralPrimitives">
       <UniqueIdentifier>{69efd3aa-04fd-4b1e-be35-61217582c550}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Assets\Shaders\Rasterisation">
+      <UniqueIdentifier>{aa99c09f-bed1-4436-a86c-e859ea7731e2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assets\Shaders\PathTracing">
+      <UniqueIdentifier>{76a0b5b4-eebb-403a-a79a-1cb4762c0fbd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -169,13 +175,22 @@
     <FxCompile Include="Raytracing.hlsl">
       <Filter>Assets\Shaders</Filter>
     </FxCompile>
-    <FxCompile Include="Rasterisation.hlsl">
-      <Filter>Assets\Shaders</Filter>
+    <FxCompile Include="RayVertex.hlsl">
+      <Filter>Assets\Shaders\Rasterisation</Filter>
+    </FxCompile>
+    <FxCompile Include="RayPixel.hlsl">
+      <Filter>Assets\Shaders\Rasterisation</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders.hlsl">
+      <Filter>Assets\Shaders\Rasterisation</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="PathTracing.hlsl">
-      <Filter>Assets\Shaders</Filter>
+      <Filter>Assets\Shaders\PathTracing</Filter>
+    </None>
+    <None Include="Rasterisation.hlsli">
+      <Filter>Assets\Shaders\Rasterisation</Filter>
     </None>
   </ItemGroup>
 </Project>

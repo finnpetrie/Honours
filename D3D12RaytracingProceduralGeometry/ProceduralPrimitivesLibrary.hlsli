@@ -28,29 +28,7 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     float t_min;
     float t_max;
     
-    float4x4 Q_1 = {1.0f/1.5f, 0.0f, 0.0f,0.0f,
-                 0.0f, 1.0f, 0.0f, 0.0f,
-                  0.0f, 0.0f, 1.0f/2.0f , 0.0f,
-                  0.0f, 0.0f, 0.0f, -1.0f};
-
-  float4x4 Q_2 = { 1.0f/2, 0.0f, 0.0f, 0.0f,
-                  0.0f, 0.0f, 0.0f,  -0.1f,
-                   0.0f, 0.0f, 1.0f/1.5f, 0.0f,
-                     0.0f, -0.1f, 0.0f, 0.0f };
-
-  float4x4 Q_cone = { -1.0f, 0.0f, 0.0f, 0.0f,
-                            0.0f, 1.0f, 0.0f, 0.0f,
-                            0.0f, 0.0f, -1.0f, 0.0f,
-                            0.0f, 0.0f, 0.0f, 0.0f };
-
-    float4x4 Q_3 = { -1.0f ,0.0f, 0.0f, 0.0f,
-                    0.0f, 1.0f, 0.0f,  0.0f,
-                     0.0f, 0.0f, 1.0f , 0.0f,
-                       0.0f, 0.0f, 0.0f, -0.09f };
-    float4x4 Q_4 = { 0.0f,0.0f, 0.0f, 0.0f,
-                0.0f, 1.0f, 0.0f,  0.0f,
-                 0.0f, 0.0f, 1.0f   , 0.0f,
-                   0.0f, 0.0f, 0.0f, -0.5f };
+ 
                    
     switch (analyticPrimitive)
     {

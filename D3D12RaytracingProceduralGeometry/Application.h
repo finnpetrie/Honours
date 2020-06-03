@@ -17,6 +17,7 @@
 #include "DirectXRaytracingHelper.h"
 #include "PerformanceTimers.h"
 #include <dxcapi.h>
+#include <d3dcompiler.h>
 #include <fstream>
 #include "Primitive.h"
 #include "Camera.h"
@@ -25,7 +26,12 @@
 #include "AccelerationStructure.h"
 #include "Pipeline.h"
 
+//constant buffer for rasterisation
+struct RasterSceneCB {
+    XMFLOAT4X4 mvp;
+};
 //intersection buffers
+
 struct IBuffer
 {
     ComPtr<ID3D12Resource> textureResource;
@@ -36,6 +42,8 @@ struct IBuffer
 class Application : public DXSample
 {
 public:
+
+    
     CComPtr<IDxcBlob> compileShaders(LPCWSTR fileName);
     CComPtr<IDxcBlob> compileShaderTwo(LPCWSTR fileName);
     void createRayTracingPipeline_Two();
@@ -69,7 +77,10 @@ private:
     ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList;
     ComPtr<ID3D12StateObject> m_dxrStateObject;
 
+    //Raster Pipeline
+    ComPtr<ID3D12PipelineState> m_rasterState;
     // Root signatures
+    ComPtr<ID3D12RootSignature> m_rasterRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature[LocalRootSignature::Type::Count];
 
@@ -79,6 +90,15 @@ private:
     UINT m_descriptorSize;
     
     IDxcBlob* m_rayGenLibrary;
+    
+    //raster resources
+    ComPtr<ID3D12Resource> rasterVertexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW rasterVertexView;
+    ComPtr<ID3D12Resource> rasterConstant;
+    RasterSceneCB rasterConstantBuffer;
+    ComPtr<ID3D12DescriptorHeap> m_rasterHeap;
+    UINT8* m_pCbvDataBegin;   
+    
     
     Scene* scene;
     AccelerationStructure* acclerationStruct;
@@ -91,7 +111,7 @@ private:
     UINT m_raytracingOutputResourceUAVDescriptorHeapIndex;
     //collection of intersection buffers for writing intersections.
     std::vector<IBuffer> intersectionBuffers;
-
+    UINT intersectionIndex = 1;
     // Shader tables
     static const wchar_t* c_hitGroupNames_TriangleGeometry[RayType::Count];
     static const wchar_t* c_hitGroupNames_AABBGeometry[IntersectionShaderType::Count][RayType::Count];
@@ -128,11 +148,14 @@ private:
     void CreateRootSignatures();
     void CreateDxilLibrarySubobject(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
+    void CreateRasterRootSignatures();
     void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
+	void CreateRasterisationPipeline();
     void CreateRaytracingPipelineStateObject();
     void CreateIntersectionBuffers();
     void CreateAuxilaryDeviceResources();
     void CreateDescriptorHeap();
+    void CreateRasterisationBuffers();
     void CreateRaytracingOutputResource();
     void BuildGeometry();
     

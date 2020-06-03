@@ -270,11 +270,15 @@ void Application::CreateDeviceDependentResources()
 
     // Create a raytracing pipeline state object which defines the binding of shaders, state and resources to be used during raytracing.
     CreateRaytracingPipelineStateObject();
+
+    CreateRasterRootSignatures();
+    CreateRasterisationPipeline();
      //createRayTracingPipeline_Two();
 
     // Create a heap for descriptors.
     CreateDescriptorHeap();
 
+    CreateRasterisationBuffers();
     // Build geometry to be used in the sample.
     BuildGeometry();
 
@@ -415,6 +419,33 @@ void Application::CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracing
     }
 }
 
+void Application::CreateRasterRootSignatures() {
+
+    auto device = m_deviceResources->GetD3DDevice();
+  
+
+    CD3DX12_DESCRIPTOR_RANGE ranges[1];
+    CD3DX12_ROOT_PARAMETER rootParameters[1];
+
+    ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+    rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
+
+    D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
+        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+
+    CD3DX12_ROOT_SIGNATURE_DESC rasterRoot(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr, rootSignatureFlags);
+
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+    ThrowIfFailed(D3D12SerializeRootSignature(&rasterRoot, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+    ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
+   
+}   
+
 // Local root signature and shader association
 // This is a root signature that enables a shader to have unique arguments that come from shader tables.
 void Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline)
@@ -444,6 +475,49 @@ void Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* 
             rootSignatureAssociation->AddExports(hitGroupsForIntersectionShaderType);
         }
     }
+}
+
+void Application::CreateRasterisationPipeline() {
+
+    auto device = m_deviceResources->GetD3DDevice();
+    auto commandAllocator = m_deviceResources->GetCommandAllocator();
+    auto commandList = m_deviceResources->GetCommandList();
+    ComPtr<ID3DBlob> vertexShader;
+    ComPtr<ID3DBlob> pixelShader;
+
+    UINT compileFlags = D3DCOMPILE_DEBUG;
+    std::wstring shaderPath = L"/Users/endev/Documents/Honours/DirectX-Graphics-Samples-master/DirectX-Graphics-Samples-master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry/";
+    ThrowIfFailed(D3DCompileFromFile((shaderPath + L"shaders.hlsl").c_str(), nullptr, nullptr, "VSMain", "vs_5_0", compileFlags, 0, &vertexShader, nullptr));
+    ThrowIfFailed(D3DCompileFromFile((shaderPath + L"shaders.hlsl").c_str(), nullptr, nullptr, "PSMain", "ps_5_0", compileFlags, 0, &pixelShader, nullptr));
+
+    D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+    };
+
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+    psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+    psoDesc.pRootSignature = m_rasterRootSignature.Get();
+    psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+    psoDesc.DepthStencilState.DepthEnable = FALSE;
+    psoDesc.DepthStencilState.StencilEnable = FALSE;
+    psoDesc.SampleMask = UINT_MAX;
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.NumRenderTargets = 1;
+    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    psoDesc.SampleDesc.Count = 1;
+
+    ThrowIfFailed(device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterState)));
+    ThrowIfFailed(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocator, m_rasterState.Get(), IID_PPV_ARGS(&commandList)));
+
+    // Command lists are created in the recording state, but there is nothing
+    // to record yet. The main loop expects it to be closed, so close it now.
+    ThrowIfFailed(commandList->Close());
 }
 
 // Create a raytracing pipeline state object (RTPSO).
@@ -587,6 +661,58 @@ void Application::CreateDescriptorHeap()
     m_descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
+void Application::CreateRasterisationBuffers() {
+    auto device = m_deviceResources->GetD3DDevice();
+    
+    D3D12_DESCRIPTOR_HEAP_DESC rasterCBVDesc = {};
+    rasterCBVDesc.NumDescriptors = 1;
+    rasterCBVDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    rasterCBVDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+    ThrowIfFailed(device->CreateDescriptorHeap(&rasterCBVDesc, IID_PPV_ARGS(&m_rasterHeap)));
+    Vertex triangleVertices[] =
+    {
+        { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+        { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+        { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 0.0f, 1.0f } }
+    };
+
+    const UINT bufferSize = sizeof(triangleVertices);
+
+    ThrowIfFailed(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        D3D12_HEAP_FLAG_NONE,
+        &CD3DX12_RESOURCE_DESC::Buffer(bufferSize),
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&rasterVertexBuffer)));
+
+
+    UINT8* pVertexDataBegin;
+    CD3DX12_RANGE readRange(0, 0);
+    ThrowIfFailed(rasterVertexBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin)));
+    memcpy(pVertexDataBegin, triangleVertices, sizeof(triangleVertices));
+    rasterVertexBuffer->Unmap(0, nullptr);  
+
+    rasterVertexView.BufferLocation = rasterVertexBuffer->GetGPUVirtualAddress();
+    rasterVertexView.StrideInBytes = sizeof(Vertex);
+    rasterVertexView.SizeInBytes = bufferSize;
+
+    ThrowIfFailed(device->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        D3D12_HEAP_FLAG_NONE,
+        &CD3DX12_RESOURCE_DESC::Buffer(1024 * 64),
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&rasterConstant)));
+
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+    cbvDesc.BufferLocation = rasterConstant->GetGPUVirtualAddress();
+    cbvDesc.SizeInBytes = (sizeof(RasterSceneCB) + 255) & ~255;
+    device->CreateConstantBufferView(&cbvDesc, m_rasterHeap->GetCPUDescriptorHandleForHeapStart());
+
+  
+    ThrowIfFailed(rasterConstant->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
+    memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
+}
 
 // Build geometry used in the sample.
 void Application::BuildGeometry()
@@ -754,6 +880,24 @@ void Application::OnKeyDown(UINT8 key)
         break;
     case 'L': 
         m_animateLight = !m_animateLight;
+        break;
+    case '0':
+        intersectionIndex = 0;
+        break;
+    case '1':
+        intersectionIndex = 1;
+        break;
+    case '2': 
+        intersectionIndex = 2;
+        break;
+    case '3':
+        intersectionIndex = 3;
+        break;
+    case '4': 
+        intersectionIndex = 4;
+        break;
+    case '5':
+        intersectionIndex = 5;
         break;
     }
 }
@@ -970,7 +1114,7 @@ void Application::OnRender()
 
     DoRaytracing();
    // CopyRaytracingOutputToBackbuffer();
-    CopyIntersectionBufferToBackBuffer(0);
+    CopyIntersectionBufferToBackBuffer(intersectionIndex);
     // End frame.
     for (auto& gpuTimer : m_gpuTimers)
     {

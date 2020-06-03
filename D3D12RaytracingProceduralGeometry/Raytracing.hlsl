@@ -99,7 +99,6 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
     if (payload.recursionDepth >= MAX_RAY_RECURSION_DEPTH)
     {
        payload.color = float4(1,1,1, 1);
-       payload.depth_5 = float4(0.5, 0.5, 1.0, 0);
        return payload;
     }
 
@@ -200,9 +199,7 @@ void MyRaygenShader()
     intersectionBuffer[i][DispatchRaysIndex().xy] = float4(0,0,0,0);
     }
     RayPayload payload = { float4(0,0,0,0), 
-    { float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0)},
         0,
-        float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0), float4(0,0,0,0),
         0 };
     RayPayload traced = TraceRadianceRay(ray, payload);
 
