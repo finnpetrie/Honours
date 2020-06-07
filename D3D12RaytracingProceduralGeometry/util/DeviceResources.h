@@ -44,6 +44,7 @@ namespace DX
         void SetAdapterOverride(UINT adapterID) { m_adapterIDoverride = adapterID; }
         void CreateDeviceResources();
         void CreateWindowSizeDependentResources();
+        void SetRasterRenderTarget();
         void SetWindow(HWND window, int width, int height);
         bool WindowSizeChanged(int width, int height, bool minimized);
         void HandleDeviceLost();

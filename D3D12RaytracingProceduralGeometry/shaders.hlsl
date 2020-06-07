@@ -13,7 +13,8 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
 {
     PSInput result;
 
-    result.position = mul(mvp, position);
+   // result.position = mul(mvp, position);
+    result.position = position;
     result.color = color;
 
     return result;
@@ -21,5 +22,5 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    return input.color;
+   return float4(1, 1, 1, 0);
 }

@@ -232,7 +232,6 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
         break;
 
     case WM_PAINT:
-        if (pSample)
         {
             pSample->OnUpdate();
             pSample->OnRender();

@@ -405,6 +405,13 @@ void DeviceResources::CreateWindowSizeDependentResources()
     m_scissorRect.bottom = backBufferHeight;
 }
 
+void DeviceResources::SetRasterRenderTarget() {
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_backBufferIndex, m_rtvDescriptorSize);
+    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+    const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+    m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+}
+
 // This method is called when the Win32 window is created (or re-created).
 void DeviceResources::SetWindow(HWND window, int width, int height)
 {

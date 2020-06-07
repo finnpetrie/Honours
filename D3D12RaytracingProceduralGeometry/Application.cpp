@@ -712,6 +712,9 @@ void Application::CreateRasterisationBuffers() {
   
     ThrowIfFailed(rasterConstant->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
     memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
+
+    m_deviceResources->WaitForGpu();
+
 }
 
 // Build geometry used in the sample.
@@ -924,6 +927,42 @@ void Application::OnUpdate()
     }
 }
 
+
+void Application::DoRasterisation() {
+    auto commandList = m_deviceResources->GetCommandList();
+    auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
+    auto viewPort = m_deviceResources->GetScreenViewport();
+    auto scissorRect = m_deviceResources->GetScissorRect();
+    auto rtv = m_deviceResources->GetRenderTargetView();
+    auto renderTarget = m_deviceResources->GetRenderTarget();
+    commandList->SetPipelineState(m_rasterState.Get());
+    commandList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
+    
+    ID3D12DescriptorHeap* ppHeaps[] = { m_rasterHeap.Get() };
+    commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+
+    commandList->SetGraphicsRootDescriptorTable(0, m_rasterHeap->GetGPUDescriptorHandleForHeapStart());
+    commandList->RSSetViewports(1, &viewPort);
+    commandList->RSSetScissorRects(1, &scissorRect);
+
+   // commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+    //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+    //commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+    m_deviceResources->SetRasterRenderTarget();
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    commandList->IASetVertexBuffers(0, 1, &rasterVertexView);
+    commandList->DrawInstanced(3, 1, 0, 0);
+
+    commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+   // ThrowIfFailed(commandList->Close());
+
+
+    
+}
+
+
 void Application::DoRaytracing()
 {
     auto commandList = m_deviceResources->GetCommandList();
@@ -1107,19 +1146,25 @@ void Application::OnRender()
 
     // Begin frame.
     m_deviceResources->Prepare();
-    for (auto& gpuTimer : m_gpuTimers)
+   /* for (auto& gpuTimer : m_gpuTimers)
     {
         gpuTimer.BeginFrame(commandList);
-    }
+    }*/
 
-    DoRaytracing();
-   // CopyRaytracingOutputToBackbuffer();
-    CopyIntersectionBufferToBackBuffer(intersectionIndex);
+   // DoRaytracing();
+    //CopyRaytracingOutputToBackbuffer();
+    //CopyIntersectionBufferToBackBuffer(intersectionIndex);
+
+    if (true) {
+      //  m_deviceResources->Prepare();
+
+        DoRasterisation();
+    }
     // End frame.
-    for (auto& gpuTimer : m_gpuTimers)
+    /*for (auto& gpuTimer : m_gpuTimers)
     {
         gpuTimer.EndFrame(commandList);
-    }
+    }*/
 
     m_deviceResources->Present(D3D12_RESOURCE_STATE_PRESENT);
 }

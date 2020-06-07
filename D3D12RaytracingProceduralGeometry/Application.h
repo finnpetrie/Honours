@@ -67,6 +67,7 @@ private:
     static const UINT FrameCount = 3;
     std::vector<float> fpsAverages;
     bool testing = false;
+    bool drawRays = false;
     // Constants.
     UINT NUM_BLAS = 100000;          // Triangle + AABB bottom-level AS.
     const float c_aabbWidth = 2;      // AABB width.
@@ -158,7 +159,7 @@ private:
     void CreateRasterisationBuffers();
     void CreateRaytracingOutputResource();
     void BuildGeometry();
-    
+    void DoRasterisation();
    
    
     void BuildShaderTables();

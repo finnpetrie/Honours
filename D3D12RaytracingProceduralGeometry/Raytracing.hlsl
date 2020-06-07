@@ -204,7 +204,7 @@ void MyRaygenShader()
     RayPayload traced = TraceRadianceRay(ray, payload);
 
     // Write the raytraced color to the output texture.
-    g_renderTarget[DispatchRaysIndex().xy] = payload.color;
+    g_renderTarget[DispatchRaysIndex().xy] = traced.color;
     uint offset = 0;
 
     //if drawing rays, need to write the intersections for this ray into a 3D tensor.
@@ -359,7 +359,7 @@ if (l_materialCB.reflectanceCoef > 0.1f) {
 //0.1f is a good coefficient for reflectioncolour.
  // rayPayload.color += refractionColour + 0.1*reflectionColour;
 //  rayPayload.color = refractionColour;
-float4 color = ambient + refractionColour + 0.1 * reflectionColour + pathColour;
+float4 color = ambient + refractionColour +  reflectionColour + pathColour;
 
 float t = RayTCurrent();
 rayPayload.color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
