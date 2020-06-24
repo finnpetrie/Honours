@@ -139,9 +139,11 @@ namespace DX
         // Direct3D rendering objects.
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>        m_rtvDescriptorHeap;
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>        m_dsvDescriptorHeap;
+       
         UINT                                                m_rtvDescriptorSize;
         D3D12_VIEWPORT                                      m_screenViewport;
         D3D12_RECT                                          m_scissorRect;
+
 
         // Direct3D properties.
         DXGI_FORMAT                                         m_backBufferFormat;

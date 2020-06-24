@@ -48,6 +48,7 @@ public:
 	virtual void keyPress(UINT8 key);
 	virtual void mouseMove(float dx, float dy);
 	Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
+	XMMATRIX GetMVP();
 	void Init(float m_aspectRatio);
 	void UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void BuildMeshes(std::unique_ptr<DX::DeviceResources>& m_deviceResources);

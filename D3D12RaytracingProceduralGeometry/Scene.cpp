@@ -24,6 +24,9 @@ Scene::Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources)
 }
 
 
+XMMATRIX Scene::GetMVP() {
+    return camera->getMVP();
+}
 
 void Scene::Init(float m_aspectRatio)
 {

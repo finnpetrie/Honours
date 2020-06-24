@@ -28,7 +28,7 @@
 
 //constant buffer for rasterisation
 struct RasterSceneCB {
-    XMFLOAT4X4 mvp;
+    XMMATRIX mvp;
 };
 //intersection buffers
 
@@ -84,7 +84,13 @@ private:
     ComPtr<ID3D12RootSignature> m_rasterRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature[LocalRootSignature::Type::Count];
+  
+    
+    ComPtr<ID3D12Resource>      m_stagingTarget[6];
+    ComPtr<ID3D12DescriptorHeap> m_stagingHeap;
+    UINT                         m_stagingHeapSize;
 
+    IBuffer stagingResource;
     // Descriptors
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
     UINT m_descriptorsAllocated;
@@ -92,7 +98,15 @@ private:
     
     IDxcBlob* m_rayGenLibrary;
     
+    
     //raster resources
+    ComPtr<ID3D12Resource> intersectionBuffer;
+    ComPtr<ID3D12Resource> outputBuffer;
+    ComPtr<ID3D12Resource> g_buffer;
+    D3D12_GPU_DESCRIPTOR_HANDLE gBufferDescriptorHandle;
+    UINT gBufferDescriptorHeapIndex;
+
+
     ComPtr<ID3D12Resource> rasterVertexBuffer;
     D3D12_VERTEX_BUFFER_VIEW rasterVertexView;
     ComPtr<ID3D12Resource> rasterConstant;
@@ -120,7 +134,6 @@ private:
     static const wchar_t* c_intersectionShaderNames[IntersectionShaderType::Count];
     static const wchar_t* c_closestHitShaderNames[GeometryType::Count];
     static const wchar_t* c_anyHitShaderNames[GeometryType::Count];
-
     static const wchar_t* c_missShaderNames[RayType::Count];
 
     ComPtr<ID3D12Resource> m_missShaderTable;
@@ -138,6 +151,7 @@ private:
 
 	
     void RecreateD3D();
+	void CopyIntersectionToCPU();
     void DoRaytracing();
    
     void CreateDeviceDependentResources();
@@ -153,10 +167,12 @@ private:
     void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
 	void CreateRasterisationPipeline();
     void CreateRaytracingPipelineStateObject();
+    void CreateIntersectionVertexBuffer();
     void CreateIntersectionBuffers();
     void CreateAuxilaryDeviceResources();
     void CreateDescriptorHeap();
-    void CreateRasterisationBuffers();
+	void CreateBufferForIntersectionData();
+	void CreateRasterisationBuffers();
     void CreateRaytracingOutputResource();
     void BuildGeometry();
     void DoRasterisation();
@@ -164,6 +180,7 @@ private:
    
     void BuildShaderTables();
     void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
+	void CreateStagingRenderTargetResource();
 	void CopyIntersectionBufferToBackBuffer(UINT intersectionIndex);
 	void CopyRaytracingOutputToBackbuffer();
     void CalculateFrameStats();

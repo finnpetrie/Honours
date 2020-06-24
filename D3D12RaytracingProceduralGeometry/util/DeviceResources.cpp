@@ -204,6 +204,7 @@ void DeviceResources::CreateDeviceResources()
 
     m_rtvDescriptorSize = m_d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
+
     if (m_depthBufferFormat != DXGI_FORMAT_UNKNOWN)
     {
         D3D12_DESCRIPTOR_HEAP_DESC dsvDescriptorHeapDesc = {};

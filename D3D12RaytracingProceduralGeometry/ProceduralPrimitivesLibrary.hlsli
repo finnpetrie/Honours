@@ -28,7 +28,7 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     float t_min;
     float t_max;
     
- 
+    
                    
     switch (analyticPrimitive)
     {

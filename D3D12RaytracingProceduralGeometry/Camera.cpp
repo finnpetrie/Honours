@@ -58,6 +58,14 @@ void Camera::OnKeyDown(UINT8 key) {
     }
 }
 
+XMMATRIX Camera::getMVP() {
+    float fovAngleY = 45.0f;
+
+    XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
+    XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), aspectRatio, 0.01f, 125.0f);
+    XMMATRIX viewProj = view * proj;
+    return viewProj;
+}
 void Camera::OnMouseMove(float dx, float dy) {
 
     if (firstMouse) // initially set to true

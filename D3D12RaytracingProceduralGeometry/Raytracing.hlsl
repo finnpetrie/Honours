@@ -18,9 +18,12 @@ RaytracingAccelerationStructure g_scene : register(t0, space0);
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 RWTexture2D<float4> intersectionBuffer [6]: register(u1);
+RWBuffer<float4> g_buffer : register(u7);
+
 // Triangle resources
 ByteAddressBuffer g_indices : register(t1, space0);
 StructuredBuffer<Vertex> g_vertices : register(t2, space0);
+
 
 // Procedural geometry resources
 StructuredBuffer<PrimitiveInstancePerFrameBuffer> g_AABBPrimitiveAttributes : register(t3, space0);
@@ -301,8 +304,10 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float3 pos_n = normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
-    intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
- 
+    //intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
+    uint x = DispatchRaysIndex().x;
+    uint y = DispatchRaysIndex().y;
+    //g_buffer[1080*y + x] = float4(pos, 1);
     float3 l_dir = normalize(g_sceneCB.lightPosition.xyz - pos);
     Ray shadowRay = { pos, l_dir };
     float3 currentDir =    RayTCurrent() * WorldRayDirection();
@@ -359,7 +364,7 @@ if (l_materialCB.reflectanceCoef > 0.1f) {
 //0.1f is a good coefficient for reflectioncolour.
  // rayPayload.color += refractionColour + 0.1*reflectionColour;
 //  rayPayload.color = refractionColour;
-float4 color = ambient + refractionColour +  reflectionColour + pathColour;
+float4 color = ambient + refractionColour +  0.5*reflectionColour + pathColour;
 
 float t = RayTCurrent();
 rayPayload.color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
@@ -494,6 +499,14 @@ void MyIntersectionShader_SignedDistancePrimitive()
         ReportHit(thit, /*hitKind*/ 0, attr);
     }
  
+}
+
+[shader("intersection")]
+void CSG_Intersection() {
+    Ray localRay = GetRayInAABBPrimitiveLocalSpace();
+
+    //do a test based on the CSG tree.
+
 }
 
 #endif // RAYTRACING_HLSL

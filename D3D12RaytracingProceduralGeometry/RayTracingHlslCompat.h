@@ -183,4 +183,11 @@ namespace SignedDistancePrimitive {
     };
 }
 
+namespace CSGPrimitive {
+    enum Enum {
+        CSG = 0,
+        Count
+    };
+}
+
 #endif // RAYTRACINGHLSLCOMPAT_H

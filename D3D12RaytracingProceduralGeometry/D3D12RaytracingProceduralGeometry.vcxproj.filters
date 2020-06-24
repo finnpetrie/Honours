@@ -192,5 +192,8 @@
     <None Include="Rasterisation.hlsli">
       <Filter>Assets\Shaders\Rasterisation</Filter>
     </None>
+    <None Include="ConstructiveSolidGeometry.hlsli">
+      <Filter>Assets\Shaders\ProceduralPrimitives</Filter>
+    </None>
   </ItemGroup>
 </Project>

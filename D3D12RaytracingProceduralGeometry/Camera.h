@@ -27,6 +27,7 @@ private:
 public:
 
 	virtual void OnKeyDown(UINT8 key);
+	XMMATRIX getMVP();
 	virtual void OnMouseMove(float x, float y);
 
 	Camera(float aspectRatio);
