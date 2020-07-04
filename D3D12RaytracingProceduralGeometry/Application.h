@@ -68,6 +68,7 @@ private:
     std::vector<float> fpsAverages;
     bool testing = false;
     bool drawRays = false;
+    bool recordIntersections = false;
     // Constants.
     UINT NUM_BLAS = 100000;          // Triangle + AABB bottom-level AS.
     const float c_aabbWidth = 2;      // AABB width.

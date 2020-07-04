@@ -15,6 +15,11 @@ Camera::Camera(float aspectRatio) : aspectRatio(aspectRatio) {
     m_up = XMVector3Normalize(XMVector3Cross(m_direction, m_right));
 }
 
+XMVECTOR Camera::getPosition()
+{
+    return this->m_eye;
+}
+
 void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene)
 {
     m_at = XMVectorAdd(m_eye, m_front);

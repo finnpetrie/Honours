@@ -30,17 +30,20 @@ XMMATRIX Scene::GetMVP() {
 
 void Scene::Init(float m_aspectRatio)
 {
-    instancing = false;
+  
     if (!instancing) {
         CreateGeometry();
         NUM_BLAS = 2;
     }
     else {
 
-
-         CreateSpheres();
-         coordinates = new PlyFile("/Models/Main_Room_Dense_Filtered_3_million_Verts.ply");
+        if (!triangleInstancing) {
+            CreateSpheres();
+        }
+         //CreateSpheres();
+         coordinates = new PlyFile("/Models/Main_Room_Dense_Filtered_10_million.ply");
          coordinates->translateToOrigin(coordinates->centroid());
+        // coordinates->translateCloud(Eigen::Vector3d(0.0, 0.0, 0.0));
           //because triangle geometry can't be stored in the procedural geometry BLAS, we add +1
         NUM_BLAS = coordinates->size() + 1;
     }
@@ -67,7 +70,7 @@ void Scene::Init(float m_aspectRatio)
 
     
 
-    m_planeMaterialCB = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 1, 0,  1, 0.4f, 50, 1 };
+    m_planeMaterialCB = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 0, 0,  1, 0.4f, 50, 1 };
 
     // Albedos
     XMFLOAT4 green = XMFLOAT4(0.1f, 1.0f, 0.5f, 1.0f);
@@ -90,7 +93,19 @@ void Scene::Init(float m_aspectRatio)
     {
         if (quatJulia) {
             using namespace SignedDistancePrimitive;
-            SetAttributes(offset + QuaternionJulia, red, 0, 0, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.4, 0.4, 0.4, 0),0, 0, 1.0f, 0.7f, 50, 1.0f);
+
+        }
+        offset += SignedDistancePrimitive::Count;
+
+    }
+
+
+    {
+
+        if (CSG) {
+            using namespace CSGPrimitive;
+            SetAttributes(offset + CSGPrimitive::CSG, red, 1, 1, 1.0f, 0.7f, 50, 1.0f);
         }
     }
 
@@ -100,12 +115,19 @@ void Scene::Init(float m_aspectRatio)
     }
 
     {
-       Geometry torus;
-        //torus.LoadModel("/Models/albany_mesh.obj");
+        Geometry torus;
+        torus.LoadModel("/Models/IcoSphere_Tiny.obj");
         Geometry plane;
         plane.initPlane();
-        this->plane = true;
-        meshes = {  plane};
+        this->plane = false;
+        if (triangleInstancing) {
+            meshes = { torus };
+        }
+        else{
+            this->plane = true;
+
+           meshes = { plane };
+        }
 
     }
 
@@ -115,8 +137,8 @@ void Scene::Init(float m_aspectRatio)
         XMFLOAT4 lightPosition;
         XMFLOAT4 lightAmbientColor;
         XMFLOAT4 lightDiffuseColor;
-
-        lightPosition = XMFLOAT4(20.0f, 18.0f, -20.0f, 0.0f);
+     
+        lightPosition = XMFLOAT4(18, 10, -18, 0.0f);
         m_sceneCB->lightPosition = XMLoadFloat4(&lightPosition);
 
         lightAmbientColor = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
@@ -127,6 +149,27 @@ void Scene::Init(float m_aspectRatio)
         m_sceneCB->lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
     }
 }
+
+
+void Scene::convertCSGToArray(int numberOfNodes) {
+
+    auto SetNodeValues = [&](UINT index, UINT leftNode, UINT rightNode, UINT boolValue, UINT parentIndex, UINT geometry) {
+        csgTree[index].boolValue = boolValue;
+        csgTree[index].leftNodeIndex = leftNode;
+        csgTree[index].rightNodeIndex = rightNode;
+        csgTree[index].geometry = geometry;
+        csgTree[index].parentIndex = parentIndex;
+    };
+
+    SetNodeValues(0, 1, 2, 0, -1, -1);
+    SetNodeValues(1, 3, 4, 1, 0, -1);
+    SetNodeValues(2, -1, -1, -1, 0, 1);
+    SetNodeValues(3, -1, -1, -1, 1, 3);
+    SetNodeValues(4, -1, -1, -1, 1, 4);
+   
+
+}
+
 
 void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources)
 {
@@ -141,6 +184,8 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
 
     XMMATRIX mScale2 = XMMatrixScaling(2, 2, 2);
     XMMATRIX mScale3 = XMMatrixScaling(3, 3, 3);
+    XMMATRIX massive = XMMatrixScaling(10, 10, 10);
+
 
     XMMATRIX mRotation = XMMatrixRotationY(-2 * animationTime);
 
@@ -188,8 +233,17 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
             using namespace SignedDistancePrimitive;
             SetTransformForAABB(offset + SignedDistancePrimitive::QuaternionJulia, mScale3, mRotation);
         }
-    }
+        offset += SignedDistancePrimitive::Count;
 
+    }
+    
+    {
+
+        if (CSG) {
+            using namespace CSGPrimitive;
+            SetTransformForAABB(offset + CSGPrimitive::CSG, mScale15, mRotation);
+        }
+    }
 
 }
 
@@ -273,8 +327,18 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
             if (quatJulia) {
                 using namespace SignedDistancePrimitive;
 
-                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(8, 8, 8));
+                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(4, 0, 4), XMFLOAT3(200, 200, 200));
             }
+            offset += SignedDistancePrimitive::Count;
+
+        }
+
+        {
+            if (CSG) {
+                using namespace CSGPrimitive;
+                m_aabbs[offset + CSGPrimitive::CSG] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(6, 6, 6));
+            }
+
         }
         AllocateUploadBuffer(device, m_aabbs.data(), m_aabbs.size() * sizeof(m_aabbs[0]), &m_aabbBuffer.resource);
     }
@@ -295,9 +359,16 @@ void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResource
         m_sceneCB->lightPosition = XMVector3Transform(prevLightPosition, rotate);
 
     }
+ //   m_sceneCB->lightPosition = camera->getPosition();
 }
 
 
+
+void Scene::CreateCSGTree(std::unique_ptr<DX::DeviceResources>  &m_deviceResources) {
+    auto device = m_deviceResources->GetD3DDevice();
+    auto frameCount = m_deviceResources->GetBackBufferCount();
+    csgTree.Create(device, 5, frameCount, L"CSG Tree");
+}
 
 void Scene::CreateAABBPrimitiveAttributesBuffers(std::unique_ptr<DX::DeviceResources>& m_deviceResources)
 {
@@ -309,6 +380,7 @@ void Scene::CreateAABBPrimitiveAttributesBuffers(std::unique_ptr<DX::DeviceResou
 
 void Scene::releaseResources() {
    m_sceneCB.Release();
+   csgTree.Release();
    m_aabbPrimitiveAttributeBuffer.Release();
    m_indexBuffer.resource.Reset();
    m_vertexBuffer.resource.Reset();
@@ -329,6 +401,11 @@ StructuredBuffer<PrimitiveInstancePerFrameBuffer>* Scene::getPrimitiveAttributes
     return &m_aabbPrimitiveAttributeBuffer;
 }
 
+StructuredBuffer<CSGNode>* Scene::getCSGTree()
+{
+    return &csgTree;
+}
+
 
 void Scene::CreateSpheres() {
     float X = 1.0f;
@@ -336,7 +413,7 @@ void Scene::CreateSpheres() {
         float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
         float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
         float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(1, 0, 0, 0), 0, 0, 1, 0.4f, 50, 1 };
+        PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.5, 0.5, 0, 0), 0, 0, 1, 0.4f, 50, 1 };
 
         Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0, 0, 0), XMFLOAT3(0.5
             , 0.5
@@ -399,7 +476,7 @@ void Scene::CreateGeometry() {
     Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(-1, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
 
 
-    analyticalObjects = { sphere, hyperboloid, ellipsoid, Cylinder, Paraboloid, Cone, csg_union, intersection };
+  //  analyticalObjects = { hyperboloid, ellipsoid, sphere, AABB, Cone, Paraboloid, Cylinder };
 
 }
 

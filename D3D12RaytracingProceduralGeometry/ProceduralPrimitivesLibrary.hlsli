@@ -49,6 +49,7 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     }
 }
 
+
 // Analytic geometry intersection test.
 // AABB local space dimensions: <-1,1>.
 bool RayVolumetricGeometryIntersectionTest(in Ray ray, in VolumetricPrimitive::Enum volumetricPrimitive, out float thit, out ProceduralPrimitiveAttributes attr, in float elapsedTime)
@@ -84,7 +85,7 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
         return opS( sdTorus82(position, float2(0.60, 0.3)),
                     sdCylinder(opRep(float3(atan2(position.z, position.x) / 6.2831, 
                                             1, 
-                                            0.015 + 0.25 * length(position)) + 1,
+                       0.015 + 0.25 * length(position)) + 1,
                                      float3(0.05, 1, 0.075)),
                                float2(0.02, 0.8)));
     
@@ -94,8 +95,8 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
     
     case SignedDistancePrimitive::QuaternionJulia: 
        
-        return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
-        //return sdGyroid(position);
+  //  return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
+       return sdGyroid(position);
     default: return 0;
     }
 }

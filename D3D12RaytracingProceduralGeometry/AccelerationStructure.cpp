@@ -127,68 +127,109 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
 
     // Bottom-level AS with a single plane.
     {
-        auto& instanceDesc = instanceDescs[BottomLevelASType::Triangle];
-        instanceDesc = {};
-        instanceDesc.InstanceMask = 1;
-        instanceDesc.InstanceContributionToHitGroupIndex = 0;
-        instanceDesc.AccelerationStructure = bottomLevelASaddresses[BottomLevelASType::Triangle];
 
-        // Calculate transformation matrix.
-        const XMVECTOR vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 7.35f, -0.35f));
-
-        // Scale in XZ dimensions.
-      //XMMATRIX mScale = XMMatrixScaling(fWidth.x, fWidth.y, fWidth.z);
-        XMMATRIX mScale;
-        XMMATRIX mTransform;
-        XMMATRIX mTranslation = XMMatrixTranslationFromVector(vBasePosition);
-
-        if (scene->plane) {
-            mScale = XMMatrixScaling(fWidth.x, fWidth.y, fWidth.z);
-            mTransform = mScale + mTranslation;
-        }
-        else {
-
-             mScale = XMMatrixScaling(10, 10, 10);
-             mTransform = mScale;
-        }
-    
-
-        XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTransform);
-    }
-    float X = 10;
-    // Create instanced bottom-level AS with procedural geometry AABBs.
-    // Instances share all the data, except for a transform.
-    {
-        //we only iterate over the n-1 bottom level acc. structs, since triangle geomtry is a struct of its own.
-        for (int i = 0; i < scene->NUM_BLAS - 1; i++) {
-            auto& instanceDesc = instanceDescs[BottomLevelASType::AABB + i];
+        if (!scene->triangleInstancing && !scene->instancing) {
+            auto& instanceDesc = instanceDescs[BottomLevelASType::Triangle];
             instanceDesc = {};
             instanceDesc.InstanceMask = 1;
+            instanceDesc.InstanceContributionToHitGroupIndex = 0;
+            instanceDesc.AccelerationStructure = bottomLevelASaddresses[BottomLevelASType::Triangle];
 
-            // Set hit group offset to beyond the shader records for the triangle AABB.
-            instanceDesc.InstanceContributionToHitGroupIndex = BottomLevelASType::AABB * RayType::Count;
-            instanceDesc.AccelerationStructure = bottomLevelASaddresses[(BottomLevelASType::AABB)];
-            /*float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-             float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-             float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));*/
-            float x;
-            float y;
-            float z;
+            // Calculate transformation matrix.
+
+            XMVECTOR vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 7.35f, -0.35f));
+
             if (scene->instancing) {
+                vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, -1.0f, -0.35f));
+            }
+
+            XMMATRIX mScale;
+            XMMATRIX mTransform;
+            XMMATRIX mTranslation = XMMatrixTranslationFromVector(vBasePosition);
+
+            if (scene->plane) {
+                mScale = XMMatrixScaling(fWidth.x, fWidth.y, fWidth.z);
+                mTransform = mScale + mTranslation;
+            }
+            else {
+
+                mScale = XMMatrixScaling(10, 10, 10);
+                mTransform = mScale;
+            }
+
+
+            XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTransform);
+        }
+        else if(scene->triangleInstancing && scene->instancing) {
+            for (int i = 0; i < scene->NUM_BLAS - 1; i++) {
+                auto& instanceDesc = instanceDescs[BottomLevelASType::Triangle + i];
+                instanceDesc = {};
+                instanceDesc.InstanceMask = 1;
+
+                // Set hit group offset to beyond the shader records for the triangle AABB.
+                instanceDesc.InstanceContributionToHitGroupIndex = BottomLevelASType::Triangle * RayType::Count;
+                instanceDesc.AccelerationStructure = bottomLevelASaddresses[(BottomLevelASType::Triangle)];
+                /*float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+                 float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+                 float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));*/
+                float x;
+                float y;
+                float z;
+
                 Vertex_Ply coord = scene->coordinates->getPointAt(i);
 
                 x = 1 * coord.location.x();
                 y = 1 * coord.location.y();
                 z = 1 * coord.location.z();
+                XMMATRIX mScale = XMMatrixScaling(0.1, 0.1, 0.1);
+
+                XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(x, y, z)));
+                XMMATRIX mTransform = mScale + mTranslation;
+
+                XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTransform);
             }
-            else {
-                x = 0;
-                y = scene->c_aabbWidth / 2;
-                z = 0;
+        }
+    }
+        // Scale in XZ dimensions.
+      //XMMATRIX mScale = XMMatrixScaling(fWidth.x, fWidth.y, fWidth.z);
+      
+    
+    float X = 10;
+    // Create instanced bottom-level AS with procedural geometry AABBs.
+    // Instances share all the data, except for a transform.
+    {
+        //we only iterate over the n-1 bottom level acc. structs, since triangle geomtry is a struct of its own.
+        if (!scene->triangleInstancing) {
+            for (int i = 0; i < scene->NUM_BLAS - 1; i++) {
+                auto& instanceDesc = instanceDescs[BottomLevelASType::AABB + i];
+                instanceDesc = {};
+                instanceDesc.InstanceMask = 1;
+
+                // Set hit group offset to beyond the shader records for the triangle AABB.
+                instanceDesc.InstanceContributionToHitGroupIndex = BottomLevelASType::AABB * RayType::Count;
+                instanceDesc.AccelerationStructure = bottomLevelASaddresses[(BottomLevelASType::AABB)];
+                /*float x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+                 float y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+                 float z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));*/
+                float x;
+                float y;
+                float z;
+                if (scene->instancing) {
+                    Vertex_Ply coord = scene->coordinates->getPointAt(i);
+
+                    x = 1 * coord.location.x();
+                    y = 1 * coord.location.y();
+                    z = 1 * coord.location.z();
+                }
+                else {
+                    x = 0;
+                    y = scene->c_aabbWidth / 2;
+                    z = 0;
+                }
+                // Move all AABBS above the ground plane.
+                XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(x, y, z)));
+                XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTranslation);
             }
-            // Move all AABBS above the ground plane.
-            XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(x, y, z)));
-            XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTranslation);
         }
     }
     UINT64 bufferSize = static_cast<UINT64>(instanceDescs.size() * sizeof(instanceDescs[0]));

@@ -17,16 +17,18 @@
 RaytracingAccelerationStructure g_scene : register(t0, space0);
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
-RWTexture2D<float4> intersectionBuffer [6]: register(u1);
-RWBuffer<float4> g_buffer : register(u7);
+//ConstantBuffer<CSGNode> g_CSGBuffer : register(b1);
+//RWTexture2D<float4> intersectionBuffer [6]: register(u1);
+//RWBuffer<float4> g_buffer : register(u7);
 
 // Triangle resources
 ByteAddressBuffer g_indices : register(t1, space0);
 StructuredBuffer<Vertex> g_vertices : register(t2, space0);
 
-
 // Procedural geometry resources
 StructuredBuffer<PrimitiveInstancePerFrameBuffer> g_AABBPrimitiveAttributes : register(t3, space0);
+StructuredBuffer<CSGNode> csgTree : register(t4, space0);
+
 ConstantBuffer<PrimitiveConstantBuffer> l_materialCB : register(b1);
 ConstantBuffer<PrimitiveInstanceConstantBuffer> l_aabbCB: register(b2);
 
@@ -197,10 +199,10 @@ void MyRaygenShader()
     UINT currentRecursionDepth = 0;
 
     //zero out our intersection buffer
-    for (uint i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
+   /* for (uint i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
       
     intersectionBuffer[i][DispatchRaysIndex().xy] = float4(0,0,0,0);
-    }
+    }*/
     RayPayload payload = { float4(0,0,0,0), 
         0,
         0 };
@@ -249,7 +251,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float3 pos_n =normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
-    intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
+  //  intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
 
 
    float4 pathColour = float4(0, 0, 0, 0);
@@ -280,11 +282,13 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
     }
 
-    float4 color = ambient + 0.15*reflectionColour + pathColour;
+    float4 color = ambient + 0.15*reflectionColour;
     float t = RayTCurrent();
   //color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
 
-    rayPayload.color = color;
+    //rayPayload.color = color;
+    rayPayload.color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
+
    // rayPayload.intersections[rayPayload.recursionDepth] = color;
 
 
@@ -295,82 +299,67 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitiveAttributes attr)
 {   
 
-
-      
-    // Shadow component.
-    // Trace a shadow ray.
-    
     float3 pos = HitWorldPosition();
     float3 pos_n = normalize(HitWorldPosition());
 
-    uint depth = rayPayload.recursionDepth;
-    //intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
-    uint x = DispatchRaysIndex().x;
-    uint y = DispatchRaysIndex().y;
+   // intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
+   
     //g_buffer[1080*y + x] = float4(pos, 1);
     float3 l_dir = normalize(g_sceneCB.lightPosition.xyz - pos);
+    float4 reflectionColour = float4(0,0,0,1);
     Ray shadowRay = { pos, l_dir };
-    float3 currentDir =    RayTCurrent() * WorldRayDirection();
+    float3 currentDir = RayTCurrent() * WorldRayDirection();
     currentDir += WorldRayOrigin();
 
     float4 ambient = l_materialCB.albedo;
+    
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
-    float4 reflectionColour = float4(0, 0, 0, 0);
-    float4 pathColour = float4(0, 0, 0, 0);
-    //float3 r_dir = randomDirection(HitWorldPosition().xy);
 
-//float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
-if (!shadowHit) {
-    ambient += PhongLighting(float4(attr.normal, 0), shadowHit);
-}
-float4 refractionColour = float4(0, 0, 0, 1);
-float3 dir = normalize(WorldRayDirection());
-// float3 worldNormal = mul(attr.normal, (float3x3)ObjectToWorld3x4());
 
-if (l_materialCB.refractiveCoef < 0) {
-    //assume refractive glass
-    float n1 = 1;
-    float n2 = l_materialCB.refractiveCoef;
-    float3 outwardNormal;
-    float index;
-    float3 refracted;
-    if (dot(dir, attr.normal) > 0) {
-        outwardNormal = -attr.normal;
-        index = n2;
+    if (!shadowHit) {
+        ambient += PhongLighting(float4(attr.normal, 0), shadowHit);
     }
-    else {
-        outwardNormal = attr.normal;
-        index = n1 / n2;
+    float4 refractionColour = float4(0, 0, 0, 1);
+    float3 dir = normalize(WorldRayDirection());
+   
+    if (l_materialCB.refractiveCoef > 0) {
+        //assume refractive glass
+        float n1 = 1;
+        float n2 = l_materialCB.refractiveCoef;
+        float3 outwardNormal;
+        float index;
+        float3 refracted;
+        if (dot(dir, attr.normal) > 0) {
+            outwardNormal = -attr.normal;
+            index = n2;
+        }
+        else {
+            outwardNormal = attr.normal;
+            index = n1 / n2;
+        }
+        if (refractTest(dir, outwardNormal, index, refracted)) {
+            Ray r = { pos, refracted };
+            refractionColour = TraceRadianceRay(r, rayPayload).color;
+        }
+        else {
+            Ray r = { pos, reflect(dir, attr.normal) };
+            // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
+        }
+        float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
     }
-    if (refractTest(dir, outwardNormal, index, refracted)) {
-        Ray r = { pos, refracted };
-        //refraction is nosiy, huh?
-       // refractionColour = float4(refracted, 1.0);
-        refractionColour = TraceRadianceRay(r, rayPayload).color;
-    }
-    else {
+    if (l_materialCB.reflectanceCoef > 0.1f) {
         Ray r = { pos, reflect(dir, attr.normal) };
-        // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
+        reflectionColour = TraceRadianceRay(r, rayPayload).color;
     }
-    float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
-}
-
-if (l_materialCB.reflectanceCoef > 0.1f) {
-    Ray r = { pos, reflect(dir, attr.normal) };
-    reflectionColour = TraceRadianceRay(r, rayPayload).color;
-}
 
 
 //0.1f is a good coefficient for reflectioncolour.
  // rayPayload.color += refractionColour + 0.1*reflectionColour;
 //  rayPayload.color = refractionColour;
-float4 color = ambient + refractionColour +  0.5*reflectionColour + pathColour;
+float4 color = ambient + refractionColour +  0.1*reflectionColour;
 
 float t = RayTCurrent();
 rayPayload.color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
-
-//rayPayload.color = float4(attr.normal, 1);
-//rayPayload.intersections[depth] = color;
 
 }
 
@@ -460,16 +449,6 @@ void MyIntersectionShader_AnalyticPrimitive()
     }
 }
 
-/*[shader("intersection")]
-void CSG_Intersection()
-{
-    Ray localRay = GetRayInAABBPrimitiveLocalSpace();
-    SignedDistancePrimitive::Enum primitiveType = (SignedDistancePrimitive::Enum) l_aabbCB.primitiveType;
-
-   
-
-}*/
-
 [shader("intersection")]
 void MyIntersectionShader_VolumetricPrimitive()
 {
@@ -501,12 +480,56 @@ void MyIntersectionShader_SignedDistancePrimitive()
  
 }
 
+bool RayCSGIntersectionTest(in Ray ray, in CSGPrimitive::Enum csgPrimitive, out float thit, out ProceduralPrimitiveAttributes attr) {
+    // return RaySpheresIntersectionTest(ray, thit, attr);
+    //run a post order traversal of the CSG tree
+    //store the CSG tree in a constant-buffer
+    //compute all intersections along the ray for all geometry.
+    CSGNode csgStack[10];
+    int stackPointer = 0;
+    csgStack[0] = csgTree[0];
+    CSGNode current;
+    bool complete = false;
+    while (!complete){
+       // root = csgTree[root.leftNodeIndex];
+        //pop stack
+        current = csgStack[stackPointer];
+        stackPointer -= 1;
+        csgStack[stackPointer] = csgTree[current.rightNodeIndex];
+        stackPointer += 1;
+        csgStack[stackPointer] = csgTree[current.leftNodeIndex];
+       
+       //RayCSGIntersectionTest(ray, csgPrimitive, thit, attr);
+        if (current.geometry != -1) {
+            //want to save the intersections
+            RayAnalyticGeometryIntersectionTest(ray, (AnalyticPrimitive::Enum)current.geometry, thit, attr);
+            return true;
+        }
+        //depth first search of the CSG tree.
+
+   }
+    return complete;
+    //process the tree and put it into an array form
+}
+
 [shader("intersection")]
 void CSG_Intersection() {
     Ray localRay = GetRayInAABBPrimitiveLocalSpace();
+   // AnalyticPrimitive::Enum primitiveType = (AnalyticPrimitive::Enum) l_aabbCB.primitiveType;
 
+   CSGPrimitive::Enum primitiveType = (CSGPrimitive::Enum) l_aabbCB.primitiveType;
+
+    float thit;
+    ProceduralPrimitiveAttributes attr;
+    if (RayCSGIntersectionTest(localRay, primitiveType, thit, attr)) {
+        PrimitiveInstancePerFrameBuffer aabbAttribute = g_AABBPrimitiveAttributes[l_aabbCB.instanceIndex];
+        attr.normal = mul(attr.normal, (float3x3) aabbAttribute.localSpaceToBottomLevelAS);
+        attr.normal = normalize(mul((float3x3) ObjectToWorld3x4(), attr.normal));
+
+        ReportHit(thit, /*hitKind*/ 0, attr);
+    }
     //do a test based on the CSG tree.
-
+    //look up ways to decompose the recursive structure of the CSG tree.
 }
 
 #endif // RAYTRACING_HLSL

@@ -15,6 +15,7 @@ private:
 		StructuredBuffer<PrimitiveInstancePerFrameBuffer> m_aabbPrimitiveAttributeBuffer;
 		std::vector<D3D12_RAYTRACING_AABB> m_aabbs;
 		
+		StructuredBuffer<CSGNode> csgTree;
 
 		std::vector<Geometry> meshes;
 		Camera* camera;
@@ -28,14 +29,15 @@ public:
 	D3DBuffer m_vertexBuffer;
 	D3DBuffer m_indexBuffer;
 
-
 	std::vector<Vertex> totalVertices;
 	std::vector<uint32_t> totalIndices;
 
 
 	std::vector<Primitive> analyticalObjects;
-	bool instancing = true;
-	bool quatJulia = false;
+	bool instancing = false;
+	bool CSG = false;
+	bool triangleInstancing = false;
+	bool quatJulia = true;
 	bool plane = true;
 	const float c_aabbWidth = 2;      // AABB width.
 	const float c_aabbDistance = 2;   // Distance between AABBs.
@@ -50,14 +52,13 @@ public:
 	Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
 	XMMATRIX GetMVP();
 	void Init(float m_aspectRatio);
+	void convertCSGToArray(int numberOfNodes);
 	void UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void BuildMeshes(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
 
 	void sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources, bool m_animateLights = false, float time = 0);
-
-
-
+	void CreateCSGTree(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void CreateAABBPrimitiveAttributesBuffers(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 
 
@@ -66,6 +67,7 @@ public:
 	ConstantBuffer<SceneConstantBuffer>* getSceneBuffer();
 	D3DBuffer* getAABB();
 	StructuredBuffer<PrimitiveInstancePerFrameBuffer>* getPrimitiveAttributes();
+	StructuredBuffer<CSGNode>* getCSGTree();
 	void CreateSpheres();
 	void CreateGeometry();
 	UINT CreateBufferSRV(std::unique_ptr<DX::DeviceResources> m_deviceResources, D3DBuffer* buffer, uint32_t numElements, UINT elementSize);

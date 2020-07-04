@@ -31,7 +31,7 @@ public:
 	virtual void OnMouseMove(float x, float y);
 
 	Camera(float aspectRatio);
-
+	XMVECTOR getPosition();
 	void Update(ConstantBuffer<SceneConstantBuffer> &scene);
 
 };

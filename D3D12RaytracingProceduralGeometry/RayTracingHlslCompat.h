@@ -62,6 +62,7 @@ struct ShadowRayPayload
 
 };
 
+
 struct SceneConstantBuffer
 {
     XMMATRIX projectionToWorld;
@@ -102,6 +103,21 @@ struct PrimitiveInstancePerFrameBuffer
     XMMATRIX localSpaceToBottomLevelAS;   // Matrix from local primitive space to bottom-level object space.
     XMMATRIX bottomLevelASToLocalSpace;   // Matrix from bottom-level object space to local primitive space.
 };
+
+struct CSGNode {
+    //0 = Union, 1 = Difference, 2 = Intersection.
+    UINT boolValue;
+    //pertains to the geometry described by the AABB encodings
+    UINT geometry;
+    UINT parentIndex;
+    UINT leftNodeIndex;
+    UINT rightNodeIndex;
+
+    //to guarantee 16 bit byte alignment
+    XMFLOAT3 padding;
+};
+
+
 
 struct Vertex
 {

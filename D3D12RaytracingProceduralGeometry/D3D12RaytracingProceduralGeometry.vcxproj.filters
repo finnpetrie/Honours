@@ -31,6 +31,9 @@
     <Filter Include="Assets\Shaders\PathTracing">
       <UniqueIdentifier>{76a0b5b4-eebb-403a-a79a-1cb4762c0fbd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Texture">
+      <UniqueIdentifier>{21add595-ab85-4e9b-83cc-db4dafbd2192}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -75,12 +78,6 @@
     <ClInclude Include="SignedDistancePrimitives.hlsli">
       <Filter>Assets\Shaders\ProceduralPrimitives</Filter>
     </ClInclude>
-    <ClInclude Include="VolumetricPrimitives.hlsli">
-      <Filter>Assets\Shaders\ProceduralPrimitives</Filter>
-    </ClInclude>
-    <ClInclude Include="RaytracingShaderHelper.hlsli">
-      <Filter>Assets\Shaders</Filter>
-    </ClInclude>
     <ClInclude Include="util\PerformanceTimers.h">
       <Filter>Header Files\Util</Filter>
     </ClInclude>
@@ -119,6 +116,18 @@
     </ClInclude>
     <ClInclude Include="Application.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ConstructiveSolidGeometry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RaytracingShaderHelper.hlsli">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectXTex.h">
+      <Filter>Source Files\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="VolumetricPrimitives.hlsli">
+      <Filter>Assets\Shaders\ProceduralPrimitives</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -170,6 +179,7 @@
     <ClCompile Include="Application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ConstructiveSolidGeometry.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Raytracing.hlsl">
@@ -184,6 +194,9 @@
     <FxCompile Include="shaders.hlsl">
       <Filter>Assets\Shaders\Rasterisation</Filter>
     </FxCompile>
+    <FxCompile Include="Ray-Lines.hlsl">
+      <Filter>Assets\Shaders\Util</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="PathTracing.hlsl">
@@ -194,6 +207,9 @@
     </None>
     <None Include="ConstructiveSolidGeometry.hlsli">
       <Filter>Assets\Shaders\ProceduralPrimitives</Filter>
+    </None>
+    <None Include="DirectXTex.inl">
+      <Filter>Source Files\Texture</Filter>
     </None>
   </ItemGroup>
 </Project>
