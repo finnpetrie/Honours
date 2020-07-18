@@ -105,7 +105,7 @@ void Scene::Init(float m_aspectRatio)
 
         if (CSG) {
             using namespace CSGPrimitive;
-            SetAttributes(offset + CSGPrimitive::CSG, red, 1, 1, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0, 0, 0.1, 0), 0, 0, 1.0f, 0.7f, 50, 1.0f);
         }
     }
 
@@ -151,22 +151,33 @@ void Scene::Init(float m_aspectRatio)
 }
 
 
-void Scene::convertCSGToArray(int numberOfNodes) {
-
-    auto SetNodeValues = [&](UINT index, UINT leftNode, UINT rightNode, UINT boolValue, UINT parentIndex, UINT geometry) {
+void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResources>& m_deviceResources) {
+  //  auto device = m_deviceResources->GetD3DDevice();
+    auto SetNodeValues = [&](int index, int leftNode, int rightNode, int boolValue, int parentIndex, int geometry) {
         csgTree[index].boolValue = boolValue;
         csgTree[index].leftNodeIndex = leftNode;
         csgTree[index].rightNodeIndex = rightNode;
         csgTree[index].geometry = geometry;
         csgTree[index].parentIndex = parentIndex;
+        csgTree[index].myIndex = index;
     };
 
-    SetNodeValues(0, 1, 2, 0, -1, -1);
-    SetNodeValues(1, 3, 4, 1, 0, -1);
-    SetNodeValues(2, -1, -1, -1, 0, 1);
-    SetNodeValues(3, -1, -1, -1, 1, 3);
-    SetNodeValues(4, -1, -1, -1, 1, 4);
+    /**
+     int boolValue;
+    //pertains to the geometry described by the AABB encodings
+    int geometry;
+    int parentIndex;
+    int leftNodeIndex;
+    int rightNodeIndex;
+    UINT myIndex;*/
+
+    SetNodeValues(0, 1, 2, 1, -1, -1);
+    SetNodeValues(1, 3, 4, 0, 0, -1);
+    SetNodeValues(2, -1, -1, -1, 0, 7);
+    SetNodeValues(3, -1, -1, -1, 1, 2);
+    SetNodeValues(4, -1, -1, -1, 1, 3);
    
+   // AllocateUploadBuffer(device, csgTree.data(), csgTree.size() * sizeof(csgTree[0]), &csgTree.resource);
 
 }
 
@@ -327,7 +338,7 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
             if (quatJulia) {
                 using namespace SignedDistancePrimitive;
 
-                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(4, 0, 4), XMFLOAT3(200, 200, 200));
+                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(4, 0, 4), XMFLOAT3(9, 9, 9));
             }
             offset += SignedDistancePrimitive::Count;
 
@@ -336,7 +347,7 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
         {
             if (CSG) {
                 using namespace CSGPrimitive;
-                m_aabbs[offset + CSGPrimitive::CSG] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(6, 6, 6));
+                m_aabbs[offset + CSGPrimitive::CSG] = InitializeAABB(XMINT3(2, 0, 2), XMFLOAT3(9, 9, 9));
             }
 
         }
@@ -452,21 +463,23 @@ void Scene::CreateGeometry() {
                     0.0f, 0.0f, 0.0f, -0.5f };
 
 
-    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.1, 0.0, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0.01, 0.01, 0.01, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1.5, 1.5, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0, 0.1, 0), 1, 1.5, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.1, 0.0, 0.1, 0), 1, 1.5f, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.0, 0.0, 0.05, 0), 1.0f, 1.333f, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 1, 0.0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 1, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.1, 0.0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.0, 0.0, 0.05, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 0, 0.0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 0, 0, 1, 0.4f, 50, 1 };
 
     PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
-    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(6, 6, 6));
+    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 0.0f, 0.0f), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(3, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
     Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
@@ -476,7 +489,7 @@ void Scene::CreateGeometry() {
     Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(-1, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
 
 
-  //  analyticalObjects = { hyperboloid, ellipsoid, sphere, AABB, Cone, Paraboloid, Cylinder };
+  // analyticalObjects = { ellipsoid, Paraboloid, AABB, sphere };
 
 }
 

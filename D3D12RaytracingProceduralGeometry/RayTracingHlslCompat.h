@@ -106,18 +106,29 @@ struct PrimitiveInstancePerFrameBuffer
 
 struct CSGNode {
     //0 = Union, 1 = Difference, 2 = Intersection.
-    UINT boolValue;
+    int boolValue;
     //pertains to the geometry described by the AABB encodings
-    UINT geometry;
-    UINT parentIndex;
-    UINT leftNodeIndex;
-    UINT rightNodeIndex;
-
+    int geometry;
+    int parentIndex;
+    int leftNodeIndex;
+    int rightNodeIndex;
+    UINT myIndex;
     //to guarantee 16 bit byte alignment
     XMFLOAT3 padding;
+    XMFLOAT3 padding2;
+
 };
 
-
+struct intersectionInterval {
+    float tmin;
+    float tmax;
+    bool hit;
+    XMFLOAT3 normal;
+};
+struct CSGHit {
+    UINT Index;
+    float t;
+};
 
 struct Vertex
 {
@@ -162,11 +173,21 @@ static const XMFLOAT4 ChromiumReflectance = XMFLOAT4(0.549f, 0.556f, 0.554f, 1.0
 static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
 //static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.0, 0.0, 0.0, 1.0f);
 static const float InShadowRadiance = 0.35f;
-
+namespace CSGState {
+    enum Enum {
+        Classify = 0,
+        SaveLeft = 1,
+        GoToLeft = 2,
+        GoToRight = 3,
+        LoadLeft = 4,
+        LoadRight = 5
+    };
+}
 namespace AnalyticPrimitive {
     enum Enum {
         AABB = 0,
         Spheres,
+        Sphere,
         Cone,
         Ellipsoid,
         Hyperboloid,

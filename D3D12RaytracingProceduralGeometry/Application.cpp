@@ -26,7 +26,7 @@ const wchar_t* Application::c_intersectionShaderNames[] =
     L"MyIntersectionShader_AnalyticPrimitive",
     L"MyIntersectionShader_VolumetricPrimitive",
     L"MyIntersectionShader_SignedDistancePrimitive",
-    L"CSG_Intersection"
+       L"CSG_Intersection"
 };
 const wchar_t* Application::c_closestHitShaderNames[] =
 {
@@ -136,7 +136,7 @@ void Application::CreateDeviceDependentResources()
     CreateDescriptorHeap();
 
     if (recordIntersections) {
-        CreateStagingRenderTargetResource();
+      //  CreateStagingRenderTargetResource();
     }
    // CreateIntersectionVertexBuffer();
     //CreateRasterisationBuffers();
@@ -145,7 +145,6 @@ void Application::CreateDeviceDependentResources()
 
 
     // Build raytracing acceleration structures from the generated geometry.
-    //BuildAccelerationStructures();
     acclerationStruct = new AccelerationStructure(m_deviceResources, scene, m_dxrDevice, m_dxrCommandList, m_dxrStateObject);
     // Create constant buffers for the geometry and the scene.
     //CreateConstantBuffers();
@@ -153,8 +152,8 @@ void Application::CreateDeviceDependentResources()
     // Create AABB primitive attribute buffers.
     scene->CreateAABBPrimitiveAttributesBuffers(m_deviceResources);
 
-    scene->CreateCSGTree(m_deviceResources);
-    scene->convertCSGToArray(5);
+     scene->CreateCSGTree(m_deviceResources);
+    scene->convertCSGToArray(5, m_deviceResources);
     // Build shader tables, which define shaders and their local root arguments.
     BuildShaderTables();
 
@@ -183,6 +182,7 @@ void Application::CreateRootSignatures()
         //1 output texture, 1 read back buffer, MAX_RAY_DEPTH_OUTPUT
         UINT uavSize;
         if (recordIntersections) {
+            //usually 2
             uavSize =   2 + MAX_RAY_RECURSION_DEPTH;
         }
         else {
@@ -535,7 +535,7 @@ void Application::CreateDescriptorHeap()
     // 1 - raytracing output texture SRV
     // n - Interesection Buffers
     // 1 flat gbuffer
-    descriptorHeapDesc.NumDescriptors = 4 + MAX_RAY_RECURSION_DEPTH;
+    descriptorHeapDesc.NumDescriptors = 10 + MAX_RAY_RECURSION_DEPTH;
     descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     descriptorHeapDesc.NodeMask = 0;
@@ -668,24 +668,6 @@ void Application::BuildShaderTables()
         GetShaderIDs(stateObjectProperties.Get());
         shaderIDSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
     }
-
-    /*************--------- Shader table layout -------*******************
-    | --------------------------------------------------------------------
-    | Shader table - HitGroupShaderTable: 
-    | [0] : MyHitGroup_Triangle
-    | [1] : MyHitGroup_Triangle_ShadowRay
-    | [2] : MyHitGroup_AABB_AnalyticPrimitive
-    | [3] : MyHitGroup_AABB_AnalyticPrimitive_ShadowRay 
-    | ...
-    | [6] : MyHitGroup_AABB_VolumetricPrimitive
-    | [7] : MyHitGroup_AABB_VolumetricPrimitive_ShadowRay
-    | [8] : MyHitGroup_AABB_SignedDistancePrimitive 
-    | [9] : MyHitGroup_AABB_SignedDistancePrimitive_ShadowRay,
-    | ...
-    | [20] : MyHitGroup_AABB_SignedDistancePrimitive
-    | [21] : MyHitGroup_AABB_SignedDistancePrimitive_ShadowRay
-    | --------------------------------------------------------------------
-    **********************************************************************/
 
      // RayGen shader table.
     {
@@ -851,9 +833,6 @@ void Application::DoRasterisation() {
     commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
    // ThrowIfFailed(commandList->Close());
-
-
-    
 }
 
 
@@ -900,9 +879,11 @@ void Application::DoRaytracing()
         scene->getPrimitiveAttributes()->CopyStagingToGpu(frameIndex);
         commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::AABBattributeBuffer, scene->getPrimitiveAttributes()->GpuVirtualAddress(frameIndex));
 
-        scene->getCSGTree()->CopyStagingToGpu(frameIndex);
-        commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::CSGTree, scene->getCSGTree()->GpuVirtualAddress(frameIndex));
-    }
+        if (scene->CSG) {
+            scene->getCSGTree()->CopyStagingToGpu(frameIndex);
+            commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::CSGTree, scene->getCSGTree()->GpuVirtualAddress(frameIndex));
+        }
+     }
 
     // Bind the heaps, acceleration structure and dispatch rays.  
     D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
@@ -931,7 +912,7 @@ void Application::CopyIntersectionBufferToBackBuffer(UINT intersectionIndex) {
 
     
     D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_DEST);
     preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(intersectionBuffers[intersectionIndex].textureResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
    
@@ -1129,10 +1110,10 @@ void Application::OnRender()
     }
 
     DoRaytracing();
-    CopyRaytracingOutputToBackbuffer();
+    CopyRaytracingOutputToBackbuffer();  
     if (recordIntersections) {
-        CopyIntersectionToCPU();
-        //CopyIntersectionBufferToBackBuffer(intersectionIndex);
+        //CopyIntersectionToCPU();
+       // CopyIntersectionBufferToBackBuffer(intersectionIndex);
     }
     if (false) {
       //  m_deviceResources->Prepare();

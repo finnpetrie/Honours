@@ -100,7 +100,7 @@ namespace IntersectionShaderType {
         AnalyticPrimitive = 0,
         VolumetricPrimitive,
         SignedDistancePrimitive,
-        CSG,
+       CSG,
         Count
     };
     inline UINT PerPrimitiveTypeCount(Enum type)

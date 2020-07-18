@@ -181,7 +181,7 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
     case AnalyticPrimitive::Hyperboloid: Q = float4x4( -1.0f ,0.0f, 0.0f, 0.0f,
                                                     0.0f, 1.0f, 0.0f,  0.0f,
                                                      0.0f, 0.0f, 1.0f , 0.0f,
-                                                       0.0f, 0.0f, 0.0f, -0.09f );
+                                                       0.0f, 0.0f, 0.0f, -1.0f );
         break;
     case AnalyticPrimitive::Ellipsoid: Q = float4x4( 1.0f / 1.5f, 0.0f, 0.0f,0.0f,
                                              0.0f, 1.0f, 0.0f, 0.0f,
@@ -196,12 +196,17 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
     case AnalyticPrimitive::Cylinder: Q = float4x4( 0.0f, 0.0f, 0.0f, 0.0f,
                                         0.0f, 1.0f, 0.0f, 0.0f,
                                         0.0f, 0.0f, 1.0f, 0.0f,
-                                        0.0f, 0.0f, 0.0f, -0.5f );
+                                        0.0f, 0.0f, 0.0f, -1.0f );
         break;
     case AnalyticPrimitive::Cone: Q = float4x4 (-1.0f, 0.0f, 0.0f, 0.0f,
                                                 0.0f, 1.0f, 0.0f, 0.0f,
                                                 0.0f, 0.0f, -1.0f, 0.0f,
                                                 0.0f, 0.0f, 0.0f, 0.0f);
+        break;
+    case AnalyticPrimitive::Sphere: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
         break;
      default: return false;
 
@@ -221,6 +226,62 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
         
     }
  
+    return hitFound;
+
+}
+
+bool CSGRayTest(in Ray ray, out float tmin, out float tmax, out float3 normal, in AnalyticPrimitive::Enum type) {
+
+    //thit = RayTCurrent();
+
+    float4x4 Q;
+    bool hitFound = false;
+    switch (type) {
+    case AnalyticPrimitive::Hyperboloid: Q = float4x4(-1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
+    case AnalyticPrimitive::Ellipsoid: Q = float4x4(1.0f / 1.5f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f / 2.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
+    case AnalyticPrimitive::Paraboloid: Q = float4x4 (1.0f / 2, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -0.1f,
+        0.0f, 0.0f, 1.0f / 1.5f, 0.0f,
+        0.0f, -0.1f, 0.0f, 0.0f);
+        break;
+    case AnalyticPrimitive::Cylinder: Q = float4x4(0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
+    case AnalyticPrimitive::Cone: Q = float4x4 (-1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, -1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f);
+        break;
+    case AnalyticPrimitive::Sphere: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
+    default: return false;
+
+    }
+    float _thit;
+    ProceduralPrimitiveAttributes _attr;
+
+    if (QuadricRayIntersectionTest(ray, tmin, tmax, _thit, _attr, type, Q))
+    {
+
+       // thit = _thit;
+        normal = _attr.normal;
+        hitFound = true;
+
+    }
+
     return hitFound;
 
 }

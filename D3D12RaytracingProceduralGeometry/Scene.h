@@ -35,9 +35,9 @@ public:
 
 	std::vector<Primitive> analyticalObjects;
 	bool instancing = false;
-	bool CSG = false;
+	bool CSG = true;
 	bool triangleInstancing = false;
-	bool quatJulia = true;
+	bool quatJulia = false;
 	bool plane = true;
 	const float c_aabbWidth = 2;      // AABB width.
 	const float c_aabbDistance = 2;   // Distance between AABBs.
@@ -52,7 +52,7 @@ public:
 	Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
 	XMMATRIX GetMVP();
 	void Init(float m_aspectRatio);
-	void convertCSGToArray(int numberOfNodes);
+	void convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void BuildMeshes(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m_deviceResources);

@@ -18,7 +18,7 @@ RaytracingAccelerationStructure g_scene : register(t0, space0);
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 //ConstantBuffer<CSGNode> g_CSGBuffer : register(b1);
-//RWTexture2D<float4> intersectionBuffer [6]: register(u1);
+RWTexture2D<float4> intersectionBuffer [6]: register(u1);
 //RWBuffer<float4> g_buffer : register(u7);
 
 // Triangle resources
@@ -113,7 +113,7 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.0001;
+    rayDesc.TMin = 0.1;
     rayDesc.TMax = 10000;
   //  RayPayload rayPayload = { float4(0, 0, 0, 0), payload.recursionDepth + 1, payload.seed};
     //float3 pos = WorldRayOrigin() + RayTCurrent() * WorldRayDirection();
@@ -166,7 +166,7 @@ bool ShadowRay(in Ray ray, in UINT currentRayRecursionDepth) {
     RayDesc rayDesc;
     rayDesc.Origin = ray.origin;
     rayDesc.Direction = ray.direction;
-    rayDesc.TMin = 0.001;
+    rayDesc.TMin = 0.1;
     rayDesc.TMax = 10000;
 
     ShadowRayPayload shadow = { true };
@@ -199,10 +199,10 @@ void MyRaygenShader()
     UINT currentRecursionDepth = 0;
 
     //zero out our intersection buffer
-   /* for (uint i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
+    for (uint i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
       
     intersectionBuffer[i][DispatchRaysIndex().xy] = float4(0,0,0,0);
-    }*/
+    }
     RayPayload payload = { float4(0,0,0,0), 
         0,
         0 };
@@ -251,7 +251,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float3 pos_n =normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
-  //  intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
+    intersectionBuffer[depth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
 
 
    float4 pathColour = float4(0, 0, 0, 0);
@@ -302,7 +302,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float3 pos = HitWorldPosition();
     float3 pos_n = normalize(HitWorldPosition());
 
-   // intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(pos, 1);
+    intersectionBuffer[rayPayload.recursionDepth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
    
     //g_buffer[1080*y + x] = float4(pos, 1);
     float3 l_dir = normalize(g_sceneCB.lightPosition.xyz - pos);
@@ -356,7 +356,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
 //0.1f is a good coefficient for reflectioncolour.
  // rayPayload.color += refractionColour + 0.1*reflectionColour;
 //  rayPayload.color = refractionColour;
-float4 color = ambient + refractionColour +  0.1*reflectionColour;
+float4 color = ambient + refractionColour +  reflectionColour;
 
 float t = RayTCurrent();
 rayPayload.color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
@@ -414,10 +414,10 @@ void AnyHit_Triangle(inout RayPayload payload, in BuiltInTriangleIntersectionAtt
 //***************************************************************************
 
 
-/*[shader("closesthit")]
+[shader("closesthit")]
 void ClosestHit_CSG( inout RayPayload payload, in ProceduralPrimitiveAttributes attr){
 
-}*/
+}
 // Get ray in AABB's local space.
 Ray GetRayInAABBPrimitiveLocalSpace()
 {
@@ -435,8 +435,8 @@ Ray GetRayInAABBPrimitiveLocalSpace()
 void MyIntersectionShader_AnalyticPrimitive()
 {
     Ray localRay = GetRayInAABBPrimitiveLocalSpace();
-    AnalyticPrimitive::Enum primitiveType = (AnalyticPrimitive::Enum) l_aabbCB.primitiveType;
-
+   // AnalyticPrimitive::Enum primitiveType = (AnalyticPrimitive::Enum) l_aabbCB.primitiveType;
+    AnalyticPrimitive::Enum primitiveType = (AnalyticPrimitive::Enum) csgTree[3].geometry;
     float thit;
     ProceduralPrimitiveAttributes attr;
     if (RayAnalyticGeometryIntersectionTest(localRay, primitiveType, thit, attr))
@@ -480,56 +480,294 @@ void MyIntersectionShader_SignedDistancePrimitive()
  
 }
 
-bool RayCSGIntersectionTest(in Ray ray, in CSGPrimitive::Enum csgPrimitive, out float thit, out ProceduralPrimitiveAttributes attr) {
-    // return RaySpheresIntersectionTest(ray, thit, attr);
-    //run a post order traversal of the CSG tree
-    //store the CSG tree in a constant-buffer
-    //compute all intersections along the ray for all geometry.
-    CSGNode csgStack[10];
-    int stackPointer = 0;
-    csgStack[0] = csgTree[0];
-    CSGNode current;
-    bool complete = false;
-    while (!complete){
-       // root = csgTree[root.leftNodeIndex];
-        //pop stack
-        current = csgStack[stackPointer];
-        stackPointer -= 1;
-        csgStack[stackPointer] = csgTree[current.rightNodeIndex];
-        stackPointer += 1;
-        csgStack[stackPointer] = csgTree[current.leftNodeIndex];
-       
-       //RayCSGIntersectionTest(ray, csgPrimitive, thit, attr);
-        if (current.geometry != -1) {
-            //want to save the intersections
-            RayAnalyticGeometryIntersectionTest(ray, (AnalyticPrimitive::Enum)current.geometry, thit, attr);
-            return true;
-        }
-        //depth first search of the CSG tree.
 
-   }
-    return complete;
-    //process the tree and put it into an array form
+
+bool isEmpty(CSGNode csgStack[10], int nodePointer) {
+    if (nodePointer == -1) {
+        return true;
+    }
+    return false;
 }
+
+
+void Push(inout CSGNode csgStack[10], inout int nodePointer, CSGNode node) {
+    nodePointer += 1;
+    csgStack[nodePointer] = node;
+}
+
+CSGNode Pop(inout CSGNode csgStack[10], inout int nodePointer) {
+    CSGNode popped = csgStack[nodePointer];
+    nodePointer -= 1;
+    return popped;
+}
+
+
+bool nodeEquals(CSGNode one, CSGNode two) {
+    return true;
+
+    if ((one.parentIndex == two.parentIndex) && (one.geometry == two.geometry) && (one.leftNodeIndex == two.leftNodeIndex) && (one.rightNodeIndex == two.rightNodeIndex)) {
+        return true;
+    }
+    return false;
+}
+
+int getNodeIndex(CSGNode node) {
+    CSGNode parent = csgTree[node.parentIndex];
+    CSGNode right = csgTree[parent.rightNodeIndex];
+    if (nodeEquals(node, right)) {
+        return parent.rightNodeIndex;
+    }
+    else {
+        return parent.leftNodeIndex;
+    }
+}
+
+
+void CSGCombine(in int operation, in intersectionInterval left, in intersectionInterval right, inout float tmin, inout float tmax, inout float3 normal, inout bool hit) {
+  
+    if (operation == 0) {
+        if (left.hit && right.hit) {
+            //union
+            //get smallest and largest values over all intersections -- will need to record whether there were intersections for the subtrees
+            tmin = min(left.tmin, right.tmin);
+            tmax = max(left.tmax, right.tmax);
+            if (tmin == left.tmin) {
+                normal = left.normal;
+            }
+            else {
+                normal = right.normal;
+            }
+            hit = true;
+        }
+        //else we don't intersect one of the subtrees
+        else {
+            if (right.hit) {
+                tmin = right.tmin;
+                tmax = right.tmax;
+                normal = right.normal;
+                hit = true;
+            }
+            else if(left.hit){
+                tmin = left.tmin;
+                tmax = left.tmax;
+                normal = left.normal;
+                hit = true;
+            }
+            else {
+                tmin = -1;
+                tmax = -1;
+                normal = float3(0, 0, 0);
+                hit = false;
+            }
+        }
+    }
+
+
+
+
+    else if (operation == 1) {
+        //intersection
+        if (left.hit && right.hit) {
+            float e = max(left.tmin, right.tmin);
+            float f = min(left.tmax, right.tmax);
+            hit = true;
+            tmin = min(e, f);
+            tmax = max(e, f);
+
+            if (tmin == e) {
+                if (e == left.tmin) {
+                    normal = left.normal;
+                }
+                else {
+                    normal = right.normal;
+                }
+            }
+        }
+        else {
+            tmin = -1;
+            tmax = -1;
+            normal = float3(0, 0, 0);
+            hit = false;
+        }
+    }
+
+
+
+
+
+    else {
+
+    //difference
+        if (right.hit && left.hit) {
+            if (right.tmin < left.tmin) {
+                tmin = right.tmin;
+                tmax = left.tmin;
+                normal = right.normal;
+                hit = true;
+
+            }
+            else if (left.tmax < right.tmax) {
+                tmin = left.tmax;
+                tmax = right.tmax;
+                normal = -left.normal;
+                hit = true;
+
+            }
+        }
+        else {
+            if (left.hit) {
+                tmin = left.tmin;
+                tmax = left.tmax;
+                normal = left.normal;
+                hit = true;
+            }
+            else {
+                tmin = -1;
+                tmax = -1;
+                normal = float3(0, 0, 0);
+                hit = false;
+            }
+        }
+    }
+
+    
+}
+
+
+bool RayCSGIntersectionTest(in Ray ray, in CSGPrimitive::Enum csgPrimitive, out float thit, out ProceduralPrimitiveAttributes attr) {
+    float minL = 0;
+    float minR = 0;
+    bool visitedNodes[10] = { 0, 0,0,0,0,0, 0,0,0,0 };
+    intersectionInterval intersections[10];
+    CSGNode csgStack[10];
+    int nodePointer = -1;
+    bool entry = true;
+   // csgStack[0] = csgTree[0];
+    
+    CSGNode root = csgTree[0];
+    while (!isEmpty(csgStack, nodePointer) || entry) {
+        entry = false;
+        //works
+        while (root.leftNodeIndex != -1 && !visitedNodes[root.myIndex]) {
+
+            Push(csgStack, nodePointer, csgTree[root.rightNodeIndex]);
+            Push(csgStack, nodePointer, root);
+
+            root = csgTree[root.leftNodeIndex];
+        }
+
+
+        if (root.leftNodeIndex == -1 && !visitedNodes[root.myIndex]) {
+            if (root.rightNodeIndex != -1) {
+                Push(csgStack, nodePointer, csgTree[root.rightNodeIndex]);
+            }
+            Push(csgStack, nodePointer, root);
+        }
+        //works
+        root = Pop(csgStack, nodePointer);
+        //
+        if ((root.rightNodeIndex != -1) && (csgStack[nodePointer].parentIndex == root.myIndex)) {
+            CSGNode right = Pop(csgStack, nodePointer);
+            Push(csgStack, nodePointer, root);
+            root = right;
+            //return fal
+        }else {
+            //evaluate node
+            //intersect root.
+          
+            int index = root.myIndex;
+            //works - or at least runs.
+            if (root.boolValue == -1) {
+                //primitive node
+
+                float  tmin, tmax;
+                float3 normal;
+                bool hit = RayCSGGeometryIntervals(ray, (AnalyticPrimitive::Enum)root.geometry, tmin, tmax, normal);
+                //  float3 normal = attr.normal;
+                      //intersect geometry
+                intersectionInterval i = { tmin, tmax, hit, normal };
+                //store this interval in the intersections array at our node's index.
+                intersections[index] = i;
+                visitedNodes[index] = true;
+
+            }
+            else {
+              
+                 //internal node
+                 //get left node and right node intervals -- we know these have been stored since this is a postorder traversal
+              
+                //we certainly reach this.
+                intersectionInterval left = intersections[root.leftNodeIndex];
+                intersectionInterval right = intersections[root.rightNodeIndex];
+                float tmin, tmax;
+                float3 normal;
+                bool hit;
+                //combine the nodes
+                CSGCombine(root.boolValue, left, right, tmin, tmax, normal, hit);
+
+                //store the new tmin tmax value and normal at the node's index
+                intersectionInterval interval = { tmin, tmax, hit, normal };
+                intersections[index] = interval;
+                visitedNodes[index] = true;
+
+            }
+        }
+    }
+
+    root = csgTree[0];
+    intersectionInterval left = intersections[root.leftNodeIndex];
+    intersectionInterval right = intersections[root.rightNodeIndex];
+    float tmin, tmax;
+    float3 normal;
+    bool hit;
+
+    CSGCombine(root.boolValue, left, right, tmin, tmax, normal, hit);
+   
+    /**
+    intersectionInterval i = intersections[root.myIndex];
+    float tmin = i.tmin;
+    float tmax = i.tmax;
+    float3 normal = i.normal;
+    bool hit = i.hit*/
+    
+    if (hit) {
+       if (tmin > RayTMin()) {
+            thit = tmin;
+            attr.normal = intersections[root.myIndex].normal;
+            return true;
+
+        }
+        else if (tmax > RayTMin()) {
+            thit = tmax;
+            attr.normal = intersections[root.rightNodeIndex].normal;
+            return true;
+
+        }
+    }
+    return false;
+}
+
+
 
 [shader("intersection")]
 void CSG_Intersection() {
     Ray localRay = GetRayInAABBPrimitiveLocalSpace();
    // AnalyticPrimitive::Enum primitiveType = (AnalyticPrimitive::Enum) l_aabbCB.primitiveType;
 
-   CSGPrimitive::Enum primitiveType = (CSGPrimitive::Enum) l_aabbCB.primitiveType;
+  CSGPrimitive::Enum primitiveType = (CSGPrimitive::Enum) l_aabbCB.primitiveType;
+  // AnalyticPrimitive::Enum primitiveType = AnalyticPrimitive::Enum::Sphere;
 
     float thit;
     ProceduralPrimitiveAttributes attr;
+   // if (RayCSGIntersectionTest(localRay, primitiveType, thit, attr)) {
     if (RayCSGIntersectionTest(localRay, primitiveType, thit, attr)) {
-        PrimitiveInstancePerFrameBuffer aabbAttribute = g_AABBPrimitiveAttributes[l_aabbCB.instanceIndex];
+    PrimitiveInstancePerFrameBuffer aabbAttribute = g_AABBPrimitiveAttributes[l_aabbCB.instanceIndex];
         attr.normal = mul(attr.normal, (float3x3) aabbAttribute.localSpaceToBottomLevelAS);
         attr.normal = normalize(mul((float3x3) ObjectToWorld3x4(), attr.normal));
 
-        ReportHit(thit, /*hitKind*/ 0, attr);
+        ReportHit(thit, 0, attr);
     }
     //do a test based on the CSG tree.
     //look up ways to decompose the recursive structure of the CSG tree.
 }
-
 #endif // RAYTRACING_HLSL

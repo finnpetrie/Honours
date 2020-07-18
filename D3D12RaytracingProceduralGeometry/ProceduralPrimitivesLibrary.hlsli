@@ -35,6 +35,7 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);
     //case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
     case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
+    case AnalyticPrimitive::Sphere: return RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::CSG_Difference:  return ConstructiveSolidGeometry_D(ray, thit, attr);
     case AnalyticPrimitive::CSG_Union: return ConstructiveSolidGeometry(ray, thit, attr);
     case AnalyticPrimitive::CSG_Intersection: return ConstructiveSolidGeometry_I(ray, thit, attr);
@@ -47,6 +48,10 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
 
     default: return false;
     }
+}
+
+bool RayCSGGeometryIntervals(in Ray ray, in AnalyticPrimitive::Enum analyticPrimitive, out float tMin, out float tMax, out float3 normal) {
+    return CSGRayTest(ray, tMin, tMax, normal, analyticPrimitive);
 }
 
 
@@ -95,8 +100,8 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
     
     case SignedDistancePrimitive::QuaternionJulia: 
        
-  //  return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
-       return sdGyroid(position);
+   return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
+      // return sdGyroid(position);
     default: return 0;
     }
 }
