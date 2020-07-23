@@ -102,6 +102,37 @@ bool SolveRayQuadricInteresection(in Ray ray, out float tmin, out float tmax, in
     return SolveQuadraticEqn(a, b, c, tmin, tmax);
 }
 
+
+bool rayPlane(in Ray r, inout float tmin, inout float tmax, out float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float3 translation) {
+    float epsilon = 0.001;
+    float denominator = dot(r.direction, normal);
+    if (abs(denominator) < epsilon) {
+        return false;
+    }
+
+   
+    //float t2 = 1 - r.origin.x / r.direction.x;
+  
+    float3 p_2 = -(r.origin - translation);
+    float t1 = dot(p_2, normal) / denominator;
+    float3 intersectionPoint;
+    if (t1 > epsilon) {
+        intersectionPoint = r.origin + t1 * r.direction;
+        if ((abs(intersectionPoint.y < 1)) && (abs(intersectionPoint.z) < 1)) {
+          if (sqrt(intersectionPoint.y * intersectionPoint.y + intersectionPoint.z * intersectionPoint.z) < radius) {
+                thit = t1;
+                tmin = tmax = t1;
+                attr.normal = float3(1, 0, 0);
+                if (dot(attr.normal, r.direction) > 0) {
+                    attr.normal = -attr.normal;
+                }
+                return true;
+            }
+        }
+
+    }
+    return false;
+}
 bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, out float thit, out ProceduralPrimitiveAttributes attr, in AnalyticPrimitive::Enum analyticPrimitive = AnalyticPrimitive::Enum::Hyperboloid, in float4x4 Q = float4x4(-1.0f, 0.0f, 0.0f, 0.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
     0.0f, 0.0f, 1.0f, 0.0f,
@@ -109,10 +140,17 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
 
 
     float n_x, n_y, n_z;
+    bool plane = false;
+
+ 
 
     if (!SolveRayQuadricInteresection(r, tmin, tmax, Q)) {
         return false;
     }
+
+    //determine whether qudraic or plane intersection is closer
+    
+    
 
     if (tmin < RayTMin()) {
         if (tmax < RayTMin()) {
@@ -124,6 +162,7 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
         thit = tmin;
     }
 
+   
     float3 intersectionPoint = r.origin + thit * r.direction;
 
     if (abs(intersectionPoint.x) > 2) {
@@ -140,6 +179,8 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
     intersectionPoint = r.origin + thit * r.direction;
 
     attr.normal = CalculateNormalForARayQuadricHit(r, thit, Q);
+
+
     //bound along x-axis
     if (abs(intersectionPoint.x) > 2) {
         return false;
@@ -158,6 +199,7 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
     }*/
 
     //bound paraboloid in all axes
+    
     if (analyticPrimitive == AnalyticPrimitive::Cone) {
         if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2) || intersectionPoint.y > 0) {
             return false;
@@ -225,6 +267,26 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
             hitFound = true;
         
     }
+
+    float left_tmin, left_tmax, left_thit, right_tmin, right_tmax, right_thit;
+    ProceduralPrimitiveAttributes leftPlane, rightPlane;
+    if(type == AnalyticPrimitive::Cylinder) {
+        //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
+       if (rayPlane(ray, left_tmin, left_tmax, left_thit, leftPlane, float3(1, 0, 0), 1, float3(-2, 0, 0))) {
+            if ((_thit > left_thit) || (!hitFound)) {
+                thit = left_thit;
+                attr = leftPlane;
+                hitFound = true;
+            }
+        }
+       if (rayPlane(ray, right_tmin, right_tmax, right_thit, rightPlane, float3(1, 0, 0),  1, float3(2, 0, 0))) {
+           if ((_thit > right_thit) || (!hitFound)) {
+               thit = right_thit;
+               attr = rightPlane;
+               hitFound = true;
+           }
+       }
+    }
  
     return hitFound;
 
@@ -281,6 +343,28 @@ bool CSGRayTest(in Ray ray, out float tmin, out float tmax, out float3 normal, i
         hitFound = true;
 
     }
+
+    float left_tmin, left_tmax, left_thit, right_tmin, right_tmax, right_thit;
+    ProceduralPrimitiveAttributes leftPlane, rightPlane;
+    if (type == AnalyticPrimitive::Cylinder) {
+        //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
+        if (rayPlane(ray, left_tmin, left_tmax, left_thit, leftPlane, float3(1, 0, 0), 1, float3(-2, 0, 0))) {
+            if ((_thit > left_thit) || (!hitFound)) {
+                tmin = left_thit;
+                _thit = left_thit;
+                normal = leftPlane.normal;
+                hitFound = true;
+            }
+        }
+        if (rayPlane(ray, right_tmin, right_tmax, right_thit, rightPlane, float3(1, 0, 0), 1, float3(2, 0, 0))) {
+            if ((_thit > right_thit) || (!hitFound)) {
+                tmin = right_thit;
+                normal =  rightPlane.normal;
+                hitFound = true;
+            }
+        }
+    }
+
 
     return hitFound;
 

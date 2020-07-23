@@ -153,7 +153,7 @@ void Application::CreateDeviceDependentResources()
     scene->CreateAABBPrimitiveAttributesBuffers(m_deviceResources);
 
      scene->CreateCSGTree(m_deviceResources);
-    scene->convertCSGToArray(5, m_deviceResources);
+    scene->convertCSGToArray(10, m_deviceResources);
     // Build shader tables, which define shaders and their local root arguments.
     BuildShaderTables();
 

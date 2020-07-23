@@ -44,7 +44,7 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     case AnalyticPrimitive::Paraboloid: return RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::Cylinder: return RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::Cone: return  RayQuadric(ray, thit, attr, analyticPrimitive);
-
+    case AnalyticPrimitive::Plane: return rayPlane(ray, t_min, t_max, thit, attr, float3(1, 0, 0), 1, float3(0, 0, 0));
 
     default: return false;
     }

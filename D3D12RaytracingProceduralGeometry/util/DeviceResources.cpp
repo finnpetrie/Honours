@@ -572,7 +572,7 @@ void DeviceResources::WaitForGpu() noexcept
         UINT64 fenceValue = m_fenceValues[m_backBufferIndex];
         if (SUCCEEDED(m_commandQueue->Signal(m_fence.Get(), fenceValue)))
         {
-            // Wait until the Signal has been processed.
+            // Wait until the Signal has been processed. 
             if (SUCCEEDED(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent.Get())))
             {
                 WaitForSingleObjectEx(m_fenceEvent.Get(), INFINITE, FALSE);

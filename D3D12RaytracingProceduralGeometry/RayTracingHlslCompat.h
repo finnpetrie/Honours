@@ -119,6 +119,12 @@ struct CSGNode {
 
 };
 
+struct AltNode {
+    int boolValue;
+    int geometry;
+    XMFLOAT3 padding;
+};
+
 struct intersectionInterval {
     float tmin;
     float tmax;
@@ -185,7 +191,8 @@ namespace CSGState {
 }
 namespace AnalyticPrimitive {
     enum Enum {
-        AABB = 0,
+        AABB  = 0,
+        Plane,
         Spheres,
         Sphere,
         Cone,

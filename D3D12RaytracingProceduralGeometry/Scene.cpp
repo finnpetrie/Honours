@@ -105,7 +105,7 @@ void Scene::Init(float m_aspectRatio)
 
         if (CSG) {
             using namespace CSGPrimitive;
-            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0, 0, 0.1, 0), 0, 0, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0, 0, 0.1, 0), 1, 0, 1.0f, 0.7f, 50, 1.0f);
         }
     }
 
@@ -162,6 +162,14 @@ void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResou
         csgTree[index].myIndex = index;
     };
 
+
+    SetNodeValues(0, -1, -1, -1, 1, 2);
+    SetNodeValues(1, -1, -1, -1, 1, 7);
+    SetNodeValues(2, -1, -1, 0, -1, -1);
+    SetNodeValues(3, -1, -1, -1, -1, 5);
+    SetNodeValues(4, -1, -1, -1, -1, 4);
+    SetNodeValues(5, -1, -1, 0, -1, -1);
+    SetNodeValues(6, -1, -1, 1, -1, -1);
     /**
      int boolValue;
     //pertains to the geometry described by the AABB encodings
@@ -171,11 +179,26 @@ void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResou
     int rightNodeIndex;
     UINT myIndex;*/
 
+   /* SetNodeValues(0, 1, 2, 1, -1, -1);
+    SetNodeValues(1, 3, 4, 1, 0, -1);
+    SetNodeValues(2, 5, 6, 1, 0, -1);
+    SetNodeValues(3, -1, -1, -1, 1, 2);
+    SetNodeValues(4, -1, -1, -1, 1, 7);
+    SetNodeValues(5, -1, -1, -1, 2, 5);
+    SetNodeValues(6, -1, -1, -1, 2, 4);
+    /*
+    
     SetNodeValues(0, 1, 2, 1, -1, -1);
+    SetNodeValues(2, -1, -1, -1, 0, 5);
+    SetNodeValues(1, 3, 4, 2, 0, -1);
+    SetNodeValues(3, -1, -1, -1, 1, 2);
+    SetNodeValues(4, -1, -1, -1, 1, 3);
+
+  /*  SetNodeValues(0, 1, 2, 1, -1, -1);
     SetNodeValues(1, 3, 4, 0, 0, -1);
     SetNodeValues(2, -1, -1, -1, 0, 7);
     SetNodeValues(3, -1, -1, -1, 1, 2);
-    SetNodeValues(4, -1, -1, -1, 1, 3);
+    SetNodeValues(4, -1, -1, -1, 1, 3);*/
    
    // AllocateUploadBuffer(device, csgTree.data(), csgTree.size() * sizeof(csgTree[0]), &csgTree.resource);
 
@@ -378,7 +401,7 @@ void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResource
 void Scene::CreateCSGTree(std::unique_ptr<DX::DeviceResources>  &m_deviceResources) {
     auto device = m_deviceResources->GetD3DDevice();
     auto frameCount = m_deviceResources->GetBackBufferCount();
-    csgTree.Create(device, 5, frameCount, L"CSG Tree");
+    csgTree.Create(device, 7, frameCount, L"CSG Tree");
 }
 
 void Scene::CreateAABBPrimitiveAttributesBuffers(std::unique_ptr<DX::DeviceResources>& m_deviceResources)
@@ -435,38 +458,13 @@ void Scene::CreateSpheres() {
 }
 
 void Scene::CreateGeometry() {
-    XMMATRIX nullQ = XMMatrixIdentity();
 
-    XMMATRIX Q_Ellipse(1.0f / 1.5f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f / 2.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, -1.0f);
-
-
-    XMMATRIX Q_paraboloid = { 1.0f / 2, 0.0f, 0.0f, 0.0f,
-                    0.0f, 0.0f, 0.0f,  -0.1f,
-                        0.0f, 0.0f, 1.0f / 1.5f, 0.0f,
-                        0.0f, -0.1f, 0.0f, 0.0f };
-
-    XMMATRIX Q_cone = { -1.0f, 0.0f, 0.0f, 0.0f,
-                                0.0f, 1.0f, 0.0f, 0.0f,
-                                0.0f, 0.0f, -1.0f, 0.0f,
-                                0.0f, 0.0f, 0.0f, 0.0f };
-
-    XMMATRIX Q_hyperboloid = { -1.0f ,0.0f, 0.0f, 0.0f,
-                    0.0f, 1.0f, 0.0f,  0.0f,
-                        0.0f, 0.0f, 1.0f , 0.0f,
-                        0.0f, 0.0f, 0.0f, -0.09f };
-    XMMATRIX Q_cylinder = { 0.0f,0.0f, 0.0f, 0.0f,
-                0.0f, 1.0f, 0.0f,  0.0f,
-                    0.0f, 0.0f, 1.0f   , 0.0f,
-                    0.0f, 0.0f, 0.0f, -0.5f };
 
 
     PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1.5, 1.5, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0, 0.1, 0), 1, 1.5, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.1, 0.0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.0, 0.0, 0.05, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
@@ -475,7 +473,7 @@ void Scene::CreateGeometry() {
 
     PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
-    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0.0f, 0.0f, 2.0f), XMFLOAT3(9, 9, 9));
+    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0, 0.0f, 0), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 0.0f, 0.0f), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(3, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
@@ -483,13 +481,13 @@ void Scene::CreateGeometry() {
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
     Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
-    Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(5.0f, 0.0, 2.0f), XMFLOAT3(6, 6, 6));
+    Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(0, 0.0, 0), XMFLOAT3(6, 6, 6));
     Primitive difference(AnalyticPrimitive::Enum::CSG_Difference, CSG, XMFLOAT3(0.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
     Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(-2.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
     Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(-1, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
+    Primitive plane(AnalyticPrimitive::Plane, cylin_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
 
-
-  // analyticalObjects = { ellipsoid, Paraboloid, AABB, sphere };
+    analyticalObjects = {Cylinder, Paraboloid, AABB };
 
 }
 
