@@ -153,23 +153,28 @@ void Scene::Init(float m_aspectRatio)
 
 void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResources>& m_deviceResources) {
   //  auto device = m_deviceResources->GetD3DDevice();
-    auto SetNodeValues = [&](int index, int leftNode, int rightNode, int boolValue, int parentIndex, int geometry) {
+    auto SetNodeValues = [&](int index, int leftNode, int rightNode, int boolValue, int parentIndex, int geometry, XMFLOAT3 translation) {
         csgTree[index].boolValue = boolValue;
         csgTree[index].leftNodeIndex = leftNode;
         csgTree[index].rightNodeIndex = rightNode;
         csgTree[index].geometry = geometry;
         csgTree[index].parentIndex = parentIndex;
         csgTree[index].myIndex = index;
+        csgTree[index].translation = translation;
     };
+   
+   // SetNodeValues(0, -1, -1, -1, -1, 3, XMFLOAT3(0, 0, 0));
+    //SetNodeValues(1, -1, -1, -1, 1, 3, XMFLOAT3(0.5, 0.5, 0));
+    //SetNodeValues(2, 0, 1,1, 1, -1, XMFLOAT3(0, 0, 0));
 
 
-    SetNodeValues(0, -1, -1, -1, 1, 2);
-    SetNodeValues(1, -1, -1, -1, 1, 7);
-    SetNodeValues(2, -1, -1, 0, -1, -1);
-    SetNodeValues(3, -1, -1, -1, -1, 5);
-    SetNodeValues(4, -1, -1, -1, -1, 4);
-    SetNodeValues(5, -1, -1, 0, -1, -1);
-    SetNodeValues(6, -1, -1, 1, -1, -1);
+    SetNodeValues(0, -1, -1, -1, 1, 3, XMFLOAT3(0,0,0));
+    SetNodeValues(1, -1, -1, -1, 1, 6, XMFLOAT3(0, 0, 0));
+    SetNodeValues(2, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
+    SetNodeValues(3, -1, -1, -1, -1, 5, XMFLOAT3(0, 0, 0));
+    SetNodeValues(4, -1, -1, -1, -1, 4, XMFLOAT3(0, 0, 0));
+    SetNodeValues(5, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
+    SetNodeValues(6, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
     /**
      int boolValue;
     //pertains to the geometry described by the AABB encodings
@@ -475,7 +480,7 @@ void Scene::CreateGeometry() {
 
     Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0, 0.0f, 0), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 0.0f, 0.0f), XMFLOAT3(9, 9, 9));
-    Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(3, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(0, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
 
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
@@ -486,8 +491,8 @@ void Scene::CreateGeometry() {
     Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(-2.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
     Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(-1, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
     Primitive plane(AnalyticPrimitive::Plane, cylin_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-
-    analyticalObjects = {Cylinder, Paraboloid, AABB };
+  
+    analyticalObjects = {Sphere, Paraboloid, AABB };
 
 }
 

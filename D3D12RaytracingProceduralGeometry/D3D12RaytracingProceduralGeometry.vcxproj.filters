@@ -197,6 +197,9 @@
     <FxCompile Include="Ray-Lines.hlsl">
       <Filter>Assets\Shaders\Util</Filter>
     </FxCompile>
+    <FxCompile Include="Photon-Mapping.hlsl">
+      <Filter>Assets\Shaders\Util</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="PathTracing.hlsl">

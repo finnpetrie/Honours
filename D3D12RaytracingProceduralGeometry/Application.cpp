@@ -59,6 +59,13 @@ const wchar_t* Application::c_hitGroupNames_AABBGeometry[][RayType::Count] =
 
 
 
+const wchar_t* Application::c_photon_rayGen = L"Photon_Ray_Gen";
+
+const wchar_t* Application::c_photon_closestHit[] =
+{
+    L"ClosestHit_Photon_Triangle",
+    L"ClosestHit_Photon_Procedural",
+};
 
 
 Application::Application(UINT width, UINT height, std::wstring name) :
@@ -123,11 +130,13 @@ void Application::CreateDeviceDependentResources()
     CreateRaytracingInterfaces();
     //pipeline = new Pipeline(m_deviceResources, m_dxrDevice, m_dxrStateObject);
     // Create root signatures for the shaders.
+    CreatePhotonMappingRootSignatures();
     CreateRootSignatures();
 
     // Create a raytracing pipeline state object which defines the binding of shaders, state and resources to be used during raytracing.
     CreateRaytracingPipelineStateObject();
 
+    CreatePhotonMappingFirstPassStateObject();
    // CreateRasterRootSignatures();
    // CreateRasterisationPipeline();
      //createRayTracingPipeline_Two();
@@ -156,6 +165,7 @@ void Application::CreateDeviceDependentResources()
     scene->convertCSGToArray(10, m_deviceResources);
     // Build shader tables, which define shaders and their local root arguments.
     BuildShaderTables();
+    BuildPhotonShaderTable();
 
     // Create an output 2D texture to store the raytracing result to.
     CreateRaytracingOutputResource();
@@ -170,6 +180,60 @@ void Application::SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE
     ThrowIfFailed(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error), error ? static_cast<wchar_t*>(error->GetBufferPointer()) : nullptr);
     ThrowIfFailed(device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&(*rootSig))));
 }
+
+
+void Application::CreatePhotonMappingRootSignatures()
+{
+    auto device = m_deviceResources->GetD3DDevice();
+
+    // Global Root Signature
+    // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
+    {
+        CD3DX12_DESCRIPTOR_RANGE ranges[2]; // Perfomance TIP: Order from most frequent to least frequent.
+        //1 output texture, 1 read back buffer, MAX_RAY_DEPTH_OUTPUT
+        //render view
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);  // 1 output texture
+        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
+
+        CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignature::Slot::Count];
+        rootParameters[GlobalRootSignature::Slot::OutputView].InitAsDescriptorTable(1, &ranges[0]);
+        rootParameters[GlobalRootSignature::Slot::AccelerationStructure].InitAsShaderResourceView(0);
+        rootParameters[GlobalRootSignature::Slot::SceneConstant].InitAsConstantBufferView(0);
+        rootParameters[GlobalRootSignature::Slot::AABBattributeBuffer].InitAsShaderResourceView(3);
+        rootParameters[GlobalRootSignature::Slot::CSGTree].InitAsShaderResourceView(4); //yes will need this for CSG
+        rootParameters[GlobalRootSignature::Slot::VertexBuffers].InitAsDescriptorTable(1, &ranges[1]);
+        CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+        SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_photonGlobalRootSignature);
+    }
+
+    // Local Root Signature
+    // This is a root signature that enables a shader to have unique arguments that come from shader tables - this will be needed for the photon mapping process
+    {
+        // Triangle geometry
+        {
+            namespace RootSignatureSlots = LocalRootSignature::Triangle::Slot;
+            CD3DX12_ROOT_PARAMETER rootParameters[RootSignatureSlots::Count];
+            rootParameters[RootSignatureSlots::MaterialConstant].InitAsConstants(SizeOfInUint32(PrimitiveConstantBuffer), 1);
+
+            CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+            localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+            SerializeAndCreateRaytracingRootSignature(localRootSignatureDesc, &m_photonLocalRootSignature[LocalRootSignature::Type::Triangle]);
+        }
+
+        // AABB geometry
+        {
+            namespace RootSignatureSlots = LocalRootSignature::AABB::Slot;
+            CD3DX12_ROOT_PARAMETER rootParameters[RootSignatureSlots::Count];
+            rootParameters[RootSignatureSlots::MaterialConstant].InitAsConstants(SizeOfInUint32(PrimitiveConstantBuffer), 1);
+            rootParameters[RootSignatureSlots::GeometryIndex].InitAsConstants(SizeOfInUint32(PrimitiveInstanceConstantBuffer), 2);
+
+            CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+            localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+            SerializeAndCreateRaytracingRootSignature(localRootSignatureDesc, &m_photonLocalRootSignature[LocalRootSignature::Type::AABB]);
+        }
+    }
+}
+
  
 void Application::CreateRootSignatures()
 {
@@ -290,6 +354,42 @@ void Application::CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracing
     }
 }
 
+
+void Application::CreateHitGroupSubobjectsPhotonPass(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline)
+{
+    // Triangle geometry hit groups
+    {
+        for (UINT rayType = 0; rayType < RayType::Count; rayType++)
+        {
+            auto hitGroup = raytracingPipeline->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+            if (rayType == RayType::Radiance)
+            {
+                hitGroup->SetClosestHitShaderImport(c_photon_closestHit[GeometryType::Triangle]);
+               // hitGroup->SetAnyHitShaderImport(c_anyHitShaderNames[GeometryType::Triangle]);
+            }
+            hitGroup->SetHitGroupExport(c_hitGroupNames_TriangleGeometry[rayType]);
+            hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+        }
+    }
+
+    // AABB geometry hit groups
+    {
+        // Create hit groups for each intersection shader.
+        for (UINT t = 0; t < IntersectionShaderType::Count; t++)
+            for (UINT rayType = 0; rayType < RayType::Count; rayType++)
+            {
+                auto hitGroup = raytracingPipeline->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+                hitGroup->SetIntersectionShaderImport(c_intersectionShaderNames[t]);
+                if (rayType == RayType::Radiance)
+                {
+                   // hitGroup->SetAnyHitShaderImport(c_anyHitShaderNames[GeometryType::AABB]);
+                    hitGroup->SetClosestHitShaderImport(c_photon_closestHit[GeometryType::AABB]);
+                }
+                hitGroup->SetHitGroupExport(c_hitGroupNames_AABBGeometry[t][rayType]);
+                hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
+            }
+    }
+}
 void Application::CreateRasterRootSignatures() {
 
     auto device = m_deviceResources->GetD3DDevice();
@@ -319,7 +419,7 @@ void Application::CreateRasterRootSignatures() {
 
 // Local root signature and shader association
 // This is a root signature that enables a shader to have unique arguments that come from shader tables.
-void Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline)
+void Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline,  ComPtr<ID3D12RootSignature> *rootSig)
 {
     // Ray gen and miss shaders in this sample are not using a local root signature and thus one is not associated with them.
 
@@ -327,7 +427,7 @@ void Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* 
     // Triangle geometry
     {
         auto localRootSignature = raytracingPipeline->CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
-        localRootSignature->SetRootSignature(m_raytracingLocalRootSignature[LocalRootSignature::Type::Triangle].Get());
+        localRootSignature->SetRootSignature(rootSig[LocalRootSignature::Type::Triangle].Get());
         // Shader association
         auto rootSignatureAssociation = raytracingPipeline->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
         rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
@@ -337,7 +437,7 @@ void Application::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* 
     // AABB geometry
     {
         auto localRootSignature = raytracingPipeline->CreateSubobject<CD3DX12_LOCAL_ROOT_SIGNATURE_SUBOBJECT>();
-        localRootSignature->SetRootSignature(m_raytracingLocalRootSignature[LocalRootSignature::Type::AABB].Get());
+        localRootSignature->SetRootSignature(rootSig[LocalRootSignature::Type::AABB].Get());
         // Shader association
         auto rootSignatureAssociation = raytracingPipeline->CreateSubobject<CD3DX12_SUBOBJECT_TO_EXPORTS_ASSOCIATION_SUBOBJECT>();
         rootSignatureAssociation->SetSubobjectToAssociate(*localRootSignature);
@@ -391,6 +491,54 @@ void Application::CreateRasterisationPipeline() {
     ThrowIfFailed(commandList->Close());
 }
 
+
+void Application::CreatePhotonMappingFirstPassStateObject() {
+    // 1 - Pipeline config
+    CD3DX12_STATE_OBJECT_DESC photonMapping{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+
+    // DXIL library
+    auto lib = photonMapping.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+    D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing, ARRAYSIZE(g_pRaytracing));
+    lib->SetDXILLibrary(&libdxil);
+   
+    {
+        lib->DefineExport(c_photon_rayGen);
+       
+        lib->DefineExports(c_photon_closestHit);
+        lib->DefineExports(c_intersectionShaderNames);
+        lib->DefineExports(c_missShaderNames);
+    }
+    // Hit groups
+    CreateHitGroupSubobjectsPhotonPass(&photonMapping);
+
+    // Shader config
+    // Defines the maximum sizes in bytes for the ray rayPayload and attribute structure.
+    auto shaderConfig = photonMapping.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+    UINT payloadSize = max(sizeof(RayPayload), sizeof(ShadowRayPayload));
+    UINT attributeSize = sizeof(struct ProceduralPrimitiveAttributes);
+    shaderConfig->Config(payloadSize, attributeSize);
+    CreateLocalRootSignatureSubobjects(&photonMapping, m_photonLocalRootSignature);
+
+    // Global root signature
+    // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
+    auto globalRootSignature = photonMapping.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+    globalRootSignature->SetRootSignature(m_photonGlobalRootSignature.Get());
+
+    // Pipeline config
+    // Defines the maximum TraceRay() recursion depth.
+    auto pipelineConfig = photonMapping.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+    // PERFOMANCE TIP: Set max recursion depth as low as needed
+    // as drivers may apply optimization strategies for low recursion depths.
+    UINT maxRecursionDepth = MAX_RAY_RECURSION_DEPTH;
+    pipelineConfig->Config(maxRecursionDepth);
+
+    PrintStateObjectDesc(photonMapping);
+
+    // Create the state object.
+    ThrowIfFailed(m_dxrDevice->CreateStateObject(photonMapping, IID_PPV_ARGS(&m_photonMapStateObject)), L"Couldn't create DirectX Raytracing state object.\n");
+
+}
+
 // Create a raytracing pipeline state object (RTPSO).
 // An RTPSO represents a full set of shaders reachable by a DispatchRays() call,
 // with all configuration options resolved, such as local signatures and other state.
@@ -424,7 +572,7 @@ void Application::CreateRaytracingPipelineStateObject()
 
     // Local root signature and shader association
     // This is a root signature that enables a shader to have unique arguments that come from shader tables.
-    CreateLocalRootSignatureSubobjects(&raytracingPipeline);
+    CreateLocalRootSignatureSubobjects(&raytracingPipeline, m_raytracingLocalRootSignature);
 
     // Global root signature
     // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
@@ -623,6 +771,124 @@ void Application::BuildGeometry()
 
 // Build geometry descs for bottom-level AS.
 
+
+void Application::BuildPhotonShaderTable() {
+    auto device = m_deviceResources->GetD3DDevice();
+
+    void* rayGenShaderID;
+    void* missShaderIDs[RayType::Count];
+    void* hitGroupShaderIDs_Triangle[RayType::Count];
+    void* hitGroupShaderIDs_AABBGeometry[IntersectionShaderType::Count][RayType::Count];
+
+    unordered_map<void*, wstring> shaderIdToStringMap;
+
+
+    auto GetShaderIDs = [&](auto* stateObjectProperties)
+    {
+        rayGenShaderID = stateObjectProperties->GetShaderIdentifier(c_photon_rayGen);
+        shaderIdToStringMap[rayGenShaderID] = c_photon_rayGen;
+
+        for (UINT i = 0; i < RayType::Count; i++)
+        {
+            missShaderIDs[i] = stateObjectProperties->GetShaderIdentifier(c_missShaderNames[i]);
+            shaderIdToStringMap[missShaderIDs[i]] = c_missShaderNames[i];
+        }
+        for (UINT i = 0; i < RayType::Count; i++)
+        {
+            hitGroupShaderIDs_Triangle[i] = stateObjectProperties->GetShaderIdentifier(c_hitGroupNames_TriangleGeometry[i]);
+            shaderIdToStringMap[hitGroupShaderIDs_Triangle[i]] = c_hitGroupNames_TriangleGeometry[i];
+        }
+        for (UINT r = 0; r < IntersectionShaderType::Count; r++)
+            for (UINT c = 0; c < RayType::Count; c++)
+            {
+                hitGroupShaderIDs_AABBGeometry[r][c] = stateObjectProperties->GetShaderIdentifier(c_hitGroupNames_AABBGeometry[r][c]);
+                shaderIdToStringMap[hitGroupShaderIDs_AABBGeometry[r][c]] = c_hitGroupNames_AABBGeometry[r][c];
+            }
+    };
+
+    UINT shaderIDSize;
+    {
+        ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+        ThrowIfFailed(m_photonMapStateObject.As(&stateObjectProperties));
+        GetShaderIDs(stateObjectProperties.Get());
+        shaderIDSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    }
+
+    {
+        UINT numShaderRecords = 1;
+        UINT shaderRecordSize = shaderIDSize; // No root arguments
+
+        ShaderTable rayGenShaderTable(device, numShaderRecords, shaderRecordSize, L"PhotonRayGenTable");
+        rayGenShaderTable.push_back(ShaderRecord(rayGenShaderID, shaderRecordSize, nullptr, 0));
+        rayGenShaderTable.DebugPrint(shaderIdToStringMap);
+        m_photonRayGenTable = rayGenShaderTable.GetResource();
+    }
+
+    // Miss shader table.
+    {
+        UINT numShaderRecords = RayType::Count;
+        UINT shaderRecordSize = shaderIDSize; // No root arguments
+
+        ShaderTable missShaderTable(device, numShaderRecords, shaderRecordSize, L"MissPhotonTable");
+        for (UINT i = 0; i < RayType::Count; i++)
+        {
+            missShaderTable.push_back(ShaderRecord(missShaderIDs[i], shaderIDSize, nullptr, 0));
+        }
+        missShaderTable.DebugPrint(shaderIdToStringMap);
+        m_missPhotonTableStrideInBytes = missShaderTable.GetShaderRecordSize();
+        m_missPhotonTable = missShaderTable.GetResource();
+    }
+
+    // Hit group shader table.
+    {
+        UINT numShaderRecords = RayType::Count + IntersectionShaderType::TotalPrimitiveCount * RayType::Count;
+        UINT shaderRecordSize = shaderIDSize + LocalRootSignature::MaxRootArgumentsSize();
+        ShaderTable hitGroupShaderTable(device, numShaderRecords, shaderRecordSize, L"PhotonHitGroupTable");
+
+        // Triangle geometry hit groups.
+        {
+            LocalRootSignature::Triangle::RootArguments rootArgs;
+            rootArgs.materialCb = scene->m_planeMaterialCB;
+
+            for (auto& hitGroupShaderID : hitGroupShaderIDs_Triangle)
+            {
+                hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderID, shaderIDSize, &rootArgs, sizeof(rootArgs)));
+            }
+        }
+
+        // AABB geometry hit groups.
+        {
+            LocalRootSignature::AABB::RootArguments rootArgs;
+            UINT instanceIndex = 0;
+
+            // Create a shader record for each primitive.
+            for (UINT iShader = 0, instanceIndex = 0; iShader < IntersectionShaderType::Count; iShader++)
+            {
+                UINT numPrimitiveTypes = IntersectionShaderType::PerPrimitiveTypeCount(static_cast<IntersectionShaderType::Enum>(iShader));
+
+                // Primitives for each intersection shader.
+                for (UINT primitiveIndex = 0; primitiveIndex < numPrimitiveTypes; primitiveIndex++, instanceIndex++)
+                {
+                    //    rootArgs.materialCb = m_aabbMaterialCB[instanceIndex];
+                    rootArgs.materialCb = scene->m_aabbMaterialCB[instanceIndex];
+                    rootArgs.aabbCB.instanceIndex = instanceIndex;
+                    rootArgs.aabbCB.primitiveType = primitiveIndex;
+
+                    // Ray types.
+                    for (UINT r = 0; r < RayType::Count; r++)
+                    {
+                        auto& hitGroupShaderID = hitGroupShaderIDs_AABBGeometry[iShader][r];
+                        hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderID, shaderIDSize, &rootArgs, sizeof(rootArgs)));
+                    }
+                }
+            }
+        }
+        hitGroupShaderTable.DebugPrint(shaderIdToStringMap);
+        m_hitgroupPhotonTableStrideInBytes = hitGroupShaderTable.GetShaderRecordSize();
+        m_hitgroupPhotonTable = hitGroupShaderTable.GetResource();
+    }
+
+}
 // Build shader tables.
 // This encapsulates all shader records - shaders and the arguments for their local root signatures.
 void Application::BuildShaderTables()
@@ -834,6 +1100,66 @@ void Application::DoRasterisation() {
 
    // ThrowIfFailed(commandList->Close());
 }
+
+void Application::DoScreenSpacePhotonMapping()
+{
+    auto commandList = m_deviceResources->GetCommandList();
+    auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
+
+    auto DispatchRays = [&](auto* raytracingCommandList, auto* stateObject, auto* dispatchDesc)
+    {
+        dispatchDesc->HitGroupTable.StartAddress = m_hitgroupPhotonTable->GetGPUVirtualAddress();
+        dispatchDesc->HitGroupTable.SizeInBytes = m_hitgroupPhotonTable->GetDesc().Width;
+        dispatchDesc->HitGroupTable.StrideInBytes = m_hitgroupPhotonTableStrideInBytes;
+        dispatchDesc->MissShaderTable.StartAddress = m_missPhotonTable->GetGPUVirtualAddress();
+        dispatchDesc->MissShaderTable.SizeInBytes = m_missPhotonTable->GetDesc().Width;
+        dispatchDesc->MissShaderTable.StrideInBytes = m_missPhotonTableStrideInBytes;
+        dispatchDesc->RayGenerationShaderRecord.StartAddress = m_photonRayGenTable->GetGPUVirtualAddress();
+        dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_photonRayGenTable->GetDesc().Width;
+        dispatchDesc->Width = m_width;
+        dispatchDesc->Height = m_height;
+        dispatchDesc->Depth = 1;
+        raytracingCommandList->SetPipelineState1(stateObject);
+
+        m_gpuTimers[GpuTimers::Raytracing].Start(commandList);
+        raytracingCommandList->DispatchRays(dispatchDesc);
+        m_gpuTimers[GpuTimers::Raytracing].Stop(commandList);
+    };
+
+    auto SetCommonPipelineState = [&](auto* descriptorSetCommandList)
+    {
+        descriptorSetCommandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
+        // Set index and successive vertex buffer decriptor tables.
+      //  commandList->SetComputeRootDescriptorTable(GlobalRootSignature::Slot::VertexBuffers, m_indexBuffer.gpuDescriptorHandle);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature::Slot::VertexBuffers, scene->m_indexBuffer.gpuDescriptorHandle);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
+    };
+
+    commandList->SetComputeRootSignature(m_photonGlobalRootSignature.Get());
+
+    // Copy dynamic buffers to GPU.
+    {
+        scene->getSceneBuffer()->CopyStagingToGpu(frameIndex);
+        commandList->SetComputeRootConstantBufferView(GlobalRootSignature::Slot::SceneConstant, scene->getSceneBuffer()->GpuVirtualAddress(frameIndex));
+        scene->getPrimitiveAttributes()->CopyStagingToGpu(frameIndex);
+        commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::AABBattributeBuffer, scene->getPrimitiveAttributes()->GpuVirtualAddress(frameIndex));
+
+        if (scene->CSG) {
+            scene->getCSGTree()->CopyStagingToGpu(frameIndex);
+            commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::CSGTree, scene->getCSGTree()->GpuVirtualAddress(frameIndex));
+        }
+    }
+
+    // Bind the heaps, acceleration structure and dispatch rays.  
+    D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+    SetCommonPipelineState(commandList);
+    commandList->SetComputeRootShaderResourceView(GlobalRootSignature::Slot::AccelerationStructure, acclerationStruct->getTopLevel()->GetGPUVirtualAddress());
+    DispatchRays(m_dxrCommandList.Get(), m_photonMapStateObject.Get(), &dispatchDesc);
+
+    m_deviceResources->WaitForGpu();
+}
+
+
 
 
 void Application::DoRaytracing()

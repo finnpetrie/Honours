@@ -113,8 +113,8 @@ struct CSGNode {
     int leftNodeIndex;
     int rightNodeIndex;
     UINT myIndex;
+    XMFLOAT3 translation;
     //to guarantee 16 bit byte alignment
-    XMFLOAT3 padding;
     XMFLOAT3 padding2;
 
 };

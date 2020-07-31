@@ -18,7 +18,7 @@ RaytracingAccelerationStructure g_scene : register(t0, space0);
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 //ConstantBuffer<CSGNode> g_CSGBuffer : register(b1);
-RWTexture2D<float4> intersectionBuffer [6]: register(u1);
+RWTexture2D<float4> screenSpacePhotonMap [2]: register(u1);
 //RWBuffer<float4> g_buffer : register(u7);
 
 // Triangle resources
@@ -185,10 +185,34 @@ bool ShadowRay(in Ray ray, in UINT currentRayRecursionDepth) {
 }
 
 
+//photon mapping ray-gen
+
+[shader("raygeneration")]
+void Photon_Ray_Gen() {
+
+
+    //for each light source
+
+    //send random ray light source
+
+}
+
+[shader("closesthit")]
+void ClosestHit_Photon_Triangle(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
+
+
+}
+
+//don't need to define custom interesctions, since we will use the same as backward ray-tracing
+[shader("closesthit")]
+void ClosestHit_Photon_Procedural(inout RayPayload payload, in ProceduralPrimitiveAttributes attr) {
+
+
+}
+
 //***************************************************************************
 //********************------ Ray gen shader.. -------************************
 //***************************************************************************
-
 [shader("raygeneration")]
 void MyRaygenShader()
 {
@@ -199,10 +223,10 @@ void MyRaygenShader()
     UINT currentRecursionDepth = 0;
 
     //zero out our intersection buffer
-    for (uint i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
+   /* for (uint i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
       
     intersectionBuffer[i][DispatchRaysIndex().xy] = float4(0,0,0,0);
-    }
+    }*/
     RayPayload payload = { float4(0,0,0,0), 
         0,
         0 };
@@ -251,7 +275,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float3 pos_n =normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
-    intersectionBuffer[depth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
+    //intersectionBuffer[depth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
 
 
    float4 pathColour = float4(0, 0, 0, 0);
@@ -302,7 +326,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float3 pos = HitWorldPosition();
     float3 pos_n = normalize(HitWorldPosition());
 
-    intersectionBuffer[rayPayload.recursionDepth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
+    //intersectionBuffer[rayPayload.recursionDepth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
    
     //g_buffer[1080*y + x] = float4(pos, 1);
     float3 l_dir = normalize(g_sceneCB.lightPosition.xyz - pos);
@@ -660,7 +684,11 @@ bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttribute
             //trace a ray and find interesections - store
             float  tmin, tmax;
             float3 normal;
-            bool hit = RayCSGGeometryIntervals(ray, (AnalyticPrimitive::Enum)current.geometry, tmin, tmax, normal);
+            Ray r;
+            r.origin = ray.origin + current.translation;
+            r.direction = ray.direction + current.translation;
+            //r.direction = ray.direction + current.translation;
+            bool hit = RayCSGGeometryIntervals(r, (AnalyticPrimitive::Enum)current.geometry, tmin, tmax, normal);
             intersectionInterval inter = { tmin, tmax, hit, normal };
             //store this interval in the intersections array at   our node's index.
             intersections[i] = inter;
@@ -687,7 +715,7 @@ bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttribute
     }
  
 
-    intersectionInterval final = intersections[i -1];
+    intersectionInterval final = intersections[2];
 
     if (final.hit) {
         if (final.tmin > RayTMin()) {

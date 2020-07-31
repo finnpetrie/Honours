@@ -78,13 +78,22 @@ private:
     ComPtr<ID3D12Device5> m_dxrDevice;
     ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList;
     ComPtr<ID3D12StateObject> m_dxrStateObject;
-
+    ComPtr<ID3D12StateObject>  m_photonMapStateObject;
     //Raster Pipeline
     ComPtr<ID3D12PipelineState> m_rasterState;
     // Root signatures
     ComPtr<ID3D12RootSignature> m_rasterRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature[LocalRootSignature::Type::Count];
+
+    ComPtr<ID3D12RootSignature> m_photonLocalRootSignature[LocalRootSignature::Type::Count];
+    ComPtr<ID3D12RootSignature> m_photonGlobalRootSignature;;
+
+    ComPtr<ID3D12Resource> m_missPhotonTable;
+    UINT m_missPhotonTableStrideInBytes;
+    ComPtr<ID3D12Resource> m_hitgroupPhotonTable;
+    UINT m_hitgroupPhotonTableStrideInBytes;
+    ComPtr<ID3D12Resource> m_photonRayGenTable;
   
     
     ComPtr<ID3D12Resource>      m_stagingTarget[6];
@@ -137,6 +146,9 @@ private:
     static const wchar_t* c_anyHitShaderNames[GeometryType::Count];
     static const wchar_t* c_missShaderNames[RayType::Count];
 
+    static const wchar_t* c_photon_rayGen;
+    static const wchar_t* c_photon_closestHit[GeometryType::Count];
+
     ComPtr<ID3D12Resource> m_missShaderTable;
     UINT m_missShaderTableStrideInBytes;
     ComPtr<ID3D12Resource> m_hitGroupShaderTable;
@@ -153,6 +165,7 @@ private:
 	
     void RecreateD3D();
 	void CopyIntersectionToCPU();
+    void DoScreenSpacePhotonMapping();
     void DoRaytracing();
    
     void CreateDeviceDependentResources();
@@ -161,12 +174,16 @@ private:
     void ReleaseWindowSizeDependentResources();
     void CreateRaytracingInterfaces();
     void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC& desc, ComPtr<ID3D12RootSignature>* rootSig);
+    void CreatePhotonMappingRootSignatures();
     void CreateRootSignatures();
     void CreateDxilLibrarySubobject(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
+    void CreateHitGroupSubobjectsPhotonPass(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateRasterRootSignatures();
-    void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
-	void CreateRasterisationPipeline();
+   
+    void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline, ComPtr<ID3D12RootSignature>* rootSig);
+    void CreateRasterisationPipeline();
+    void CreatePhotonMappingFirstPassStateObject();
     void CreateRaytracingPipelineStateObject();
     void CreateIntersectionVertexBuffer();
     void CreateIntersectionBuffers();
@@ -179,6 +196,8 @@ private:
     void DoRasterisation();
    
    
+    void BuildPhotonShaderTable();
+
     void BuildShaderTables();
     void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
 	void CreateStagingRenderTargetResource();
