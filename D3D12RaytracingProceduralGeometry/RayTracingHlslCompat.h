@@ -56,6 +56,13 @@ struct RayPayload
     UINT seed;
 };
 
+
+struct PhotonPayload {
+    XMFLOAT4 position;
+    XMFLOAT4 colour;
+    float intensity;
+    UINT recursionDepth;
+};
 struct ShadowRayPayload
 {
     bool hit;
@@ -66,6 +73,7 @@ struct ShadowRayPayload
 struct SceneConstantBuffer
 {
     XMMATRIX projectionToWorld;
+    XMMATRIX projection;
     XMVECTOR cameraPosition;
     XMVECTOR lightPosition;
     XMVECTOR lightAmbientColor;

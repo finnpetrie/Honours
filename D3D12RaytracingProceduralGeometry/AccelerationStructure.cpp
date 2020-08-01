@@ -300,7 +300,7 @@ AccelerationStructureBuffers AccelerationStructure::BuildTopLevelAS(Acceleration
 }
 
 // Build acceleration structure needed for raytracing.
-void AccelerationStructure::BuildAccelerationStructures(std::unique_ptr<DX::DeviceResources> &m_deviceResources,  ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList, ComPtr<ID3D12StateObject> m_dxrStateObject)
+void AccelerationStructure::BuildAccelerationStructures(std::unique_ptr<DX::DeviceResources> &m_deviceResources,  ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList)
 {
     auto device = m_deviceResources->GetD3DDevice();
     auto commandList = m_deviceResources->GetCommandList();
@@ -348,12 +348,12 @@ void AccelerationStructure::BuildAccelerationStructures(std::unique_ptr<DX::Devi
     m_topLevelAS = topLevelAS.accelerationStructure;
 }
 
-AccelerationStructure::AccelerationStructure(std::unique_ptr<DX::DeviceResources>& m_deviceResources, Scene* scene, ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList, ComPtr<ID3D12StateObject> m_dxrStateObject)
+AccelerationStructure::AccelerationStructure(std::unique_ptr<DX::DeviceResources>& m_deviceResources, Scene* scene, ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList)
 {
    // m_deviceResources = m_deviceResources;
     //scene = scene;
     this->scene = scene;
-    BuildAccelerationStructures(m_deviceResources, m_dxrDevice, m_dxrCommandList, m_dxrStateObject);
+    BuildAccelerationStructures(m_deviceResources, m_dxrDevice, m_dxrCommandList);
 }
 
 ComPtr<ID3D12Resource> AccelerationStructure::getTopLevel()

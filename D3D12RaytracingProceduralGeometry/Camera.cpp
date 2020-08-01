@@ -31,6 +31,7 @@ void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene)
     XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), aspectRatio, 0.01f, 125.0f);
     XMMATRIX viewProj = view * proj;
     scene->projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+    scene->projection = viewProj;
 }
 
 void Camera::OnKeyDown(UINT8 key) {

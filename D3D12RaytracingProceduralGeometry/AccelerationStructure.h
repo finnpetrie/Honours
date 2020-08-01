@@ -16,14 +16,14 @@ private:
 	
 	AccelerationStructureBuffers BuildTopLevelAS(AccelerationStructureBuffers bottomLevelAS[BottomLevelASType::Count], std::unique_ptr<DX::DeviceResources>& m_deviceResources, ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList, D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE);
 
-	void BuildAccelerationStructures(std::unique_ptr<DX::DeviceResources>& m_deviceResources, ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList, ComPtr<ID3D12StateObject> m_dxrStateObject);
+	void BuildAccelerationStructures(std::unique_ptr<DX::DeviceResources>& m_deviceResources, ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList);
 
 public:
 
 
 
 
-	AccelerationStructure(std::unique_ptr<DX::DeviceResources>& m_deviceResources, Scene* scene, ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList, ComPtr<ID3D12StateObject> m_dxrStateObject);
+	AccelerationStructure(std::unique_ptr<DX::DeviceResources>& m_deviceResources, Scene* scene, ComPtr<ID3D12Device5> m_dxrDevice, ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList);
 
 	
 	ComPtr<ID3D12Resource> getTopLevel();

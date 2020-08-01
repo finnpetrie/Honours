@@ -70,12 +70,12 @@ void Scene::Init(float m_aspectRatio)
 
     
 
-    m_planeMaterialCB = { XMFLOAT4(0.9f, 0.9f, 0.9f, 1.0f), 0, 0,  1, 0.4f, 50, 1 };
-
+    
     // Albedos
     XMFLOAT4 green = XMFLOAT4(0.1f, 1.0f, 0.5f, 1.0f);
-    XMFLOAT4 red = XMFLOAT4(1.0f, 0.5f, 0.5f, 1.0f);
+    XMFLOAT4 red = XMFLOAT4(1.0f, 0, 0, 0);
     XMFLOAT4 yellow = XMFLOAT4(1.0f, 1.0f, 0.5f, 1.0f);
+    m_planeMaterialCB = {red, 0, 0,  1, 0.4f, 50, 1 };
 
     UINT offset = 0;
     // Analytic primitives.
@@ -468,7 +468,7 @@ void Scene::CreateGeometry() {
 
     PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 1, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.1, 0.0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
@@ -480,12 +480,12 @@ void Scene::CreateGeometry() {
 
     Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(0, 0.0f, 0), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 0.0f, 0.0f), XMFLOAT3(9, 9, 9));
-    Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(0, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(1, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive Sphere(AnalyticPrimitive::Sphere, AABB_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
 
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
-    Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
+    Primitive Paraboloid(AnalyticPrimitive::Paraboloid, AABB_b, XMFLOAT3(3.0f, 0.0, -2.0f), XMFLOAT3(6, 6, 6));
     Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(0, 0.0, 0), XMFLOAT3(6, 6, 6));
     Primitive difference(AnalyticPrimitive::Enum::CSG_Difference, CSG, XMFLOAT3(0.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
     Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(-2.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));

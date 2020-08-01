@@ -146,6 +146,7 @@ private:
     static const wchar_t* c_anyHitShaderNames[GeometryType::Count];
     static const wchar_t* c_missShaderNames[RayType::Count];
 
+    static const wchar_t* c_photonMiss[RayType::Count];
     static const wchar_t* c_photon_rayGen;
     static const wchar_t* c_photon_closestHit[GeometryType::Count];
 

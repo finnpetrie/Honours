@@ -1,4 +1,4 @@
-//*********************************************************
+   //*********************************************************
 //
 // Copyright (c) Microsoft. All rights reserved.
 // This code is licensed under the MIT License (MIT).
@@ -43,6 +43,7 @@ const wchar_t* Application::c_missShaderNames[] =
 {
     L"MyMissShader", L"MyMissShader_ShadowRay"
 };
+
 // Hit groups.
 const wchar_t* Application::c_hitGroupNames_TriangleGeometry[] = 
 { 
@@ -65,6 +66,11 @@ const wchar_t* Application::c_photon_closestHit[] =
 {
     L"ClosestHit_Photon_Triangle",
     L"ClosestHit_Photon_Procedural",
+};
+
+const wchar_t* Application::c_photonMiss[] =
+{
+    L"Photon_Miss", L"Photon_Shadow_Miss"
 };
 
 
@@ -154,7 +160,7 @@ void Application::CreateDeviceDependentResources()
 
 
     // Build raytracing acceleration structures from the generated geometry.
-    acclerationStruct = new AccelerationStructure(m_deviceResources, scene, m_dxrDevice, m_dxrCommandList, m_dxrStateObject);
+    acclerationStruct = new AccelerationStructure(m_deviceResources, scene, m_dxrDevice, m_dxrCommandList);
     // Create constant buffers for the geometry and the scene.
     //CreateConstantBuffers();
 
@@ -192,7 +198,7 @@ void Application::CreatePhotonMappingRootSignatures()
         CD3DX12_DESCRIPTOR_RANGE ranges[2]; // Perfomance TIP: Order from most frequent to least frequent.
         //1 output texture, 1 read back buffer, MAX_RAY_DEPTH_OUTPUT
         //render view
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);  // 1 output texture
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0);  // 1 output texture
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
 
         CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignature::Slot::Count];
@@ -312,6 +318,15 @@ void Application::CreateDxilLibrarySubobject(CD3DX12_STATE_OBJECT_DESC* raytraci
     auto lib = raytracingPipeline->CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
     D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void *)g_pRaytracing, ARRAYSIZE(g_pRaytracing));
     lib->SetDXILLibrary(&libdxil);
+    {
+        lib->DefineExport(c_raygenShaderName);
+
+        lib->DefineExports(c_closestHitShaderNames);
+        lib->DefineExports(c_intersectionShaderNames);
+        lib->DefineExports(c_missShaderNames);
+        lib->DefineExports(c_anyHitShaderNames);
+
+    }
     // Use default shader exports for a DXIL library/collection subobject ~ surface all shaders.
 }
 
@@ -506,7 +521,7 @@ void Application::CreatePhotonMappingFirstPassStateObject() {
        
         lib->DefineExports(c_photon_closestHit);
         lib->DefineExports(c_intersectionShaderNames);
-        lib->DefineExports(c_missShaderNames);
+        lib->DefineExports(c_photonMiss);
     }
     // Hit groups
     CreateHitGroupSubobjectsPhotonPass(&photonMapping);
@@ -514,7 +529,7 @@ void Application::CreatePhotonMappingFirstPassStateObject() {
     // Shader config
     // Defines the maximum sizes in bytes for the ray rayPayload and attribute structure.
     auto shaderConfig = photonMapping.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-    UINT payloadSize = max(sizeof(RayPayload), sizeof(ShadowRayPayload));
+    UINT payloadSize = max(sizeof(PhotonPayload), sizeof(ShadowRayPayload));
     UINT attributeSize = sizeof(struct ProceduralPrimitiveAttributes);
     shaderConfig->Config(payloadSize, attributeSize);
     CreateLocalRootSignatureSubobjects(&photonMapping, m_photonLocalRootSignature);
@@ -790,8 +805,8 @@ void Application::BuildPhotonShaderTable() {
 
         for (UINT i = 0; i < RayType::Count; i++)
         {
-            missShaderIDs[i] = stateObjectProperties->GetShaderIdentifier(c_missShaderNames[i]);
-            shaderIdToStringMap[missShaderIDs[i]] = c_missShaderNames[i];
+            missShaderIDs[i] = stateObjectProperties->GetShaderIdentifier(c_photonMiss[i]);
+            shaderIdToStringMap[missShaderIDs[i]] = c_photonMiss[i];
         }
         for (UINT i = 0; i < RayType::Count; i++)
         {
@@ -1435,11 +1450,12 @@ void Application::OnRender()
         gpuTimer.BeginFrame(commandList);
     }
 
+    DoScreenSpacePhotonMapping();
     DoRaytracing();
     CopyRaytracingOutputToBackbuffer();  
     if (recordIntersections) {
         //CopyIntersectionToCPU();
-       // CopyIntersectionBufferToBackBuffer(intersectionIndex);
+     //  CopyIntersectionBufferToBackBuffer(0);
     }
     if (false) {
       //  m_deviceResources->Prepare();
