@@ -194,10 +194,10 @@
     <FxCompile Include="shaders.hlsl">
       <Filter>Assets\Shaders\Rasterisation</Filter>
     </FxCompile>
-    <FxCompile Include="Ray-Lines.hlsl">
+    <FxCompile Include="Photon-Mapping.hlsl">
       <Filter>Assets\Shaders\Util</Filter>
     </FxCompile>
-    <FxCompile Include="Photon-Mapping.hlsl">
+    <FxCompile Include="PhotonTiling.hlsl">
       <Filter>Assets\Shaders\Util</Filter>
     </FxCompile>
   </ItemGroup>

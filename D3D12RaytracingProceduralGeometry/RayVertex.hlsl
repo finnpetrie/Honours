@@ -10,7 +10,7 @@ cbuffer mvp : register(b0)
 };
 
 
-PSInput main(float4 pos : POSITION, float4 color : COLOR)
+PSInput main(float4 pos : POSITION, uint instanceID : SV_InstanceID, float4 color : COLOR)
 {
 
 	PSInput result;

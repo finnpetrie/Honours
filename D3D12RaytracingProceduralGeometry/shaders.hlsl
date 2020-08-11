@@ -1,3 +1,6 @@
+
+
+
 cbuffer MVP : register(b0)
 {
     float4x4 mvp;
@@ -9,7 +12,9 @@ struct PSInput
     float4 color : COLOR;
 };
 
-PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
+
+
+PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, float4 color : COLOR)
 {
     PSInput result;
 
@@ -20,6 +25,7 @@ PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
     return result;
 }
 
+[earlydepthstencil]
 float4 PSMain(PSInput input) : SV_TARGET
 {
    return input.color;

@@ -27,6 +27,18 @@ namespace GlobalRootSignature {
     }
 }
 
+
+namespace ComputeRootSignatureParams
+{
+    enum Value
+    {
+        OutputViewSlot = 0,
+        ParamConstantBuffer,
+        Count
+    };
+}
+
+
 namespace LocalRootSignature {
     namespace Type {
         enum Enum {

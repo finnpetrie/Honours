@@ -83,6 +83,13 @@ struct SceneConstantBuffer
     float    elapsedTime;                 // Elapsed application time.
 };
 
+struct ComputeConstantBuffer {
+    //tiling needs to know the position and direction of the camera.
+    XMVECTOR cameraPos;
+    XMVECTOR cameraDirection;
+    XMVECTOR cameraUp;
+    XMVECTOR cameraRight;
+};
 // Attributes per primitive type.
 struct PrimitiveConstantBuffer
 {

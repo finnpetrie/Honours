@@ -138,13 +138,14 @@ void Application::CreateDeviceDependentResources()
     // Create root signatures for the shaders.
     CreatePhotonMappingRootSignatures();
     CreateRootSignatures();
+    CreateComputePhotonTilingRootSignature();
 
     // Create a raytracing pipeline state object which defines the binding of shaders, state and resources to be used during raytracing.
     CreateRaytracingPipelineStateObject();
-
+    CreatePhotonTilingComptuePassStateObject();
     CreatePhotonMappingFirstPassStateObject();
-   // CreateRasterRootSignatures();
-   // CreateRasterisationPipeline();
+    CreateRasterRootSignatures();
+    CreateRasterisationPipeline();
      //createRayTracingPipeline_Two();
 
     // Create a heap for descriptors.
@@ -154,7 +155,7 @@ void Application::CreateDeviceDependentResources()
       //  CreateStagingRenderTargetResource();
     }
    // CreateIntersectionVertexBuffer();
-    //CreateRasterisationBuffers();
+    CreateRasterisationBuffers();
     // Build geometry to be used in the sample.
     BuildGeometry();
 
@@ -198,7 +199,7 @@ void Application::CreatePhotonMappingRootSignatures()
         CD3DX12_DESCRIPTOR_RANGE ranges[2]; // Perfomance TIP: Order from most frequent to least frequent.
         //1 output texture, 1 read back buffer, MAX_RAY_DEPTH_OUTPUT
         //render view
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0);  // 1 output texture
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1 + MAX_RAY_RECURSION_DEPTH, 0);  // 1 output texture
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
 
         CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignature::Slot::Count];
@@ -405,17 +406,39 @@ void Application::CreateHitGroupSubobjectsPhotonPass(CD3DX12_STATE_OBJECT_DESC* 
             }
     }
 }
+
+void Application::CreateComputePhotonTilingRootSignature() {
+    auto device = m_deviceResources->GetD3DDevice();
+    CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+    ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 6 + 1, 0); //number of photon buffers + buckets for tiled rendering
+    
+    CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+    rootParameters[ComputeRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
+    rootParameters[ComputeRootSignatureParams::ParamConstantBuffer].InitAsConstantBufferView(0);
+    //
+    //rootParameters[ComputeRootSignatureParams::ParamConstantBuffer].InitAsConstantBufferView(0);
+
+    CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC computeRootSignatureDesc;
+    computeRootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr);
+
+    ComPtr<ID3DBlob> signature;
+    ComPtr<ID3DBlob> error;
+
+    ThrowIfFailed(D3DX12SerializeVersionedRootSignature(&computeRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+    ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_computeRootSignature)));
+
+}
 void Application::CreateRasterRootSignatures() {
 
     auto device = m_deviceResources->GetD3DDevice();
   
 
     CD3DX12_DESCRIPTOR_RANGE ranges[1];
-    CD3DX12_ROOT_PARAMETER rootParameters[1];
+    CD3DX12_ROOT_PARAMETER rootParameters[2];
 
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
     rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
-
+    rootParameters[1].InitAsUnorderedAccessView(3);
     D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
         D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
@@ -507,6 +530,27 @@ void Application::CreateRasterisationPipeline() {
 }
 
 
+void Application::CreatePhotonTilingComptuePassStateObject() {
+    auto device = m_deviceResources->GetD3DDevice();
+    
+   
+    ID3DBlob* shaderBlob = nullptr;
+    ID3DBlob* errorBlob = nullptr;
+
+    ComPtr<ID3DBlob> computeShader;
+    ComPtr<ID3DBlob> error;
+    UINT compileFlags = D3DCOMPILE_DEBUG;
+    std::wstring shaderPath = L"/Users/endev/Documents/Honours/DirectX-Graphics-Samples-master/DirectX-Graphics-Samples-master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry/";
+    ThrowIfFailed(D3DCompileFromFile((shaderPath + L"PhotonTiling.hlsl").c_str(), nullptr, nullptr, "main", "cs_5_0", compileFlags, 0, &computeShader, &error));
+
+    D3D12_COMPUTE_PIPELINE_STATE_DESC tilingPhotonPipe = {};
+
+    tilingPhotonPipe.pRootSignature = m_computeRootSignature.Get();
+    tilingPhotonPipe.CS = CD3DX12_SHADER_BYTECODE(computeShader.Get());
+
+    ThrowIfFailed(device->CreateComputePipelineState(&tilingPhotonPipe, IID_PPV_ARGS(&m_computeStateObject)));
+
+}
 void Application::CreatePhotonMappingFirstPassStateObject() {
     // 1 - Pipeline config
     CD3DX12_STATE_OBJECT_DESC photonMapping{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
@@ -1175,7 +1219,19 @@ void Application::DoScreenSpacePhotonMapping()
 }
 
 
+void Application::DoTiling(UINT tileX, UINT tileY, UINT tileDepth) {
+    auto commandList = m_deviceResources->GetCommandList();
+    auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
 
+    commandList->SetPipelineState(m_computeStateObject.Get());
+    commandList->SetComputeRootSignature(m_computeRootSignature.Get());
+
+    commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
+    commandList->SetComputeRootDescriptorTable(ComputeRootSignatureParams::OutputViewSlot, m_raytracingOutputResourceUAVGpuDescriptor);
+
+    commandList->Dispatch(tileX, tileY, tileDepth);
+
+}
 
 void Application::DoRaytracing()
 {
@@ -1451,6 +1507,7 @@ void Application::OnRender()
     }
 
     DoScreenSpacePhotonMapping();
+    DoTiling(48, 48, 6);
     DoRaytracing();
     CopyRaytracingOutputToBackbuffer();  
     if (recordIntersections) {
