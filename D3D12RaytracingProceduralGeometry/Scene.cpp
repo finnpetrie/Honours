@@ -426,6 +426,13 @@ void Scene::releaseResources() {
    m_aabbBuffer.resource.Reset();
 }
 
+XMVECTOR Scene::getCameraDirection() {
+    return camera->getDirection();
+}
+
+XMVECTOR Scene::getCameraPosition() {
+    return camera->getPosition();
+}
 ConstantBuffer<SceneConstantBuffer>* Scene::getSceneBuffer()
 {
     return &m_sceneCB;

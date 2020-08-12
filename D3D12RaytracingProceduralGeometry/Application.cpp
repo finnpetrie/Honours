@@ -14,6 +14,7 @@
 #include "CompiledShaders\Raytracing.hlsl.h"
 #include "DirectXTex.h"
 #include <iostream>
+#include <cstdlib>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 using namespace std;
@@ -151,9 +152,6 @@ void Application::CreateDeviceDependentResources()
     // Create a heap for descriptors.
     CreateDescriptorHeap();
 
-    if (recordIntersections) {
-      //  CreateStagingRenderTargetResource();
-    }
    // CreateIntersectionVertexBuffer();
     CreateRasterisationBuffers();
     // Build geometry to be used in the sample.
@@ -167,8 +165,7 @@ void Application::CreateDeviceDependentResources()
 
     // Create AABB primitive attribute buffers.
     scene->CreateAABBPrimitiveAttributesBuffers(m_deviceResources);
-
-     scene->CreateCSGTree(m_deviceResources);
+    scene->CreateCSGTree(m_deviceResources);
     scene->convertCSGToArray(10, m_deviceResources);
     // Build shader tables, which define shaders and their local root arguments.
     BuildShaderTables();
@@ -199,7 +196,8 @@ void Application::CreatePhotonMappingRootSignatures()
         CD3DX12_DESCRIPTOR_RANGE ranges[2]; // Perfomance TIP: Order from most frequent to least frequent.
         //1 output texture, 1 read back buffer, MAX_RAY_DEPTH_OUTPUT
         //render view
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1 + MAX_RAY_RECURSION_DEPTH, 0);  // 1 output texture
+        //1 output, 6 screen space maps, 3 photon g-buffers, 1 photon count buffer
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1 + MAX_RAY_RECURSION_DEPTH + 3 + 1, 0);  // 1 output texture
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
 
         CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignature::Slot::Count];
@@ -259,7 +257,8 @@ void Application::CreateRootSignatures()
         else {
             uavSize = 1;
         }
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, uavSize, 0);  // 1 output texture
+        //output, photon-gbuffers, and three 1D photon buffers
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, uavSize + 3, 0);  // 1 output texture
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);  // 2 static index and vertex buffers.
 
         CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignature::Slot::Count];
@@ -533,20 +532,67 @@ void Application::CreateRasterisationPipeline() {
 void Application::CreatePhotonTilingComptuePassStateObject() {
     auto device = m_deviceResources->GetD3DDevice();
     
-   
+    CComPtr<IDxcLibrary> library;
+    HRESULT hr = DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(&library));
+    ThrowIfFailed(hr);
+
+
+  
+    CComPtr<IDxcCompiler> compiler;
+    hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
+    ThrowIfFailed(hr);
+    LPCWSTR shaderPath = L"/Users/endev/Documents/Honours/DirectX-Graphics-Samples-master/DirectX-Graphics-Samples-master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry/PhotonTiling.hlsl";
+    LPCWSTR compatPath = L"/Users/endev/Documents/Honours/DirectX-Graphics-Samples-master/DirectX-Graphics-Samples-master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry/RaytracingHlslCompat.h";
+
+    CComPtr<IDxcIncludeHandler> includeHandler;
+    ThrowIfFailed(library->CreateIncludeHandler(&includeHandler));
+    CComPtr<IDxcBlob> includeSource;
+    includeHandler->LoadSource(compatPath, &includeSource);
+
+    uint32_t codePage = CP_UTF8;
+    CComPtr<IDxcBlobEncoding> sourceBlob;
+    hr = library->CreateBlobFromFile(shaderPath, &codePage, &sourceBlob);
+
+    CComPtr<IDxcOperationResult> result;
+    hr = compiler->Compile(sourceBlob, shaderPath, L"main", L"cs_6_3", NULL, 0, NULL, 0, NULL, &result);
+
+    if (SUCCEEDED(hr)) {
+        result->GetStatus(&hr);
+    }
+
+    if (FAILED(hr)) {
+        if (result) {
+            CComPtr<IDxcBlobEncoding> errorsBlob;
+            hr = result->GetErrorBuffer(&errorsBlob);
+            if (SUCCEEDED(hr) && errorsBlob) {
+                const char* error = (const char*)errorsBlob->GetBufferPointer();
+                wchar_t wtext[10000];
+                std::mbstowcs(wtext, error, strlen(error) + 1);
+                LPCWSTR ptr = wtext;
+               OutputDebugString(wtext);
+               ThrowIfFalse(false);
+            }
+        }
+    }
+
+    
+    CComPtr<IDxcBlob> code;
+    result->GetResult(&code);
+   /**
     ID3DBlob* shaderBlob = nullptr;
     ID3DBlob* errorBlob = nullptr;
 
     ComPtr<ID3DBlob> computeShader;
     ComPtr<ID3DBlob> error;
     UINT compileFlags = D3DCOMPILE_DEBUG;
-    std::wstring shaderPath = L"/Users/endev/Documents/Honours/DirectX-Graphics-Samples-master/DirectX-Graphics-Samples-master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry/";
-    ThrowIfFailed(D3DCompileFromFile((shaderPath + L"PhotonTiling.hlsl").c_str(), nullptr, nullptr, "main", "cs_5_0", compileFlags, 0, &computeShader, &error));
-
+    ThrowIfFailed(D3DCompileFromFile((shaderPath + L"PhotonTiling.hlsl").c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, "main", "cs_5_0", compileFlags, 0, &computeShader, &error));
+    */
     D3D12_COMPUTE_PIPELINE_STATE_DESC tilingPhotonPipe = {};
 
     tilingPhotonPipe.pRootSignature = m_computeRootSignature.Get();
-    tilingPhotonPipe.CS = CD3DX12_SHADER_BYTECODE(computeShader.Get());
+    tilingPhotonPipe.CS.BytecodeLength = code->GetBufferSize();
+    tilingPhotonPipe.CS.pShaderBytecode = code->GetBufferPointer();
+    // tilingPhotonPipe.CS = CD3DX12_SHADER_BYTECODE(computeShader.Get());
 
     ThrowIfFailed(device->CreateComputePipelineState(&tilingPhotonPipe, IID_PPV_ARGS(&m_computeStateObject)));
 
@@ -653,7 +699,109 @@ void Application::CreateRaytracingPipelineStateObject()
 }
 
 
+void Application::CreatePhotonCountBuffer()
+{
+    auto device = m_deviceResources->GetD3DDevice();
+    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
 
+    // Create the output resource. The dimensions and format should match the swap-chain.
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex1D(backbufferFormat, 1, 1, 1, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    ThrowIfFailed(device->CreateCommittedResource(
+        &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&photonCountBuffer)));
+    NAME_D3D12_OBJECT(photonCountBuffer);
+
+
+    D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+    photonCountUavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, photonCountUavDescriptorHeapIndex);
+    D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+    UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+    device->CreateUnorderedAccessView(photonCountBuffer.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+    photonCountUavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), photonCountUavDescriptorHeapIndex, m_descriptorSize);
+}
+
+void Application::CreateRaytracingOutputResource()
+{
+    auto device = m_deviceResources->GetD3DDevice();
+    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
+
+    // Create the output resource. The dimensions and format should match the swap-chain.
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(backbufferFormat, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    ThrowIfFailed(device->CreateCommittedResource(
+        &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput)));
+    NAME_D3D12_OBJECT(m_raytracingOutput);
+
+
+    D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+    m_raytracingOutputResourceUAVDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, m_raytracingOutputResourceUAVDescriptorHeapIndex);
+    D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+    UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+    m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), m_raytracingOutputResourceUAVDescriptorHeapIndex, m_descriptorSize);
+}
+
+
+void Application::CreatePhotonBuffer() {
+    auto device = m_deviceResources->GetD3DDevice();
+    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
+    {   //position buffer
+    
+
+        //want to have dimension = MAX_RAY_RECURSION
+        //format DXGI_FORMAT_R32G32B32A32_FLOAT
+        auto uavDesc = CD3DX12_RESOURCE_DESC::Tex1D(DXGI_FORMAT_R8G8B8A8_UNORM, 16000, 1, 1, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+
+        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&photonBuffer)));
+        NAME_D3D12_OBJECT(photonBuffer);
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        photonUavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, photonUavDescriptorHeapIndex);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavPhotonDesc = {};
+        uavPhotonDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+        device->CreateUnorderedAccessView(photonBuffer.Get(), nullptr, &uavPhotonDesc, uavDescriptorHandle);
+        photonUavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), photonUavDescriptorHeapIndex, m_descriptorSize);
+
+
+    }
+
+    //colour buffer
+    {
+    //want to have dimension = MAX_RAY_RECURSION
+    //format DXGI_FORMAT_R32G32B32A32_FLOAT
+        auto uavDesc = CD3DX12_RESOURCE_DESC::Tex1D(DXGI_FORMAT_R8G8B8A8_UNORM, 16000, 1, 1, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+
+        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&photonColourBuffer)));
+        NAME_D3D12_OBJECT(photonColourBuffer);
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        photonUavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, photonColourUavDescriptorHeapIndex);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavPhotonDesc = {};
+        uavPhotonDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+        device->CreateUnorderedAccessView(photonColourBuffer.Get(), nullptr, &uavPhotonDesc, uavDescriptorHandle);
+        photonColourUavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), photonColourUavDescriptorHeapIndex, m_descriptorSize);
+    }
+
+    {
+        auto uavDesc = CD3DX12_RESOURCE_DESC::Tex1D(DXGI_FORMAT_R8G8B8A8_UNORM, 16000, 1, 1, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+        auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+
+        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&photonDirectionBuffer)));
+        NAME_D3D12_OBJECT(photonDirectionBuffer);
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        photonUavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, photonDirectionUavDescriptorHeapIndex);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavPhotonDesc = {};
+        uavPhotonDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+        device->CreateUnorderedAccessView(photonDirectionBuffer.Get(), nullptr, &uavPhotonDesc, uavDescriptorHandle);
+        photonDirectionUavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), photonDirectionUavDescriptorHeapIndex, m_descriptorSize);
+
+    }
+}
 
 void Application::CreateIntersectionBuffers() {
     auto device = m_deviceResources->GetD3DDevice();
@@ -687,27 +835,7 @@ void Application::CreateIntersectionBuffers() {
 
 }
 // Create a 2D output texture for raytracing.
-void Application::CreateRaytracingOutputResource()
-{
-    auto device = m_deviceResources->GetD3DDevice();
-    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
 
-    // Create the output resource. The dimensions and format should match the swap-chain.
-    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(backbufferFormat, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-
-    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-    ThrowIfFailed(device->CreateCommittedResource(
-        &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput)));
-    NAME_D3D12_OBJECT(m_raytracingOutput);
-
-
-    D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
-    m_raytracingOutputResourceUAVDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, m_raytracingOutputResourceUAVDescriptorHeapIndex);
-    D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
-    UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-    device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
-    m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), m_raytracingOutputResourceUAVDescriptorHeapIndex, m_descriptorSize); 
-}
 
 void Application::CreateAuxilaryDeviceResources()
 {
@@ -720,16 +848,7 @@ void Application::CreateAuxilaryDeviceResources()
     }
 }
 
-void Application::CreateStagingRenderTargetResource() {
-    auto device = m_deviceResources->GetD3DDevice();
-    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
 
-   // auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(backbufferFormat, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    auto readBack = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
-  //  D3D1 readbackBufferDesc = { CD3DX12_RESOURCE_DESC::Tex2D(backbufferFormat, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_NONE) };
-    D3D12_RESOURCE_DESC readbackBufferDesc{ CD3DX12_RESOURCE_DESC::Buffer(m_width * m_height * sizeof(XMFLOAT4)) };
-    device->CreateCommittedResource(&readBack, D3D12_HEAP_FLAG_NONE, &readbackBufferDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&outputBuffer));
-}
 
 
 void Application::CreateDescriptorHeap()
@@ -750,10 +869,6 @@ void Application::CreateDescriptorHeap()
     NAME_D3D12_OBJECT(m_descriptorHeap);
 
     m_descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-void Application::CreateBufferForIntersectionData() {
-
 }
 
  
@@ -823,9 +938,7 @@ void Application::BuildGeometry()
     UINT descriptorIndexIB = CreateBufferSRV(&scene->m_indexBuffer, scene->totalIndices.size(), 0);
     UINT descriptorIndexVB = CreateBufferSRV(&scene->m_vertexBuffer, scene->totalVertices.size(), sizeof(scene->totalVertices[0]));
     ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1, L"Vertex Buffer descriptor index must follow that of Vertex_Index Buffer descriptor index");
-    //  BuildProceduralGeometryAABBs();
-    //  BuildMeshes();
-    //  BuildPlaneGeometry();
+
 }
 
 // Build geometry descs for bottom-level AS.
@@ -1116,6 +1229,14 @@ void Application::OnUpdate()
     auto prevFrameIndex = m_deviceResources->GetPreviousFrameIndex();
    
     scene->sceneUpdates(m_animateGeometryTime, m_deviceResources, m_animateLight, elapsedTime);
+
+    //upload compute constants
+    m_computeConstantBuffer->cameraDirection = scene->getCameraDirection();
+    m_computeConstantBuffer->cameraPos = scene->getCameraPosition();
+    m_computeConstantBuffer->projectionToWorld = XMMatrixInverse(nullptr, scene->GetMVP());
+    //memcpy
+    
+    //scene->U(&m_computeConstantBuffer);
     if (false) {
         rasterConstantBuffer.mvp = scene->GetMVP();
         memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
@@ -1228,6 +1349,11 @@ void Application::DoTiling(UINT tileX, UINT tileY, UINT tileDepth) {
 
     commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
     commandList->SetComputeRootDescriptorTable(ComputeRootSignatureParams::OutputViewSlot, m_raytracingOutputResourceUAVGpuDescriptor);
+    
+    {
+        m_computeConstantBuffer.CopyStagingToGpu(frameIndex);
+        commandList->SetComputeRootConstantBufferView(ComputeRootSignatureParams::ParamConstantBuffer, m_computeConstantBuffer.GpuVirtualAddress(frameIndex));
+    }
 
     commandList->Dispatch(tileX, tileY, tileDepth);
 
@@ -1351,11 +1477,21 @@ void Application::CopyRaytracingOutputToBackbuffer()
 // Create resources that are dependent on the size of the main window.
 void Application::CreateWindowSizeDependentResources()
 {
+    auto device = m_deviceResources->GetD3DDevice();
     CreateRaytracingOutputResource();
     if (recordIntersections) {
         CreateIntersectionBuffers();
     }
+    //
+    CreatePhotonCountBuffer();
+    CreatePhotonBuffer();
     scene->sceneUpdates(0, m_deviceResources);
+    m_computeConstantBuffer.Create(device, FrameCount, L"ComputeConstants");
+    m_computeConstantBuffer->cameraDirection = scene->getCameraDirection();
+    m_computeConstantBuffer->cameraPos = scene->getCameraPosition();
+    m_computeConstantBuffer->projectionToWorld = XMMatrixInverse(nullptr, scene->GetMVP());
+    //memcpy
+  
 }
 
 // Release resources that are dependent on the size of the main window.

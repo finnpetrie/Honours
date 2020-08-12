@@ -69,6 +69,11 @@ struct ShadowRayPayload
 
 };
 
+struct Photon {
+    XMFLOAT3 position;
+    XMFLOAT3 direction;
+    XMFLOAT3 colour;
+};
 
 struct SceneConstantBuffer
 {
@@ -87,8 +92,7 @@ struct ComputeConstantBuffer {
     //tiling needs to know the position and direction of the camera.
     XMVECTOR cameraPos;
     XMVECTOR cameraDirection;
-    XMVECTOR cameraUp;
-    XMVECTOR cameraRight;
+    XMMATRIX projectionToWorld;
 };
 // Attributes per primitive type.
 struct PrimitiveConstantBuffer

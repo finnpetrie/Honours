@@ -110,7 +110,25 @@ private:
     
     IDxcBlob* m_rayGenLibrary;
     
-    
+    ComPtr<ID3D12Resource> photonCountBuffer;
+    D3D12_GPU_DESCRIPTOR_HANDLE photonCountUavGPUDescriptor;
+    UINT photonCountUavDescriptorHeapIndex;
+
+    ConstantBuffer<ComputeConstantBuffer> m_computeConstantBuffer;
+
+    ComPtr<ID3D12Resource> photonBuffer;
+    ComPtr<ID3D12Resource> photonColourBuffer;
+    ComPtr<ID3D12Resource> photonDirectionBuffer;
+    D3D12_GPU_DESCRIPTOR_HANDLE photonUavGPUDescriptor;
+    D3D12_GPU_DESCRIPTOR_HANDLE photonColourUavGPUDescriptor;
+    D3D12_GPU_DESCRIPTOR_HANDLE photonDirectionUavGPUDescriptor;
+
+    UINT photonUavDescriptorHeapIndex;
+    UINT photonColourUavDescriptorHeapIndex;
+    UINT photonDirectionUavDescriptorHeapIndex;
+
+
+
     //raster resources
     ComPtr<ID3D12Resource> intersectionBuffer;
     ComPtr<ID3D12Resource> outputBuffer;
@@ -173,8 +191,10 @@ private:
     void DoTiling(UINT tileX, UINT tileY, UINT tileDepth);
     void DoRaytracing();
    
+    void CreatePhotonBuffer();
     void CreateDeviceDependentResources();
     void CreateWindowSizeDependentResources();
+    void CreatePhotonCountBuffer();
     void ReleaseDeviceDependentResources();
     void ReleaseWindowSizeDependentResources();
     void CreateRaytracingInterfaces();
@@ -199,6 +219,7 @@ private:
 	void CreateBufferForIntersectionData();
 	void CreateRasterisationBuffers();
     void CreateRaytracingOutputResource();
+    void CreateComputeConstantBuffer();
     void BuildGeometry();
     void DoRasterisation();
    

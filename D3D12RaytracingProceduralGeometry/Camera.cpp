@@ -20,6 +20,11 @@ XMVECTOR Camera::getPosition()
     return this->m_eye;
 }
 
+XMVECTOR Camera::getDirection() {
+    return this->m_direction;
+}
+
+
 void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene)
 {
     m_at = XMVectorAdd(m_eye, m_front);
@@ -32,6 +37,8 @@ void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene)
     XMMATRIX viewProj = view * proj;
     scene->projectionToWorld = XMMatrixInverse(nullptr, viewProj);
     scene->projection = viewProj;
+
+
 }
 
 void Camera::OnKeyDown(UINT8 key) {

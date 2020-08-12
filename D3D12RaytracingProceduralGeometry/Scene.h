@@ -53,9 +53,11 @@ public:
 	XMMATRIX GetMVP();
 	void Init(float m_aspectRatio);
 	void convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
+	void UploadCompute(ComputeConstantBuffer& computeBuffer);
 	void UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void BuildMeshes(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
+
 
 	void sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources, bool m_animateLights = false, float time = 0);
 	void CreateCSGTree(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
@@ -63,6 +65,10 @@ public:
 
 
 	void releaseResources();
+
+	XMVECTOR getCameraDirection();
+
+	XMVECTOR getCameraPosition();
 
 	ConstantBuffer<SceneConstantBuffer>* getSceneBuffer();
 	D3DBuffer* getAABB();

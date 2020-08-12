@@ -26,13 +26,18 @@ private:
 
 public:
 
+
+	void Update(ConstantBuffer<SceneConstantBuffer>& scene);
+
 	virtual void OnKeyDown(UINT8 key);
 	XMMATRIX getMVP();
 	virtual void OnMouseMove(float x, float y);
 
 	Camera(float aspectRatio);
 	XMVECTOR getPosition();
-	void Update(ConstantBuffer<SceneConstantBuffer> &scene);
+
+	XMVECTOR getDirection();
+	
 
 };
 
