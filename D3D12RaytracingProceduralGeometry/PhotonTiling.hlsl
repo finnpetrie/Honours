@@ -7,10 +7,29 @@ struct ComputeConstantBuffer {
 	float3 up;
 	float4x4 reprojection;
 };
+
+struct Photon {
+	float4 pos;
+	float4 direction;
+	float4 colour;
+};
 //#define HLSL
 //#include "RayTracingHlslCompat.h"
-RWTexture2D<float4> screenSpacePhotonMap[5]: register(u1);
-RWTexture2D<float2> photonBucket: register(u7);
+#define MAX_PHOTONS 10000
+RWTexture2D<float4> g_renderTarget : register(u0);
+//note to self - do the register addresses need to be the same as in our other shader?
+RWStructuredBuffer<Photon> photonBuffer : register(u1);
+
+RWTexture2D<uint> photonBucket: register(u2);
+//RWTexture1D<float3> photonPosition : register(u8);
+//RWTexture1D<float3> photonColour : register(u9);
+//RWTexture1D<float3> photonDirection : register(u10);
+//RWTexture1D<float> photonCount : register(u11);
+
+groupshared uint tilePhotonCount;
+groupshared uint photonBufferIndex;
+//groupshared uint tilePhotonIndices[16000];
+
 ConstantBuffer<ComputeConstantBuffer> computeInfo : register(b0);
 
 
@@ -30,7 +49,8 @@ uint classifyIndex(uint3 DTid) {
 	uint y = DTid.y;
 	uint width;
 	uint height;
-	screenSpacePhotonMap[0].GetDimensions(width, height);
+	g_renderTarget.GetDimensions(width, height);
+	//screenSpacePhotonMap[0].GetDimensions(width, height);
 	uint cell = 0;
 
 	for (int dx = width / 10; dx < width; dx += width / 10) {
@@ -57,12 +77,14 @@ bool SphereIntersectsFrustrum(in float3 photon, in float radius, in float4 frust
 	return false;
 }
 
+//the purpose of this compute shader is to take in the photon buffer, and its contents into tile buckets.
 
-[numthreads(1, 1, 1)]
+[numthreads(128, 1, 1)]
 void main( uint3 DTid : SV_DispatchThreadID )
 {
 	float width, height;
-	screenSpacePhotonMap[0].GetDimensions(width, height);
+	//screenSpacePhotonMap[0].GetDimensions(width, height);
+	//screenSpacePhotonMap[0][DTid.xy] = float4(DTid.xy, DTid.x, 0);
 
 	uint index = classifyIndex(DTid);
 	//classify index
@@ -88,31 +110,26 @@ void main( uint3 DTid : SV_DispatchThreadID )
 	for (int i = 0; i < 4; i++) {
 		frustrumEquation[i] = float4(CreatePlane(tiledCorners[i], tiledCorners[i + 1]), 0);
 	}
+	//GroupMemoryBarrierWithSync();
 	//project to world space using the inverse of the view matrix.  
 	//Create the frustum planes by using the cross product between these points
 
-	uint photonIndex = 0;
-	screenSpacePhotonMap[3][float2(0,1)] = float4(1, 1, 0, 0);
-	for (int i = 0; i < width; i++) {
-		for (int j = 0; j < height; j++) {
-			//retrieve photon at i,j.
-			float3 photon = screenSpacePhotonMap[0][float2(i, j)].xyz;
-			//assume constant radius for now
-			if (SphereIntersectsFrustrum(photon, 1, frustrumEquation)) {
-				//store the corresponding index in the texture.
-				if (photonIndex < 700) {
-					float2 src = float2(0, 0);
-					//InterlockedAdd(photonBucket[float2(index, photonIndex)], float2(i, j), old);
-					//uint2 i = uint2(index, photonIndex);
-					//photonIndex++;
-					//probably best to do this with an interlocked add.
-					//screenSpacePhotonMap[3][float2(0, 1)] = float4(photon, 0);
-				}
-				//photonIndex += 1;
+	//GroupMemoryBarrierWithSync();
 
+	uint photonBufferWidth;
+	//photonPosition.GetDimensions(photonBufferWidth);
+	for (uint j = 0; j < photonBufferWidth; j++) {
+		Photon p = photonBuffer[j];
+		if (SphereIntersectsFrustrum(p.pos.xyz, 1, frustrumEquation)) {
+			uint photonIndex = 0;
+			InterlockedAdd(photonBufferIndex, 1, photonIndex);
+			if (photonIndex < MAX_PHOTONS) {
+				//add photon j to corresponding photon bucket
+				photonBucket[float2(index, photonIndex)] = j;
 			}
 		}
 	}
+
 }
 
 #endif

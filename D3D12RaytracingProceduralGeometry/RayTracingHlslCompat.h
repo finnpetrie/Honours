@@ -70,9 +70,9 @@ struct ShadowRayPayload
 };
 
 struct Photon {
-    XMFLOAT3 position;
-    XMFLOAT3 direction;
-    XMFLOAT3 colour;
+    XMFLOAT4 position;
+    XMFLOAT4 direction;
+    XMFLOAT4 colour;
 };
 
 struct SceneConstantBuffer

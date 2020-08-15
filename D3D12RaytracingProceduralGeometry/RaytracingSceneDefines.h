@@ -28,11 +28,31 @@ namespace GlobalRootSignature {
 }
 
 
+namespace PhotonGlobalRoot {
+    namespace Slot {
+        enum Enum {
+            OutputView = 0,
+            PhotonBuffer,
+            PhotonCounter,
+            AccelerationStructure,
+            SceneConstant,
+            AABBattributeBuffer,
+            VertexBuffers,
+            CSGTree,
+            Count
+        };
+    }
+}
+
+
+
 namespace ComputeRootSignatureParams
 {
     enum Value
     {
         OutputViewSlot = 0,
+        PhotonBuffer,
+        TiledPhotonMap,
         ParamConstantBuffer,
         Count
     };

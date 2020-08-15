@@ -116,7 +116,20 @@ private:
 
     ConstantBuffer<ComputeConstantBuffer> m_computeConstantBuffer;
 
+    ComPtr<ID3D12Resource> photonStructBuffer;
+    D3D12_GPU_DESCRIPTOR_HANDLE photonStructGPUDescriptor;
+    UINT photonStructGpuHeapIndex;
+
     ComPtr<ID3D12Resource> photonBuffer;
+    ComPtr<ID3D12Resource> photonCounter;
+    D3D12_GPU_DESCRIPTOR_HANDLE photonCounterGpuDescriptor;
+    UINT photonCounterDescriptorHeapIndex;
+
+    ComPtr<ID3D12Resource> tiledPhotonMap;
+    D3D12_GPU_DESCRIPTOR_HANDLE tiledPhotonMapGPUDescriptor;
+    UINT tiledPhotonMapDescriptorHeapIndex;
+
+
     ComPtr<ID3D12Resource> photonColourBuffer;
     ComPtr<ID3D12Resource> photonDirectionBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE photonUavGPUDescriptor;
@@ -191,9 +204,13 @@ private:
     void DoTiling(UINT tileX, UINT tileY, UINT tileDepth);
     void DoRaytracing();
    
+    void CreatePhotonBuffer_2();
+
     void CreatePhotonBuffer();
     void CreateDeviceDependentResources();
     void CreateWindowSizeDependentResources();
+	void CreateTiledPhotonMap();
+	void CreatePhotonCountTest();
     void CreatePhotonCountBuffer();
     void ReleaseDeviceDependentResources();
     void ReleaseWindowSizeDependentResources();
@@ -219,6 +236,8 @@ private:
 	void CreateBufferForIntersectionData();
 	void CreateRasterisationBuffers();
     void CreateRaytracingOutputResource();
+    void CreateCountBuffer();
+    void CreatePhotonStructuredBuffer();
     void CreateComputeConstantBuffer();
     void BuildGeometry();
     void DoRasterisation();

@@ -18,13 +18,20 @@ RaytracingAccelerationStructure g_scene : register(t0, space0);
 RWTexture2D<float4> g_renderTarget : register(u0);
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 //ConstantBuffer<CSGNode> g_CSGBuffer : register(b1);
-RWTexture2D<float4> screenSpacePhotonMap [5]: register(u1);
+//RWTexture2D<float4> screenSpacePhotonMap [5]: register(u1);
 //RWBuffer<float4> g_buffer : register(u7);
-RWTexture1D<float3> photonPosition : register(u7);
-RWTexture1D<float3> photonColour : register(u8);
-RWTexture1D<float3> photonDirection : register(u9);
+//we assume the first index is a counter
 
-RWTexture1D<uint> photonCountBuffer : register (u10);
+//RWTexture1D<float4> photonBuffer : register(u1);
+RWByteAddressBuffer photonBufferCounter : register(u2);
+RWStructuredBuffer<Photon> photonBuffer : register(u1);
+RWTexture2D<uint> tiledPhotonMap : register(u3);
+//RWBuffer<uint> photonCount : register(u3);
+/*RWTexture1D<float3> photonPosition : register(u7);
+RWTexture1D<float3> photonColour : register(u8);
+RWTexture1D<float3> photonDirection : register(u9);*/
+
+//RWTexture1D<uint> photonMount : register (u1);
 // Triangle resources
 ByteAddressBuffer g_indices : register(t1, space0);
 StructuredBuffer<Vertex> g_vertices : register(t2, space0);
@@ -36,6 +43,7 @@ StructuredBuffer<CSGNode> csgTree : register(t4, space0);
 ConstantBuffer<PrimitiveConstantBuffer> l_materialCB : register(b1);
 ConstantBuffer<PrimitiveInstanceConstantBuffer> l_aabbCB: register(b2);
 
+groupshared uint photonSharedIndex = 0;
 
 // Functions for PRNG
 // http://www.reedbeta.com/blog/quick-and-easy-gpu-random-numbers-in-d3d11/
@@ -339,11 +347,13 @@ inline void GetTileIndex(float3 rayHitPosition, out uint tileIndex) {
 [shader("raygeneration")]
 void Photon_Ray_Gen() {
     for (int i = 0; i < 6; i++) {
-        screenSpacePhotonMap[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
+        //screenSpacePhotonMap[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
     }
     //photonPosition[DispatchRaysIndex().x + DispatchRaysIndex().y] = float4(1, 1, 0, 0);
     //photonCountBuffer[0] = 10000;
     float2 samplePoint = DispatchRaysIndex().xy;
+
+    
 
     //g_renderTarget[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
     // Set seed for PRNG
@@ -465,6 +475,20 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
 
     // it is correctly tracing through bottom level aabb
    // g_renderTarget[DispatchRaysIndex().xy] = float4(0, 1, 0, 1);
+    float3 pos = HitWorldPosition();
+
+    float3 colour = float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
+    payload.colour = float4(colour, 1);
+    float3 dir = normalize(WorldRayDirection());
+
+    uint AllocIdx;
+    photonBufferCounter.InterlockedAdd(0, 1, AllocIdx);
+   // float3 newPos = float3(pos.x, pos.y, pos.z);
+    GroupMemoryBarrierWithGroupSync();
+    Photon p = { float4(colour, 0), float4(dir, 0), float4(0,0,0, 1) };
+    if (AllocIdx < 50) {
+        photonBuffer[AllocIdx] = p;
+    }
 
     uint indexSizeInBytes = 4;
     uint indicesPerTriangle = 3;
@@ -481,15 +505,12 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
     };
     
     float3 normal = HitAttribute(triangleNormals, attr.barycentrics);
-    float3 pos = HitWorldPosition();
     float3 refractionColour;
     float3 reflectionColour;
-    float3 dir = normalize(WorldRayDirection());
     float3 randDir = calculateRandomDirectionInHemisphere(normal);
 
-    float3 colour =float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
-    payload.colour = float4(colour, 1);
-    screenSpacePhotonMap[payload.recursionDepth][DispatchRaysIndex().xy] = float4(pos, 0);
+   
+    //screenSpacePhotonMap[payload.recursionDepth][DispatchRaysIndex().xy] = float4(pos, 0);
 
     float3 refractPos;
     float3 reflectPos;
@@ -531,15 +552,30 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
 
     //float2 screenDims = (width, height);
    // uv /= screenDims;
-  
+    //diffuse surface
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth > 1 ) {
-        uint photonIndex;
-       InterlockedAdd(photonCountBuffer[0], 1, photonIndex);
-        if (photonIndex < 16000) {
-            photonPosition[photonIndex] = pos;
-            photonColour[photonIndex] = payload.colour.xyz;
-            photonDirection[photonIndex] = WorldRayDirection();
-        }
+       
+        //uint photonI = 0;
+
+       // photonBuffer[AllocIdx] = photonI;
+        //InterlockedAdd(photonBuffer[0], float4(1, 1, 1, 1), photonI);
+        //uint i = photonI.x;
+        //photonBuffer[i] = float4(1, 1, 0, 0);
+        //InterlockedAdd(photonSharedIndex, 1, photonI);
+       /// uint photonIndex = photonBuffer.IncrementCounter();
+       //InterlockedAdd(photonSharedIndex, 1, photonIndex);
+       // InterlockedAdd(photonCount[0], 1, photonI);
+       // InterlockedAdd(photonMount[0], 1, photonI);
+       
+            //Photon p = { pos, payload.colour.xyz, WorldRayDirection() };
+        //    photonBuffer[photonI] = p;
+          //  photonBuffer[photonI];
+           // photonBuffer[photonIndex] = p;
+            //photonBuffer[photonIndex] = p;
+            //photonPosition[photonIndex] = pos;
+            //photonColour[photonIndex] = payload.colour.xyz;
+            //photonDirection[photonIndex] = WorldRayDirection();
+        
         uint tileIndex;
         GetTileIndex(HitWorldPosition(), tileIndex);
         payload.position = float4(HitWorldPosition(), 1);
@@ -564,8 +600,9 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
     //payload.colour = l_materialCB.albedo;
     float3 colour = 1000*float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
     payload.colour = float4(colour, 1);
-    screenSpacePhotonMap[payload.recursionDepth][DispatchRaysIndex().xy] = float4(pos, 0);
-
+   // screenSpacePhotonMap[payload.recursionDepth][DispatchRaysIndex().xy] = float4(pos, 0);
+    float4 photonI = float4(1, 1, 1, 1);
+  
     //if refractive surface, trace photons based on law of refraction
     if (l_materialCB.refractiveCoef > 0) {
         //assume refractive glass
@@ -634,7 +671,7 @@ void MyRaygenShader()
     RayPayload traced = TraceRadianceRay(r, payload);
 
     // Write the raytraced color to the output texture.
-    g_renderTarget[DispatchRaysIndex().xy] = traced.color + screenSpacePhotonMap[0][samplePoint];
+    g_renderTarget[DispatchRaysIndex().xy] = traced.color; //+ screenSpacePhotonMap[0][samplePoint];
     //uint offset = 0;
 
     //if drawing rays,   need to write the intersections for this ray into a 3D tensor.
