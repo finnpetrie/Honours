@@ -17,6 +17,9 @@ namespace GlobalRootSignature {
     namespace Slot {
         enum Enum {
             OutputView = 0,
+            PhotonBuffer,
+            TiledPhotonMap,
+            SceenSpaceMap,
             AccelerationStructure,
             SceneConstant,
             AABBattributeBuffer,
@@ -34,6 +37,7 @@ namespace PhotonGlobalRoot {
             OutputView = 0,
             PhotonBuffer,
             PhotonCounter,
+            ScreenSpaceMap,
             AccelerationStructure,
             SceneConstant,
             AABBattributeBuffer,

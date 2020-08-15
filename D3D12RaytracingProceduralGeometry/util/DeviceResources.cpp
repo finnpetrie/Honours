@@ -561,7 +561,7 @@ void DeviceResources::ExecuteCommandList()
     ThrowIfFailed(m_commandList->Close());
     ID3D12CommandList *commandLists[] = { m_commandList.Get() }; 
     m_commandQueue->ExecuteCommandLists(ARRAYSIZE(commandLists), commandLists);
-}
+   }
 
 // Wait for pending GPU work to complete.
 void DeviceResources::WaitForGpu() noexcept
