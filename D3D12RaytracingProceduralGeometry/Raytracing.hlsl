@@ -391,12 +391,14 @@ inline void GetTileIndex(float3 rayHitPosition, out uint tileIndex) {
 [shader("raygeneration")]
 void Photon_Ray_Gen() {
     g_renderTarget[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
-  /*  for (int i = 0; i < 6; i++) {
+   for (int i = 0; i < 6; i++) {
         screenSpacePhoton[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
         screenSpacePhotonColour[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
         screenSpacePhotonDirection[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
 
-    }*/
+    }
+
+ 
 
     float2 samplePoint = DispatchRaysIndex().xy;
 
@@ -526,11 +528,17 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
     float3 dir = normalize(WorldRayDirection());
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth > 1) {
 
-       // screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
-        //screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
-        //screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);
+       screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
+       screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
+        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);
         //uint tileIndex;
       //  GetTileIndex(HitWorldPosition(), tileIndex);
+        uint dstIndex = photonBuffer.IncrementCounter();
+
+        Photon p = { float4(pos, 0), float4(dir, 0), float4(colour, 0) };
+        if (dstIndex < 100000) {
+            photonBuffer[dstIndex] = p;
+        }
 
     }
 
@@ -539,12 +547,7 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
     //photonBufferCounter.InterlockedAdd(0, 1, AllocIdx);
    // float3 newPos = float3(pos.x, pos.y, pos.z);
     //GroupMemoryBarrierWithGroupSync();
-    uint dstIndex = photonBuffer.IncrementCounter();
-    
-    Photon p = { float4(pos, 0), float4(dir, 0), float4(colour, 0) };
-    if (dstIndex < 100000) {
-        photonBuffer[dstIndex] = p;
-    }
+
 
     uint indexSizeInBytes = 4;
     uint indicesPerTriangle = 3;
@@ -633,9 +636,15 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
     payload.colour = float4(colour, 1);
 
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 ) {
-       /* screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
+        screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
         screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
-        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
+        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);
+        uint dstIndex = photonBuffer.IncrementCounter();
+
+        Photon p = { float4(pos, 0), float4(dir, 0), float4(colour, 0) };
+        if (dstIndex < 100000) {
+            photonBuffer[dstIndex] = p;
+        }
         // return;
     }
     //if refractive surface, trace photons based on law of refraction
@@ -803,16 +812,19 @@ void MyRaygenShader()
     uint width;
     uint height;
     g_renderTarget.GetDimensions(width, height);
-
     float2 screenDims = float2(width, height);
 
- /*   for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 100; i++) {
+        Photon p = photonBuffer[i + DispatchRaysIndex().x + i*DispatchRaysIndex().y];
+        VisualizePhoton(p.position, p.colour, screenDims);
+    }
+
+    /*for (int i = 0; i < 6; i++) {
         float4 photon = screenSpacePhoton[i][samplePoint];
         float4 colour = screenSpacePhotonColour[i][samplePoint];
         VisualizePhoton(photon, colour, screenDims);
-    }
-    */
-   
+    }*/
+       
    // VisualizePhotonBuffer( screenDims);
 
     rng_state = uint(wang_hash(samplePoint.x + DispatchRaysDimensions().x * samplePoint.y));

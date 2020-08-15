@@ -304,13 +304,19 @@ void Application::CreateRasterRootSignatures() {
     auto device = m_deviceResources->GetD3DDevice();
 
 
-    CD3DX12_DESCRIPTOR_RANGE ranges[2];
-    CD3DX12_ROOT_PARAMETER rootParameters[2];
+    CD3DX12_DESCRIPTOR_RANGE ranges[3];
+    CD3DX12_ROOT_PARAMETER rootParameters[3];
 
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+
+    //vertex RW buffer
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
     rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
     rootParameters[1].InitAsUnorderedAccessView(0);
+    
+    //vertex RW buffer
+    rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
     D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
         D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
@@ -857,7 +863,7 @@ void Application::CreateTiledPhotonMap() {
     auto device = m_deviceResources->GetD3DDevice();
     auto backBufferFormat = m_deviceResources->GetBackBufferFormat();
     {
-        UINT photonsPerTile = 10000;
+        UINT photonsPerTile = 1000;
         UINT tiles = 20;
         auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(backBufferFormat, photonsPerTile, 20, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
         auto defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -1007,7 +1013,7 @@ void Application::CreateIntersectionBuffers() {
         ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&intersectionBuffer.textureResource)));
         NAME_D3D12_OBJECT(intersectionBuffer.textureResource);
         intersectionBuffer.uavDescriptorHeapIndex = UINT_MAX;
-
+         
         D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
         intersectionBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, intersectionBuffer.uavDescriptorHeapIndex);
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
@@ -1053,8 +1059,9 @@ void Application::CreateDescriptorHeap()
    // descriptorHeapDesc.NumDescriptors = 15 + MAX_RAY_RECURSION_DEPTH;
     //2 index/vertex buffers, 1 photon structured buffer, 1 photon count buffer, 1 output buffer
     //1 tiledPhotonMap
-    //2 v, i buffers, 1 output, 1, 
-    descriptorHeapDesc.NumDescriptors = 6 + 3*MAX_RAY_RECURSION_DEPTH + 1;
+    //2 v, i buffers, 1 output, 1
+    //+ 1 raster constant buffer view
+    descriptorHeapDesc.NumDescriptors = 6 + 3*MAX_RAY_RECURSION_DEPTH + 1 + 1;
     descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     descriptorHeapDesc.NodeMask = 0;
@@ -1068,13 +1075,14 @@ void Application::CreateDescriptorHeap()
 void Application::CreateRasterisationBuffers() {
     auto device = m_deviceResources->GetD3DDevice();
     
-    D3D12_DESCRIPTOR_HEAP_DESC rasterCBVDesc = {};
+  /*  D3D12_DESCRIPTOR_HEAP_DESC rasterCBVDesc = {};
     //1 for photon buffer
     rasterCBVDesc.NumDescriptors = 2;
     rasterCBVDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    rasterCBVDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    rasterCBVDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;*/
 
-    ThrowIfFailed(device->CreateDescriptorHeap(&rasterCBVDesc, IID_PPV_ARGS(&m_rasterHeap)));
+   // ThrowIfFailed(device->CreateDescriptorHeap(&rasterCBVDesc, IID_PPV_ARGS(&m_rasterHeap)));
+
     Vertex triangleVertices[] =
     {
         { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 1.0f, 0.0f, 0.0f } },
@@ -1110,24 +1118,24 @@ void Application::CreateRasterisationBuffers() {
         IID_PPV_ARGS(&rasterConstant)));
 
 
-    CreateRasterConstantBuffer();
+   // auto device = m_deviceResources->GetD3DDevice();
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+    //CD3DX12_RANGE readRange(0, 0);
 
+    cbvDesc.BufferLocation = rasterConstant->GetGPUVirtualAddress();
+    cbvDesc.SizeInBytes = (sizeof(RasterSceneCB) + 255) & ~255;
+    //map to descriptor heap
+    device->CreateConstantBufferView(&cbvDesc, m_descriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
+    rasterConstantBuffer.mvp = scene->GetMVP();
+    ThrowIfFailed(rasterConstant->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
+    memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
     m_deviceResources->WaitForGpu();
 
 }
 
 void Application::CreateRasterConstantBuffer() {
-    auto device = m_deviceResources->GetD3DDevice();
-    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-    CD3DX12_RANGE readRange(0, 0);
-
-    cbvDesc.BufferLocation = rasterConstant->GetGPUVirtualAddress();
-    cbvDesc.SizeInBytes = (sizeof(RasterSceneCB) + 255) & ~255;
-    device->CreateConstantBufferView(&cbvDesc, m_rasterHeap->GetCPUDescriptorHandleForHeapStart());
-
-    rasterConstantBuffer.mvp = scene->GetMVP();
-    ThrowIfFailed(rasterConstant->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
-    memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
+ 
 }
 
 // Build geometry used in the sample.
@@ -1451,6 +1459,7 @@ void Application::OnUpdate()
 
 
 void Application::DoRasterisation() {
+    UINT photonNum = 10000;
     auto commandList = m_deviceResources->GetCommandList();
     auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
     auto viewPort = m_deviceResources->GetScreenViewport();
@@ -1461,24 +1470,31 @@ void Application::DoRasterisation() {
     commandList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
     
     ID3D12DescriptorHeap* ppHeaps[] = { m_rasterHeap.Get() };
-    commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+    commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
+    //commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
+   // commandList->SetGraphicsRootConstantBufferView()
+    commandList->SetGraphicsRootDescriptorTable(0, m_descriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
-    commandList->SetGraphicsRootDescriptorTable(0, m_rasterHeap->GetGPUDescriptorHandleForHeapStart());
+    //NOTE THIS DOESN'T WORK?
+    commandList->SetGraphicsRootDescriptorTable(2, photonStructGPUDescriptor);
+    rasterConstantBuffer.mvp = scene->GetMVP();
+    memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
+  //  commandList->SetGraphicsRootConstantBufferView(0, rasterConstant.)
     commandList->RSSetViewports(1, &viewPort);
     commandList->RSSetScissorRects(1, &scissorRect);
 
    // commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-    //CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+   // CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     //commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
     m_deviceResources->SetRasterRenderTarget();
   //  const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
    // commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->IASetVertexBuffers(0, 1, &rasterVertexView);
-    commandList->DrawInstanced(3, 1, 0, 0);
+    commandList->DrawInstanced(3, photonNum, 0, 0);
 
-    commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+   // commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
    // ThrowIfFailed(commandList->Close());
 }
@@ -1764,7 +1780,12 @@ void Application::CreateWindowSizeDependentResources()
     CreateRaytracingOutputResource();
     CreateCountBuffer();
     CreatePhotonStructuredBuffer();
-    CreateIntersectionBuffers();
+    if (screenSpaceMap) {
+        CreateIntersectionBuffers();
+    }
+    else {
+        CreateTiledPhotonMap();
+    }
     //for compute and final gathering stage
    //CreateTiledPhotonMap();
     // CreatePhotonBuffer_2();
@@ -1823,6 +1844,13 @@ void Application::ReleaseDeviceDependentResources()
     m_raytracingOutput.Reset();
     m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 
+    photonStructBuffer.Reset();
+    photonStructGpuHeapIndex = UINT_MAX;
+    photonCountBuffer.Reset();
+    photonCountUavDescriptorHeapIndex = UINT_MAX;
+
+    tiledPhotonMap.Reset();
+    tiledPhotonMapDescriptorHeapIndex = UINT_MAX;
     for (auto& I : intersectionBuffers) {
         I.textureResource.Reset();
         I.uavDescriptorHeapIndex = UINT_MAX;
@@ -1934,18 +1962,11 @@ void Application::OnRender()
 
     DoScreenSpacePhotonMapping();
  //  DoTiling(1024, 720, 1);
-   // DoRasterisation();
+ //  DoRasterisation();
 
     DoRaytracing();
     CopyRaytracingOutputToBackbuffer();  
-    if (recordIntersections) {
-        //CopyIntersectionToCPU();
-     //  CopyIntersectionBufferToBackBuffer(0);
-    }
-    if (false) {
-      //  m_deviceResources->Prepare();
-
-    }
+   
     // End frame.
     for (auto& gpuTimer : m_gpuTimers)
     {

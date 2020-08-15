@@ -98,12 +98,10 @@ private:
     ComPtr<ID3D12Resource> m_photonRayGenTable;
   
     
-    ComPtr<ID3D12Resource>      m_stagingTarget[6];
-    ComPtr<ID3D12DescriptorHeap> m_stagingHeap;
-    UINT                         m_stagingHeapSize;
 
 
-    bool screenSpaceMap = false;
+
+    bool screenSpaceMap = true;
     IBuffer stagingResource;
     // Descriptors
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
@@ -132,24 +130,13 @@ private:
     UINT tiledPhotonMapDescriptorHeapIndex;
 
 
-    ComPtr<ID3D12Resource> photonColourBuffer;
-    ComPtr<ID3D12Resource> photonDirectionBuffer;
-    D3D12_GPU_DESCRIPTOR_HANDLE photonUavGPUDescriptor;
-    D3D12_GPU_DESCRIPTOR_HANDLE photonColourUavGPUDescriptor;
-    D3D12_GPU_DESCRIPTOR_HANDLE photonDirectionUavGPUDescriptor;
-
-    UINT photonUavDescriptorHeapIndex;
-    UINT photonColourUavDescriptorHeapIndex;
-    UINT photonDirectionUavDescriptorHeapIndex;
+ 
 
 
 
     //raster resources
     ComPtr<ID3D12Resource> intersectionBuffer;
-    ComPtr<ID3D12Resource> outputBuffer;
-    ComPtr<ID3D12Resource> g_buffer;
-    D3D12_GPU_DESCRIPTOR_HANDLE gBufferDescriptorHandle;
-    UINT gBufferDescriptorHeapIndex;
+  
 
 
     ComPtr<ID3D12Resource> rasterVertexBuffer;
