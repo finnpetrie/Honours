@@ -102,6 +102,8 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_stagingHeap;
     UINT                         m_stagingHeapSize;
 
+
+    bool screenSpaceMap = false;
     IBuffer stagingResource;
     // Descriptors
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
@@ -235,6 +237,7 @@ private:
     void CreateDescriptorHeap();
 	void CreateBufferForIntersectionData();
 	void CreateRasterisationBuffers();
+    void CreateRasterConstantBuffer();
     void CreateRaytracingOutputResource();
     void CreateCountBuffer();
     void CreatePhotonStructuredBuffer();

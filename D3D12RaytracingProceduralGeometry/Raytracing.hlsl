@@ -391,12 +391,12 @@ inline void GetTileIndex(float3 rayHitPosition, out uint tileIndex) {
 [shader("raygeneration")]
 void Photon_Ray_Gen() {
     g_renderTarget[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
-    for (int i = 0; i < 6; i++) {
+  /*  for (int i = 0; i < 6; i++) {
         screenSpacePhoton[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
         screenSpacePhotonColour[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
         screenSpacePhotonDirection[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
 
-    }
+    }*/
 
     float2 samplePoint = DispatchRaysIndex().xy;
 
@@ -526,9 +526,9 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
     float3 dir = normalize(WorldRayDirection());
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth > 1) {
 
-        screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
-        screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
-        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);
+       // screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
+        //screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
+        //screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);
         //uint tileIndex;
       //  GetTileIndex(HitWorldPosition(), tileIndex);
 
@@ -633,9 +633,9 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
     payload.colour = float4(colour, 1);
 
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 ) {
-        screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
+       /* screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
         screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
-        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);
+        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
         // return;
     }
     //if refractive surface, trace photons based on law of refraction
@@ -806,12 +806,12 @@ void MyRaygenShader()
 
     float2 screenDims = float2(width, height);
 
-    for (int i = 0; i < 6; i++) {
+ /*   for (int i = 0; i < 6; i++) {
         float4 photon = screenSpacePhoton[i][samplePoint];
         float4 colour = screenSpacePhotonColour[i][samplePoint];
         VisualizePhoton(photon, colour, screenDims);
     }
-
+    */
    
    // VisualizePhotonBuffer( screenDims);
 

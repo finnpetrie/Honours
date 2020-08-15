@@ -118,16 +118,9 @@ void main( uint3 DTid : SV_DispatchThreadID )
 
 	uint photonBufferWidth;
 	//photonPosition.GetDimensions(photonBufferWidth);
-	for (uint j = 0; j < photonBufferWidth; j++) {
+	for (uint j = 0; j < 100; j++) {
 		Photon p = photonBuffer[j];
-		if (SphereIntersectsFrustrum(p.pos.xyz, 1, frustrumEquation)) {
-			uint photonIndex = 0;
-			InterlockedAdd(photonBufferIndex, 1, photonIndex);
-			if (photonIndex < MAX_PHOTONS) {
-				//add photon j to corresponding photon bucket
-				photonBucket[float2(index, photonIndex)] = j;
-			}
-		}
+		
 	}
 
 }

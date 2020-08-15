@@ -30,6 +30,22 @@ namespace GlobalRootSignature {
     }
 }
 
+namespace GlobalRootSignature_NoScreenSpaceMap {
+    namespace Slot {
+        enum Enum {
+            OutputView = 0,
+            PhotonBuffer,
+            TiledPhotonMap,
+            AccelerationStructure,
+            SceneConstant,
+            AABBattributeBuffer,
+            VertexBuffers,
+            CSGTree,
+            Count
+        };
+    }
+}
+
 
 namespace PhotonGlobalRoot {
     namespace Slot {
@@ -38,6 +54,23 @@ namespace PhotonGlobalRoot {
             PhotonBuffer,
             PhotonCounter,
             ScreenSpaceMap,
+            AccelerationStructure,
+            SceneConstant,
+            AABBattributeBuffer,
+            VertexBuffers,
+            CSGTree,
+            Count
+        };
+    }
+}
+
+
+namespace PhotonGlobalRoot_NoScreenSpaceMap {
+    namespace Slot {
+        enum Enum {
+            OutputView = 0,
+            PhotonBuffer,
+            PhotonCounter,
             AccelerationStructure,
             SceneConstant,
             AABBattributeBuffer,
