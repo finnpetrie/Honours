@@ -115,7 +115,7 @@ private:
     UINT photonCountUavDescriptorHeapIndex;
 
     ConstantBuffer<ComputeConstantBuffer> m_computeConstantBuffer;
-
+    ConstantBuffer<RasterSceneCB> m_rasterConstantBuffer;
     ComPtr<ID3D12Resource> photonStructBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE photonStructGPUDescriptor;
     UINT photonStructGpuHeapIndex;

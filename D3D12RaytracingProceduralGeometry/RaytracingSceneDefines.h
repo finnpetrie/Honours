@@ -82,6 +82,17 @@ namespace PhotonGlobalRoot_NoScreenSpaceMap {
 }
 
 
+namespace RasterisationRootSignature {
+    namespace Slot {
+        enum Enum {
+            OutputView = 0,
+            PhotonBuffer,
+            Constant,
+            Count
+        };
+    }
+}
+
 
 namespace ComputeRootSignatureParams
 {

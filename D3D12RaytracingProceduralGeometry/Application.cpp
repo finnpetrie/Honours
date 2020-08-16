@@ -305,18 +305,18 @@ void Application::CreateRasterRootSignatures() {
 
 
     CD3DX12_DESCRIPTOR_RANGE ranges[3];
-    CD3DX12_ROOT_PARAMETER rootParameters[3];
+    CD3DX12_ROOT_PARAMETER rootParameters[RasterisationRootSignature::Slot::Count];
 
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+    //vertex RW buffer
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
 
+  //  rootParameters[RasterisationRootSignature::Slot::Constant].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
+    rootParameters[RasterisationRootSignature::Slot::Constant].InitAsConstantBufferView(0);
+    rootParameters[RasterisationRootSignature::Slot::OutputView].InitAsUnorderedAccessView(0);
     //vertex RW buffer
-    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
-    rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
-    rootParameters[1].InitAsUnorderedAccessView(0);
-    
-    //vertex RW buffer
-    rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
+    rootParameters[RasterisationRootSignature::Slot::PhotonBuffer].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
     D3D12_ROOT_SIGNATURE_FLAGS rootSignatureFlags =
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
         D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
@@ -1117,9 +1117,9 @@ void Application::CreateRasterisationBuffers() {
         nullptr,
         IID_PPV_ARGS(&rasterConstant)));
 
-
+    CreateRasterConstantBuffer();
    // auto device = m_deviceResources->GetD3DDevice();
-    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+  /*  D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
     //CD3DX12_RANGE readRange(0, 0);
 
     cbvDesc.BufferLocation = rasterConstant->GetGPUVirtualAddress();
@@ -1129,13 +1129,17 @@ void Application::CreateRasterisationBuffers() {
 
     rasterConstantBuffer.mvp = scene->GetMVP();
     ThrowIfFailed(rasterConstant->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
-    memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
+    memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));*/
     m_deviceResources->WaitForGpu();
 
 }
 
 void Application::CreateRasterConstantBuffer() {
- 
+    auto device = m_deviceResources->GetD3DDevice();
+    auto frameCount = m_deviceResources->GetBackBufferCount();
+
+    m_rasterConstantBuffer.Create(device, frameCount, L"RasterconstantBuffer");
+    m_rasterConstantBuffer->mvp = scene->GetMVP();
 }
 
 // Build geometry used in the sample.
@@ -1439,7 +1443,7 @@ void Application::OnUpdate()
     auto prevFrameIndex = m_deviceResources->GetPreviousFrameIndex();
    
     scene->sceneUpdates(m_animateGeometryTime, m_deviceResources, m_animateLight, elapsedTime);
-
+    m_rasterConstantBuffer->mvp = scene->GetMVP();
     //upload compute constants
     m_computeConstantBuffer->cameraDirection = scene->getCameraDirection();
     m_computeConstantBuffer->cameraPos = scene->getCameraPosition();
@@ -1473,12 +1477,16 @@ void Application::DoRasterisation() {
     commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
     //commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
    // commandList->SetGraphicsRootConstantBufferView()
-    commandList->SetGraphicsRootDescriptorTable(0, m_descriptorHeap->GetGPUDescriptorHandleForHeapStart());
+  //  commandList->SetGraphicsRootDescriptorTable(RasterisationRootSignature::Slot::Constant, m_descriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
     //NOTE THIS DOESN'T WORK?
-    commandList->SetGraphicsRootDescriptorTable(2, photonStructGPUDescriptor);
-    rasterConstantBuffer.mvp = scene->GetMVP();
-    memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
+    commandList->SetGraphicsRootDescriptorTable(RasterisationRootSignature::Slot::PhotonBuffer, photonStructGPUDescriptor);
+    m_rasterConstantBuffer.CopyStagingToGpu(frameIndex);
+
+    commandList->SetGraphicsRootConstantBufferView(RasterisationRootSignature::Slot::Constant, m_rasterConstantBuffer.GpuVirtualAddress(frameIndex));
+
+   // rasterConstantBuffer.mvp = scene->GetMVP();
+    //memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
   //  commandList->SetGraphicsRootConstantBufferView(0, rasterConstant.)
     commandList->RSSetViewports(1, &viewPort);
     commandList->RSSetScissorRects(1, &scissorRect);
@@ -1488,13 +1496,13 @@ void Application::DoRasterisation() {
    // CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
     //commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
     m_deviceResources->SetRasterRenderTarget();
-  //  const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-   // commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
+  const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+    commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->IASetVertexBuffers(0, 1, &rasterVertexView);
     commandList->DrawInstanced(3, photonNum, 0, 0);
 
-   // commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
    // ThrowIfFailed(commandList->Close());
 }
@@ -1962,10 +1970,10 @@ void Application::OnRender()
 
     DoScreenSpacePhotonMapping();
  //  DoTiling(1024, 720, 1);
- //  DoRasterisation();
+    DoRasterisation();
 
-    DoRaytracing();
-    CopyRaytracingOutputToBackbuffer();  
+   // DoRaytracing();
+   // CopyRaytracingOutputToBackbuffer();  
    
     // End frame.
     for (auto& gpuTimer : m_gpuTimers)

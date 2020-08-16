@@ -814,16 +814,16 @@ void MyRaygenShader()
     g_renderTarget.GetDimensions(width, height);
     float2 screenDims = float2(width, height);
 
-    for (int i = 0; i < 100; i++) {
+ /*   for (int i = 0; i < 100; i++) {
         Photon p = photonBuffer[i + DispatchRaysIndex().x + i*DispatchRaysIndex().y];
         VisualizePhoton(p.position, p.colour, screenDims);
-    }
+    }*/
 
-    /*for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 6; i++) {
         float4 photon = screenSpacePhoton[i][samplePoint];
         float4 colour = screenSpacePhotonColour[i][samplePoint];
         VisualizePhoton(photon, colour, screenDims);
-    }*/
+    }
        
    // VisualizePhotonBuffer( screenDims);
 
