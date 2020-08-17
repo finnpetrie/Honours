@@ -383,9 +383,9 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
     }
 }
 
-void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources, bool m_animateLights, float time)
+void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources, ConstantBuffer<RasterSceneCB> &m_rasterConstantBuffer, bool m_animateLights, float time)
 {
-    camera->Update(m_sceneCB);
+    camera->Update(m_sceneCB, m_rasterConstantBuffer);
     UpdateAABBPrimitiveAttributes(animationTime, m_deviceResources);
 
     if (m_animateLights)
@@ -473,13 +473,13 @@ void Scene::CreateGeometry() {
 
 
 
-    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.5, 0, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.5, 0, 0), 10, 2.417f, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1000, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.1, 0.0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.5, 0.0, 0.0, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.5, 0.0, 0.0, 0), 10, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 0, 0.0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 0, 0, 1, 0.4f, 50, 1 };
 

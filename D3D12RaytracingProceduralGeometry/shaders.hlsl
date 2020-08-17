@@ -11,6 +11,7 @@ struct PSInput
 {
     float4 position : SV_POSITION;
     float4 color : COLOR;
+    float4 direction : DIRECTION;
    // float4 Direction : DIRECTION;
 };
 
@@ -21,6 +22,9 @@ struct Photon {
 
 };
 RWStructuredBuffer<Photon> photons : register(u2);
+RWTexture2D<float4> GBufferBRDF : register(u4);
+RWTexture2D<float4> GBufferPosition : register(u5);
+RWTexture2D<float4> GBufferNormal : register(u6);
 //RWTexture1D<float4> photons : register(u0);
 
 
@@ -46,12 +50,21 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
     float4 c = mul(mvp, p);
     //result.position = position - photon.position;
     result.position = c;
-    result.color = photon.position;
+    result.color = photon.colour;
+    result.direction = photon.direction;
 
     return result;
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-   return input.color;
+    float4 normal = GBufferNormal[input.position.xy];
+    
+    float4 color = input.color + normal;
+    float totalPower = dot(color.xyz , float3(1.0f, 1.0f, 1.0f));
+    float3 weighted_direction = totalPower * input.direction.xyz;
+   
+    return float4(color.xyz, weighted_direction.x);
+     //return float4(color.xyz, weighted_direction.x)
+   // return input.position;
 }

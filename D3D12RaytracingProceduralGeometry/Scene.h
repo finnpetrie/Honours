@@ -59,7 +59,7 @@ public:
 	void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
 
 
-	void sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources, bool m_animateLights = false, float time = 0);
+	void sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources, ConstantBuffer<RasterSceneCB> &m_rasterConstantBuffer,  bool m_animateLights = false, float time = 0);
 	void CreateCSGTree(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void CreateAABBPrimitiveAttributesBuffers(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 

@@ -36,6 +36,7 @@ namespace GlobalRootSignature_NoScreenSpaceMap {
             OutputView = 0,
             PhotonBuffer,
             TiledPhotonMap,
+            GBuffer,
             AccelerationStructure,
             SceneConstant,
             AABBattributeBuffer,
@@ -87,6 +88,7 @@ namespace RasterisationRootSignature {
         enum Enum {
             OutputView = 0,
             PhotonBuffer,
+            GBuffer,
             Constant,
             Count
         };

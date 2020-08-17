@@ -25,7 +25,7 @@ XMVECTOR Camera::getDirection() {
 }
 
 
-void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene)
+void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene, ConstantBuffer<RasterSceneCB>& m_rasterConstantBuffer)
 {
     m_at = XMVectorAdd(m_eye, m_front);
     m_direction = XMVector4Normalize(m_at - m_eye);
@@ -36,6 +36,7 @@ void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene)
     XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), aspectRatio, 0.01f, 125.0f);
     XMMATRIX viewProj = view * proj;
     scene->projectionToWorld = XMMatrixInverse(nullptr, viewProj);
+    m_rasterConstantBuffer->mvp = viewProj;
     scene->projection = viewProj;
 
 

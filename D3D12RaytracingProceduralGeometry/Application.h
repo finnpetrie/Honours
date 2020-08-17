@@ -27,9 +27,7 @@
 #include "Pipeline.h"
 
 //constant buffer for rasterisation
-struct RasterSceneCB {
-    XMMATRIX mvp;
-};
+
 //intersection buffers
 
 struct IBuffer
@@ -70,6 +68,7 @@ private:
     bool drawRays = false;
     bool recordIntersections = true;
     // Constants.
+    UINT photonCount = 1000000;
     UINT NUM_BLAS = 100000;          // Triangle + AABB bottom-level AS.
     const float c_aabbWidth = 2;      // AABB width.
     const float c_aabbDistance = 2;   // Distance between AABBs.
@@ -101,7 +100,7 @@ private:
 
 
 
-    bool screenSpaceMap = true;
+    bool screenSpaceMap = false;
     IBuffer stagingResource;
     // Descriptors
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
@@ -129,10 +128,8 @@ private:
     D3D12_GPU_DESCRIPTOR_HANDLE tiledPhotonMapGPUDescriptor;
     UINT tiledPhotonMapDescriptorHeapIndex;
 
-
- 
-
-
+    std::vector<IBuffer> intersectionBuffers;
+    std::vector<IBuffer> geometryBuffers;
 
     //raster resources
     ComPtr<ID3D12Resource> intersectionBuffer;
@@ -157,7 +154,6 @@ private:
     D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
     UINT m_raytracingOutputResourceUAVDescriptorHeapIndex;
     //collection of intersection buffers for writing intersections.
-    std::vector<IBuffer> intersectionBuffers;
     UINT intersectionIndex = 1;
     // Shader tables
     static const wchar_t* c_hitGroupNames_TriangleGeometry[RayType::Count];
@@ -219,6 +215,7 @@ private:
 	void CreatePhotonMappingFirstPassStateObject();
     void CreateRaytracingPipelineStateObject();
     void CreateIntersectionVertexBuffer();
+    void CreateDeferredGBuffer();
     void CreateIntersectionBuffers();
     void CreateAuxilaryDeviceResources();
     void CreateDescriptorHeap();

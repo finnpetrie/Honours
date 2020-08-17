@@ -278,7 +278,7 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
             GetWindowRect(hWnd, &windowRect);
             int width = windowRect.right - windowRect.left;
             int height = windowRect.bottom - windowRect.top;
-          //  SetCapture(hWnd);
+          // SetCapture(hWnd);
             POINT cursorPos;
             GetCursorPos(&cursorPos);
 
@@ -288,7 +288,7 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
             UINT y = HIWORD(lParam);
             float dx = cursorPos.x - width / 2;
             float dy = cursorPos.y - height / 2;
-            pSample->OnMouseMove(dx, dy);
+             pSample->OnMouseMove(dx, dy);
             SetCursorPos(width / 2, height / 2);
 
         }

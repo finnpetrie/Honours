@@ -20,9 +20,12 @@ RWStructuredBuffer<Photon> photonBuffer : register(u1);
 RWByteAddressBuffer photonBufferCounter : register(u2);
 RWTexture2D<uint> tiledPhotonMap : register(u3);
 
-RWTexture2D<float4> screenSpacePhoton[5] : register(u4);
-RWTexture2D<float4> screenSpacePhotonColour[5]: register(u10);
-RWTexture2D<float4> screenSpacePhotonDirection[5] : register(u15);
+RWTexture2D<float4> GBufferBRDF : register(u4);
+RWTexture2D<float4> GBufferPosition : register(u5);
+RWTexture2D<float4> GBufferNormal : register(u6);
+//RWTexture2D<float4> screenSpacePhoton[5] : register(u4);
+//RWTexture2D<float4> screenSpacePhotonColour[5]: register(u10);
+//RWTexture2D<float4> screenSpacePhotonDirection[5] : register(u15);
 
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 
@@ -391,12 +394,12 @@ inline void GetTileIndex(float3 rayHitPosition, out uint tileIndex) {
 [shader("raygeneration")]
 void Photon_Ray_Gen() {
     g_renderTarget[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
-   for (int i = 0; i < 6; i++) {
+  /* for (int i = 0; i < 6; i++) {
         screenSpacePhoton[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
         screenSpacePhotonColour[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
         screenSpacePhotonDirection[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
 
-    }
+    }*/
 
  
 
@@ -451,7 +454,9 @@ void Photon_Ray_Gen() {
    // g_renderTarget[DispatchRaysIndex().xy] = float4(0, 1, 0, 1);
 
 }
-
+ inline float maxValue(in float3 w) {
+    return max(w.x, max(w.y, w.z));
+}
 
 inline bool inscreenSpace(float3 intersection, float2 uv) {
     uint width, height;
@@ -515,27 +520,24 @@ inline float3 calculateRandomDirectionInHemisphere(in float3 normal) {
 
 [shader("closesthit")]
 void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
-    //if diffuse - project back to the camera's origin
-   // g_renderTarget[DispatchRaysIndex().xy] = float4(0.5, 0, 0, 1);
 
-    // it is correctly tracing through bottom level aabb
-   // g_renderTarget[DispatchRaysIndex().xy] = float4(0, 1, 0, 1);
     float3 pos = HitWorldPosition();
-    //screenSpacePhoton[payload.recursionDepth -1][DispatchRaysIndex().xy] = float4(pos, 1);
 
-    float3 colour = 1000*float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
+    //compute cosine 
+    float3 colour = float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
     payload.colour = float4(colour, 1);
     float3 dir = normalize(WorldRayDirection());
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth > 1) {
 
-       screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
+       /*screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
        screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
-        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);
+        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
         //uint tileIndex;
       //  GetTileIndex(HitWorldPosition(), tileIndex);
         uint dstIndex = photonBuffer.IncrementCounter();
 
         Photon p = { float4(pos, 0), float4(dir, 0), float4(colour, 0) };
+
         if (dstIndex < 100000) {
             photonBuffer[dstIndex] = p;
         }
@@ -573,6 +575,11 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
 
     float3 refractPos;
     float3 reflectPos;
+
+    float maximumPower = maxValue(payload.colour);
+    if (rand_xorshift() < (1.f - maximumPower)) {
+        return;
+    }
     if (l_materialCB.refractiveCoef > 0) {
         //assume refractive glass
         float n1 = 1;
@@ -602,6 +609,8 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
 
     if (l_materialCB.reflectanceCoef > 0.1f) {
         Ray r = { pos, reflect(dir, normal) };
+        //power of reflected photon should be scaled by the reflective property.
+        payload.colour *= l_materialCB.reflectanceCoef;
         reflectPos = TracePhotonRay(r, payload).position;
     }
 
@@ -613,7 +622,6 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
    // uv /= screenDims;
     //diffuse surface
 
-    payload.position = float4(HitWorldPosition(), 1);
 
 
     //else we find the intersection point to the image plane, and check for intersections on the interval.
@@ -632,13 +640,13 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
     float3 refractPos;
     float3 reflectPos;
     //payload.colour = l_materialCB.albedo;
-    float3 colour = 1000*float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
+    float3 colour = 100*float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
     payload.colour = float4(colour, 1);
 
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 ) {
-        screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
+       /*screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
         screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
-        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);
+        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
         uint dstIndex = photonBuffer.IncrementCounter();
 
         Photon p = { float4(pos, 0), float4(dir, 0), float4(colour, 0) };
@@ -646,6 +654,12 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
             photonBuffer[dstIndex] = p;
         }
         // return;
+    }
+
+    //russian roulette
+    float maximumPower = maxValue(payload.colour);
+    if (rand_xorshift() < (1.f - maximumPower)) {
+        return;
     }
     //if refractive surface, trace photons based on law of refraction
     if (l_materialCB.refractiveCoef > 0) {
@@ -662,34 +676,30 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
         else {
             outwardNormal = attr.normal;
             index = n1 / n2;
+            if (refractTest(dir, outwardNormal, index, refracted)) {
+                Ray r = { pos, refracted };
+                refractPos = TracePhotonRay(r, payload).position;
+            }
+            else {
+                Ray r = { pos, reflect(dir, attr.normal) };
+                // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
+            }
+            float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
         }
-        if (refractTest(dir, outwardNormal, index, refracted)) {
-            Ray r = { pos, refracted };
-            refractPos = TracePhotonRay(r, payload).position;
-        }
-        else {
+        //evaluate colour via BRDF
+
+        //if reflective surface, trace photons based on specular reflections.
+        if (l_materialCB.reflectanceCoef > 0.1f) {
             Ray r = { pos, reflect(dir, attr.normal) };
-            // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
-        }
-        float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
-    }
-    //evaluate colour via BRDF
+            payload.colour *= l_materialCB.reflectanceCoef;
 
-    //if reflective surface, trace photons based on specular reflections.
-    if (l_materialCB.reflectanceCoef > 0.1f) {
-        Ray r = { pos, reflect(dir, attr.normal) };
-        reflectPos =  TracePhotonRay(r, payload).position;
-    }
-
-      payload.position = float4(refractPos, 1);
-      if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0) {
-            payload.position = float4(HitWorldPosition(), 1);
-      
-
-           // return;
+            reflectPos = TracePhotonRay(r, payload).position;
         }
 
+        // payload.position = float4(refractPos, 1);
 
+
+    }
 }
 
 
@@ -819,11 +829,11 @@ void MyRaygenShader()
         VisualizePhoton(p.position, p.colour, screenDims);
     }*/
 
-    for (int i = 0; i < 6; i++) {
+  /*  for (int i = 0; i < 6; i++) {
         float4 photon = screenSpacePhoton[i][samplePoint];
         float4 colour = screenSpacePhotonColour[i][samplePoint];
         VisualizePhoton(photon, colour, screenDims);
-    }
+    }*/
        
    // VisualizePhotonBuffer( screenDims);
 
@@ -908,6 +918,13 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     }
   
 
+        //if immediate ray - i.e., recursion depth = 1
+    if (rayPayload.recursionDepth == 1) {
+        //store normal, and other elements in relevant GBuffer
+        GBufferPosition[DispatchRaysIndex().xy] = float4(pos, 0);
+        GBufferNormal[DispatchRaysIndex().xy] = float4(triangleNormal, 0);
+    }
+
       if(l_materialCB.reflectanceCoef > 0){
         Ray r = { HitWorldPosition(), reflect(WorldRayDirection(), triangleNormal) };
         reflectionColour = TraceRadianceRay(r, rayPayload).color;
@@ -948,6 +965,12 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float4 ambient = l_materialCB.albedo;
     
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
+
+    if (rayPayload.recursionDepth == 1) {
+        //store normal, and other elements in relevant GBuffer
+        GBufferPosition[DispatchRaysIndex().xy] = float4(pos, 0);
+        GBufferNormal[DispatchRaysIndex().xy] = float4(attr.normal, 0);
+    }
 
 
     if (!shadowHit) {

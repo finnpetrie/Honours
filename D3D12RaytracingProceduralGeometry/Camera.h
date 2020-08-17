@@ -1,6 +1,10 @@
 #pragma once
 #include "stdafx.h"
 #include "RaytracingSceneDefines.h"
+
+struct RasterSceneCB {
+	XMMATRIX mvp;
+};
 class Camera
 {
 private:
@@ -27,7 +31,7 @@ private:
 public:
 
 
-	void Update(ConstantBuffer<SceneConstantBuffer>& scene);
+	void Update(ConstantBuffer<SceneConstantBuffer>& scene, ConstantBuffer<RasterSceneCB> &m_rasterConstantBuffer);
 
 	virtual void OnKeyDown(UINT8 key);
 	XMMATRIX getMVP();
