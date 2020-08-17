@@ -668,7 +668,7 @@ void Application::CreateRasterisationPipeline() {
     D3D12_RASTERIZER_DESC raster = {};
     raster.FillMode = D3D12_FILL_MODE_SOLID;
     raster.CullMode = D3D12_CULL_MODE_NONE;
-    raster.FrontCounterClockwise = true;
+    raster.FrontCounterClockwise = false;
     raster.DepthBias = 0;
     raster.DepthBiasClamp = 0.0f;
     raster.SlopeScaledDepthBias = 0.0f;
@@ -2050,7 +2050,7 @@ void Application::OnRender()
 
 
    // DoRaytracing();
-   // CopyRaytracingOutputToBackbuffer();  
+  // CopyRaytracingOutputToBackbuffer();  
    
     // End frame.
     for (auto& gpuTimer : m_gpuTimers)

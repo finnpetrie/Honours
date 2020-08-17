@@ -47,7 +47,10 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
    // result.color = photon.colour;
    // result.color = float4(1, 1, 1, 0);
     float4 p = position - photon.position;
+  
     float4 c = mul(mvp, float4(p.xyz, 1));
+   // c.y = -c.y;
+    //c.x = -c.x;
     //result.position = position - photon.position;
     result.position = c;
     result.color = photon.colour;

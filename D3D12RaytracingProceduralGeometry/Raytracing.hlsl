@@ -895,7 +895,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
     float3 triangleNormal = HitAttribute(triangleNormals, attr.barycentrics);
 
-    float4 ambient = float4(0.1, 0.1, 0.1, 1);
+    float4 ambient = l_materialCB.albedo;
     float3 hitPos = HitWorldPosition();
     float3 pos = HitWorldPosition();
     float3 dir = normalize(g_sceneCB.lightPosition.xyz - pos);
