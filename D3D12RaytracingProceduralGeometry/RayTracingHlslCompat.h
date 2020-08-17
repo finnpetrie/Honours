@@ -79,6 +79,9 @@ struct SceneConstantBuffer
 {
     XMMATRIX projectionToWorld;
     XMMATRIX projection;
+    XMMATRIX view;
+    XMMATRIX viewInverse;
+    XMMATRIX projectionInverse;
     XMVECTOR cameraPosition;
     XMVECTOR lightPosition;
     XMVECTOR lightAmbientColor;

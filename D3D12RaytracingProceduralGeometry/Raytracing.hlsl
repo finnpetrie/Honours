@@ -536,7 +536,7 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
       //  GetTileIndex(HitWorldPosition(), tileIndex);
         uint dstIndex = photonBuffer.IncrementCounter();
 
-        Photon p = { float4(pos, 0), float4(dir, 0), float4(colour, 0) };
+        Photon p = { float4(pos, 0), float4(dir, 1), float4(colour, 1) };
 
         if (dstIndex < 100000) {
             photonBuffer[dstIndex] = p;
@@ -643,14 +643,14 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
     float3 colour = 100*float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
     payload.colour = float4(colour, 1);
 
-    if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 ) {
+    if (l_materialCB.reflectanceCoef >= 0.0f && l_materialCB.refractiveCoef >= 0 ) {
        /*screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
         screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
         screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
         uint dstIndex = photonBuffer.IncrementCounter();
 
-        Photon p = { float4(pos, 0), float4(dir, 0), float4(colour, 0) };
-        if (dstIndex < 100000) {
+        Photon p = { float4(pos, 0), float4(dir, 1), float4(colour, 1) };
+        if (dstIndex < 1000000) {
             photonBuffer[dstIndex] = p;
         }
         // return;
@@ -828,6 +828,7 @@ void MyRaygenShader()
     GBufferPosition[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
     GBufferNormal[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
 
+
  /*   for (int i = 0; i < 100; i++) {
         Photon p = photonBuffer[i + DispatchRaysIndex().x + i*DispatchRaysIndex().y];
         VisualizePhoton(p.position, p.colour, screenDims);
@@ -845,9 +846,22 @@ void MyRaygenShader()
 
     UINT currentRecursionDepth = 0;
 
-
-    Ray r = GenerateCameraRay(DispatchRaysIndex().xy, g_sceneCB.cameraPosition.xyz, g_sceneCB.projectionToWorld);
-
+    uint2 launchIndex = DispatchRaysIndex().xy;
+    float2 dims = float2(DispatchRaysDimensions().xy);
+    float2 d = (((launchIndex.xy + 0.5f) / dims.xy) * 2.f - 1.f);
+    // Define a ray, consisting of origin, direction, and the min-max distance
+    // values
+    // #DXR Extra: Perspective Camera
+    float aspectRatio = dims.x / dims.y;
+    // Perspective
+    RayDesc ray;
+    ray.Origin = mul(g_sceneCB.viewInverse, float4(g_sceneCB.cameraPosition.xyz, 1));
+    float4 target = mul(g_sceneCB.projectionInverse, float4(d.x, -d.y, 1, 1));
+    ray.Direction = mul(g_sceneCB.viewInverse, float4(target.xyz, 0));
+    ray.TMin = 0;
+    ray.TMax = 100000;
+  Ray r = GenerateCameraRay(DispatchRaysIndex().xy, g_sceneCB.cameraPosition.xyz, g_sceneCB.projectionToWorld);
+ //   Ray r = { ray.Origin, ray.Direction };
     RayPayload payload = { float4(0,0,0,0), 
         0,
         0 };

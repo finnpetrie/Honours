@@ -1182,7 +1182,8 @@ void Application::CreateRasterConstantBuffer() {
     auto frameCount = m_deviceResources->GetBackBufferCount();
 
     m_rasterConstantBuffer.Create(device, frameCount, L"RasterconstantBuffer");
-    m_rasterConstantBuffer->mvp = scene->GetMVP();
+  //  OnUpdate();
+    //  m_rasterConstantBuffer->mvp = scene->GetMVP();
 }
 
 // Build geometry used in the sample.
@@ -1488,15 +1489,15 @@ void Application::OnUpdate()
     scene->sceneUpdates(m_animateGeometryTime, m_deviceResources, m_rasterConstantBuffer, m_animateLight, elapsedTime);
    //_rasterConstantBuffer->mvp = scene->GetMVP();
     //upload compute constants
-    m_computeConstantBuffer->cameraDirection = scene->getCameraDirection();
-    m_computeConstantBuffer->cameraPos = scene->getCameraPosition();
-    m_computeConstantBuffer->projectionToWorld = XMMatrixInverse(nullptr, scene->GetMVP());
+   // m_computeConstantBuffer->cameraDirection = scene->getCameraDirection();
+    //m_computeConstantBuffer->cameraPos = scene->getCameraPosition();
+    //m_computeConstantBuffer->projectionToWorld = XMMatrixInverse(nullptr, scene->GetMVP());
     //memcpy
     
     //scene->U(&m_computeConstantBuffer);
     if (false) {
-        rasterConstantBuffer.mvp = scene->GetMVP();
-        memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
+      //  rasterConstantBuffer.mvp = scene->GetMVP();
+        //memcpy(m_pCbvDataBegin, &rasterConstantBuffer, sizeof(rasterConstantBuffer));
     }
     if (false)
     {
@@ -2043,14 +2044,14 @@ void Application::OnRender()
     DoScreenSpacePhotonMapping();
  //  DoTiling(1024, 720, 1);
     //deferred rendering + direct lighting
-    DoRaytracing();
+      DoRaytracing();
     //CopyGBufferToBackBuffer();
     //rasterise photon volumes - indirect lighting
-    DoRasterisation();
-
+     DoRasterisation();
+//
 
    // DoRaytracing();
-  // CopyRaytracingOutputToBackbuffer();  
+   //CopyRaytracingOutputToBackbuffer();  
    
     // End frame.
     for (auto& gpuTimer : m_gpuTimers)

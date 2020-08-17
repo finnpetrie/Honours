@@ -4,20 +4,22 @@ using namespace DirectX;
 
 
 Camera::Camera(float aspectRatio) : aspectRatio(aspectRatio) {
-    m_eye = { 0.0f, 5.3f, 20.f, 0.0f };
+    m_pos = { 0.0f, 10.0f, 1.0f, 0.0f };
     //m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
-    m_front = { 0.0f, 0.0f, 1.0f, 0.0f };
+    m_front = { 0.0f, 0.0f, -1.0f, 0.0f };
 
-    m_at = XMVectorAdd(m_front, m_eye);
-    m_right = { 1.0f, 0.0f, 0.0f, 0.0f };
+    m_at = XMVectorAdd(m_pos, m_front);
 
-    m_direction = XMVector4Normalize(m_at - m_eye);
-    m_up = XMVector3Normalize(XMVector3Cross(m_direction, m_right));
+    m_direction = XMVector3Normalize(m_pos - m_at);
+    m_up = { 0.0f, 1.0f, 0.0f, 0.0f };
+    m_right = XMVector3Normalize(XMVector3Cross(m_up, m_direction));
+    m_cameraUp = XMVector3Cross(m_direction, m_right);
+   // m_up = XMVector3Normalize(XMVector3Cross(m_direction, m_right));
 }
 
 XMVECTOR Camera::getPosition()
 {
-    return this->m_eye;
+    return this->m_pos;
 }
 
 XMVECTOR Camera::getDirection() {
@@ -27,38 +29,49 @@ XMVECTOR Camera::getDirection() {
 
 void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene, ConstantBuffer<RasterSceneCB>& m_rasterConstantBuffer)
 {
-    m_at = XMVectorAdd(m_eye, m_front);
-    m_direction = XMVector4Normalize(m_at - m_eye);
-    scene->cameraPosition = m_eye;
+   // m_at = XMVectorAdd(m_eye, m_front);
+
+    m_at = XMVectorAdd(m_front, m_pos);
+    m_direction = XMVector3Normalize(m_at - m_pos);
+    scene->cameraPosition = m_pos;
 
     float fovAngleY = 45.0f;
-    XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-    XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), aspectRatio, 0.01f, 125.0f);
+    XMMATRIX view = XMMatrixLookAtRH(m_pos, m_at, m_up);
+    XMMATRIX proj = XMMatrixPerspectiveFovRH(XMConvertToRadians(fovAngleY), aspectRatio, 0.01f, 1000.0f);
     XMMATRIX viewProj = view * proj;
-    scene->projectionToWorld = XMMatrixInverse(nullptr, viewProj);
-    m_rasterConstantBuffer->mvp = viewProj;
-    scene->projection = viewProj;
+    XMVECTOR det;
+    XMMATRIX viewInverse = XMMatrixInverse(&det, view);
+    XMMATRIX projectionInverse = XMMatrixInverse(&det, proj);
+    scene->projectionToWorld = XMMatrixInverse(&det, viewProj);
+
+    m_rasterConstantBuffer->view = view;
+    m_rasterConstantBuffer->projection = viewProj;
+    // m_rasterConstantBuffer->mvp = viewProj;
+    scene->view = view;
+    scene->viewInverse = viewInverse;
+    scene->projectionInverse = projectionInverse;
+    scene->projection = proj;
 
 
 }
 
 void Camera::OnKeyDown(UINT8 key) {
-    XMVECTOR perp_Pos = XMVector3Normalize(XMVector3Cross(m_front, m_up));
+    XMVECTOR perp_Pos = XMVector3Normalize(XMVector3Cross(m_front, m_cameraUp));
 
     switch (key) {
     case 'A':
-        m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(speed * perp_Pos));
+        m_pos = XMVector3Transform(m_pos, XMMatrixTranslationFromVector(-speed * perp_Pos));
         //::cout << m_eye << std::endl;
         break;
     case 'S':
-        m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(-speed * m_front));
+        m_pos = XMVector3Transform(m_pos, XMMatrixTranslationFromVector(-speed * m_front));
         break;
     case 'W':
 
-        m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(speed * m_front));
+        m_pos = XMVector3Transform(m_pos, XMMatrixTranslationFromVector(speed * m_front));
         break;
     case 'D':
-        m_eye = XMVector3Transform(m_eye, XMMatrixTranslationFromVector(-speed * perp_Pos));
+        m_pos = XMVector3Transform(m_pos, XMMatrixTranslationFromVector(speed * perp_Pos));
         break;
     case 'I':
         speed += 1.0f;
@@ -75,8 +88,8 @@ void Camera::OnKeyDown(UINT8 key) {
 XMMATRIX Camera::getMVP() {
     float fovAngleY = 45.0f;
 
-    XMMATRIX view = XMMatrixLookAtLH(m_eye, m_at, m_up);
-    XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(fovAngleY), aspectRatio, 0.01f, 125.0f);
+    XMMATRIX view = XMMatrixLookAtRH(m_pos, m_at, m_up);
+    XMMATRIX proj = XMMatrixPerspectiveFovRH(XMConvertToRadians(fovAngleY), aspectRatio, 0.01f, 125.0f);
     XMMATRIX viewProj = view * proj;
     return viewProj;
 }
@@ -98,7 +111,7 @@ void Camera::OnMouseMove(float dx, float dy) {
     yoffset *= sensitivity;
 
 
-    yaw += xoffset;
+    yaw -= xoffset;
     pitch += yoffset;
    
 

@@ -3,19 +3,24 @@
 #include "RaytracingSceneDefines.h"
 
 struct RasterSceneCB {
-	XMMATRIX mvp;
+	//XMMATRIX mvp;
+	XMMATRIX view;
+	XMMATRIX projection;
 };
 class Camera
 {
 private:
 
 	//camera spatial variables
-	XMVECTOR m_eye;
+	XMVECTOR m_pos;
 	XMVECTOR m_front;
 	XMVECTOR m_up;
 	XMVECTOR m_at;
 	XMVECTOR m_direction;
 	XMVECTOR m_right;
+	XMVECTOR m_cameraUp;
+
+	XMMATRIX view;
 
 	//camera input variables
 	UINT lastX = 400;

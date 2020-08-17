@@ -3,7 +3,8 @@
 
 cbuffer MVP : register(b0)
 {
-    float4x4 mvp;
+    float4x4 view;
+    float4x4 proj;
 };
 //ConstantBuffer<float4x4> mvp : register(b0);
 
@@ -31,10 +32,7 @@ RWTexture2D<float4> GBufferNormal : register(u6);
 PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, float4 color : COLOR)
 {
     PSInput result;
-    float4x4 view = float4x4(1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1);
+    //float4x4 mvp = proj * view;
 //    Photon photon = photons[instanceID];
     //data is certainly getting in! WooHoo!
     Photon photon = photons[instanceID];
@@ -46,9 +44,16 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
    // result.position = position;
    // result.color = photon.colour;
    // result.color = float4(1, 1, 1, 0);
+
+
+    //for some reason the raster and ray-tracer are mirrored projections - just mirror the corresponding point.
     float4 p = position - photon.position;
-  
-    float4 c = mul(mvp, float4(p.xyz, 1));
+     p.y = -p.y;
+     p.z = -p.z;
+     p.x = -p.x;
+    float4 c = mul(proj, p);
+   // c.y = -c.y;
+   // c = mul(proj, c);
    // c.y = -c.y;
     //c.x = -c.x;
     //result.position = position - photon.position;
@@ -62,7 +67,7 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
 float4 PSMain(PSInput input) : SV_TARGET
 {
     // float4 normal = GBufferNormal[input.position.xy];
-     float4 BRDF = GBufferBRDF[input.position.xy];
+     float4 BRDF = GBufferNormal[input.position.xy];
     float4 color = input.color + BRDF;
     float totalPower = dot(color.xyz , float3(1.0f, 1.0f, 1.0f));
     float3 weighted_direction = totalPower * input.direction.xyz;
