@@ -665,6 +665,20 @@ void Application::CreateRasterisationPipeline() {
         { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 
+    D3D12_RASTERIZER_DESC raster = {};
+    raster.FillMode = D3D12_FILL_MODE_SOLID;
+    raster.CullMode = D3D12_CULL_MODE_NONE;
+    raster.FrontCounterClockwise = true;
+    raster.DepthBias = 0;
+    raster.DepthBiasClamp = 0.0f;
+    raster.SlopeScaledDepthBias = 0.0f;
+    raster.DepthClipEnable = TRUE;
+    raster.MultisampleEnable = FALSE;
+    raster.AntialiasedLineEnable = FALSE;
+    raster.ForcedSampleCount = 0;
+    raster.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON;
+
+
    // CD3DX12_BLEND_DESC d(D3D12_BLEND)
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
@@ -675,7 +689,7 @@ void Application::CreateRasterisationPipeline() {
     //psoDesc.PS.BytecodeLength = psCode->GetBufferSize();
     //psoDesc.PS.pShaderBytecode = psCode->GetBufferPointer();
    psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+   psoDesc.RasterizerState = raster;
     psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     psoDesc.DepthStencilState.DepthEnable = FALSE;
     psoDesc.DepthStencilState.StencilEnable = FALSE;

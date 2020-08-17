@@ -73,7 +73,7 @@ void Scene::Init(float m_aspectRatio)
     
     // Albedos
     XMFLOAT4 green = XMFLOAT4(0.1f, 1.0f, 0.5f, 1.0f);
-    XMFLOAT4 red = XMFLOAT4(1.0f, 0, 0, 0);
+    XMFLOAT4 red = XMFLOAT4(1.0f, 1.0f, 1.0f, 0);
     XMFLOAT4 yellow = XMFLOAT4(1.0f, 1.0f, 0.5f, 1.0f);
     m_planeMaterialCB = {red, 0, 0,  1, 0.4f, 50, 1 };
 
@@ -477,7 +477,7 @@ void Scene::CreateGeometry() {
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.1, 0), 1000, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 1, 0), 1000, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.1, 0.0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.5, 0.0, 0.0, 0), 10, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 0, 0.0, 1, 0.4f, 50, 1 };
