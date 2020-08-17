@@ -236,6 +236,7 @@ private:
     void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
 	void CreateStagingRenderTargetResource();
 	void CopyIntersectionBufferToBackBuffer(UINT intersectionIndex);
+    void CopyGBufferToBackBuffer();
 	void CopyRaytracingOutputToBackbuffer();
     void CalculateFrameStats();
     UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse = UINT_MAX);

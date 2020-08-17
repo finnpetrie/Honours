@@ -665,7 +665,7 @@ void Application::CreateRasterisationPipeline() {
         { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
     };
 
-
+   // CD3DX12_BLEND_DESC d(D3D12_BLEND)
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
     psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
     psoDesc.pRootSignature = m_rasterRootSignature.Get();
@@ -1004,8 +1004,8 @@ void Application::CreatePhotonStructuredBuffer() {
 void Application::CreateDeferredGBuffer() {
     auto device = m_deviceResources->GetD3DDevice();
     auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
-
-    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+  //  DXGI_FORMAT_R32G32B32A32_FLOAT
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(  DXGI_FORMAT_R32G32B32A32_FLOAT , m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
     geometryBuffers.clear();
 
@@ -1794,6 +1794,27 @@ void Application::CopyIntersectionBufferToBackBuffer(UINT intersectionIndex) {
     
   
 }
+void Application::CopyGBufferToBackBuffer()
+{
+    auto commandList = m_deviceResources->GetCommandList();
+    auto renderTarget = m_deviceResources->GetRenderTarget();
+
+    D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+    preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(geometryBuffers[0].textureResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+
+    commandList->CopyResource(renderTarget, geometryBuffers[0].textureResource.Get());
+
+    D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+    postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(geometryBuffers[0].textureResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+
+
+}
+
 // Copy the raytracing output to the backbuffer.
 void Application::CopyRaytracingOutputToBackbuffer()
 {
@@ -2009,7 +2030,7 @@ void Application::OnRender()
  //  DoTiling(1024, 720, 1);
     //deferred rendering + direct lighting
     DoRaytracing();
-
+    //CopyGBufferToBackBuffer();
     //rasterise photon volumes - indirect lighting
     DoRasterisation();
 

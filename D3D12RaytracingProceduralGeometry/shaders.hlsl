@@ -58,9 +58,9 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    float4 normal = GBufferNormal[input.position.xy];
-    
-    float4 color = input.color + normal;
+    // float4 normal = GBufferNormal[input.position.xy];
+     float4 BRDF = GBufferBRDF[input.position.xy];
+    float4 color = input.color + BRDF;
     float totalPower = dot(color.xyz , float3(1.0f, 1.0f, 1.0f));
     float3 weighted_direction = totalPower * input.direction.xyz;
    

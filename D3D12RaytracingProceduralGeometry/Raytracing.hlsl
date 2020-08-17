@@ -824,6 +824,10 @@ void MyRaygenShader()
     g_renderTarget.GetDimensions(width, height);
     float2 screenDims = float2(width, height);
 
+    GBufferBRDF[DispatchRaysIndex().xy] = float4(0,0,0, 0);
+    GBufferPosition[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
+    GBufferNormal[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
+
  /*   for (int i = 0; i < 100; i++) {
         Photon p = photonBuffer[i + DispatchRaysIndex().x + i*DispatchRaysIndex().y];
         VisualizePhoton(p.position, p.colour, screenDims);
@@ -858,6 +862,13 @@ void MyRaygenShader()
 
 }
 
+
+float3 lambertian(float3 normal, float3 pos) {
+    float3 lightDir = pos - g_sceneCB.lightPosition;
+
+    float3 colour = l_materialCB.albedo / M_PI * 1 * g_sceneCB.lightAmbientColor * max(0.f, dot(normal, lightDir));
+        return colour;
+}
 
 
 
@@ -921,6 +932,8 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
         //if immediate ray - i.e., recursion depth = 1
     if (rayPayload.recursionDepth == 1) {
         //store normal, and other elements in relevant GBuffer
+        float3 l = lambertian(triangleNormal, pos);
+        GBufferBRDF[DispatchRaysIndex().xy] = float4(l, 0);
         GBufferPosition[DispatchRaysIndex().xy] = float4(pos, 0);
         GBufferNormal[DispatchRaysIndex().xy] = float4(triangleNormal, 0);
     }
@@ -968,6 +981,8 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
 
     if (rayPayload.recursionDepth == 1) {
         //store normal, and other elements in relevant GBuffer
+        float3 l = lambertian(attr.normal, pos);
+        GBufferBRDF[DispatchRaysIndex().xy] = float4(l, 0);
         GBufferPosition[DispatchRaysIndex().xy] = float4(pos, 0);
         GBufferNormal[DispatchRaysIndex().xy] = float4(attr.normal, 0);
     }
