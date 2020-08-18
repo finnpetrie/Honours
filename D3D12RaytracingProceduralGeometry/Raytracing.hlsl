@@ -59,6 +59,7 @@ groupshared uint photonSharedIndex = 0;
 // Functions for PRNG
 // http://www.reedbeta.com/blog/quick-and-easy-gpu-random-numbers-in-d3d11/
 static uint rng_state;
+static const uint photonCount = 1000;
 static const float TWO_PI = 6.2831853071795864769252867665590057683943f;
 static const float PI = 3.1415926535897932384626422832795028841971f;
 static const float SQRT_OF_ONE_THIRD = 0.5773502691896257645091487805019574556476f;
@@ -538,8 +539,12 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
 
         Photon p = { float4(pos, 0), float4(dir, 1), float4(colour, 1) };
 
-        if (dstIndex < 100000) {
+        if (dstIndex < photonCount) {
             photonBuffer[dstIndex] = p;
+        }
+        else {
+           uint decr =  photonBuffer.DecrementCounter();
+
         }
 
     }
@@ -648,10 +653,15 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
         screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
         screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
         uint dstIndex = photonBuffer.IncrementCounter();
+        //photonBuffer.Consume();
 
         Photon p = { float4(pos, 0), float4(dir, 1), float4(colour, 1) };
-        if (dstIndex < 1000000) {
+        if (dstIndex < photonCount) {
+
             photonBuffer[dstIndex] = p;
+        }
+        else {
+            uint decr = photonBuffer.DecrementCounter();
         }
         // return;
     }
@@ -817,6 +827,8 @@ void PathTracingClosestHitProcedural(inout RayPayload rayPayload, in ProceduralP
 [shader("raygeneration")]
 void MyRaygenShader()
 {
+
+    //photonBuffer.DecrementCounter();
     float2 samplePoint = DispatchRaysIndex().xy;
 
     uint width;
@@ -845,21 +857,6 @@ void MyRaygenShader()
     rng_state = uint(wang_hash(samplePoint.x + DispatchRaysDimensions().x * samplePoint.y));
 
     UINT currentRecursionDepth = 0;
-
-    uint2 launchIndex = DispatchRaysIndex().xy;
-    float2 dims = float2(DispatchRaysDimensions().xy);
-    float2 d = (((launchIndex.xy + 0.5f) / dims.xy) * 2.f - 1.f);
-    // Define a ray, consisting of origin, direction, and the min-max distance
-    // values
-    // #DXR Extra: Perspective Camera
-    float aspectRatio = dims.x / dims.y;
-    // Perspective
-    RayDesc ray;
-    ray.Origin = mul(g_sceneCB.viewInverse, float4(g_sceneCB.cameraPosition.xyz, 1));
-    float4 target = mul(g_sceneCB.projectionInverse, float4(d.x, -d.y, 1, 1));
-    ray.Direction = mul(g_sceneCB.viewInverse, float4(target.xyz, 0));
-    ray.TMin = 0;
-    ray.TMax = 100000;
   Ray r = GenerateCameraRay(DispatchRaysIndex().xy, g_sceneCB.cameraPosition.xyz, g_sceneCB.projectionToWorld);
  //   Ray r = { ray.Origin, ray.Direction };
     RayPayload payload = { float4(0,0,0,0), 
@@ -918,38 +915,30 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float3 pos_n =normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
-    //intersectionBuffer[depth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
 
-
-   float4 pathColour = float4(0, 0, 0, 0);
-   /*f (true) {
-        for (int i = 0; i < 1; i++) {
-            float3 r_dir = randomDirection(HitWorldPosition().xy);
-
-            Ray path = { HitWorldPosition(), r_dir };
-            pathColour += TraceRadianceRay(path, rayPayload.recursionDepth);
-        }
-    }*/
 
     Ray shadowRay;
     shadowRay.origin = HitWorldPosition();
     shadowRay.direction = dir;
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
-    
+    float3 normal = float3(0, -1, 0);
     float4 reflectionColour = float4(0, 0, 0, 0);
     if (!shadowHit) {
         //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
-        ambient += PhongLighting(float4(triangleNormal, 0), shadowHit);
+        ambient += PhongLighting(normal, shadowHit);
+
     }
   
 
         //if immediate ray - i.e., recursion depth = 1
     if (rayPayload.recursionDepth == 1) {
         //store normal, and other elements in relevant GBuffer
-        float3 l = lambertian(triangleNormal, pos);
-        GBufferBRDF[DispatchRaysIndex().xy] = float4(l, 0);
+
+        //for some reason the triangle normal is not working??! - for now just suppose n = (0, -1, 0)
+        float3 l = lambertian(float4(normal, 0), pos);
+        GBufferBRDF[DispatchRaysIndex().xy] = float4(l, 1);
         GBufferPosition[DispatchRaysIndex().xy] = float4(pos, 0);
-        GBufferNormal[DispatchRaysIndex().xy] = float4(triangleNormal, 0);
+        GBufferNormal[DispatchRaysIndex().xy] = float4(normal, 0);
     }
 
       if(l_materialCB.reflectanceCoef > 0){

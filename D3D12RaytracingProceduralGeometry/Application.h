@@ -68,7 +68,7 @@ private:
     bool drawRays = false;
     bool recordIntersections = true;
     // Constants.
-    UINT photonCount = 1000000;
+    UINT photonCount = 1000;
     UINT NUM_BLAS = 100000;          // Triangle + AABB bottom-level AS.
     const float c_aabbWidth = 2;      // AABB width.
     const float c_aabbDistance = 2;   // Distance between AABBs.

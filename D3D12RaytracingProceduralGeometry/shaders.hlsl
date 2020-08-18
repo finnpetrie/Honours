@@ -13,7 +13,7 @@ struct PSInput
     float4 position : SV_POSITION;
     float4 color : COLOR;
     float4 direction : DIRECTION;
-   // float4 Direction : DIRECTION;
+   float distance : DISTANCE;
 };
 
 struct Photon {
@@ -36,14 +36,8 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
 //    Photon photon = photons[instanceID];
     //data is certainly getting in! WooHoo!
     Photon photon = photons[instanceID];
-    //result.position = mul(view, photon.position);
-    //transform via model view;
-    //float4 pos = mul(mvp, photon.position);
-   //result.position = pos;
-   // result.position = mul(mvp, position);
-   // result.position = position;
-   // result.color = photon.colour;
-   // result.color = float4(1, 1, 1, 0);
+   uint decr = photons.DecrementCounter();
+ 
 
 
     //for some reason the raster and ray-tracer are mirrored projections - just mirror the corresponding point.
@@ -52,23 +46,28 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
      p.z = -p.z;
      p.x = -p.x;
     float4 c = mul(proj, p);
-   // c.y = -c.y;
-   // c = mul(proj, c);
-   // c.y = -c.y;
-    //c.x = -c.x;
-    //result.position = position - photon.position;
+  
+
+    //lookup position for coordinate .xy 
+   float4 fragmentPosition = GBufferPosition[c.xy];
+    float4 rel = fragmentPosition - photon.position;
+    float distance = sqrt(dot(rel, rel));
     result.position = c;
     result.color = photon.colour;
     result.direction = photon.direction;
+    result.distance = distance;
+    //need to compress the kernel along the photon's point of intersection's normal
 
     return result;
 }
 
 float4 PSMain(PSInput input) : SV_TARGET
 {
-    // float4 normal = GBufferNormal[input.position.xy];
-     float4 BRDF = GBufferNormal[input.position.xy];
-    float4 color = input.color + BRDF;
+    float4 normal = GBufferNormal[input.position.xy];
+     float4 BRDF = GBufferBRDF[input.position.xy];
+     float maxima = max(0, dot(input.direction.xyz, normal.xyz));
+     float colourThroughput = dot(input.color.xyz, float3(1.0f, 1.0f, 1.0f));
+     float4 color = float4(BRDF.x * input.color.x, BRDF.y * input.color.y, BRDF.z * input.color.z, 1);//divided by distance?
     float totalPower = dot(color.xyz , float3(1.0f, 1.0f, 1.0f));
     float3 weighted_direction = totalPower * input.direction.xyz;
    

@@ -990,7 +990,6 @@ void Application::CreatePhotonStructuredBuffer() {
     {
         //numelements *elementsize
         UINT64 size = sizeof(Photon);
-        UINT64 numElements = 100000;
         UINT64 bufferSize = photonCount * size;
         auto uavDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
         auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -1001,7 +1000,7 @@ void Application::CreatePhotonStructuredBuffer() {
         D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
         photonStructGpuHeapIndex = AllocateDescriptor(&uavDescriptorHandle, photonStructGpuHeapIndex);
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavPhotonDesc = {};
-        uavPhotonDesc.Buffer.NumElements = numElements;
+        uavPhotonDesc.Buffer.NumElements = photonCount;
         uavPhotonDesc.Buffer.FirstElement = 0;
         uavPhotonDesc.Buffer.StructureByteStride = size;
         uavPhotonDesc.Buffer.CounterOffsetInBytes = 0;
@@ -2047,11 +2046,12 @@ void Application::OnRender()
       DoRaytracing();
     //CopyGBufferToBackBuffer();
     //rasterise photon volumes - indirect lighting
-     DoRasterisation();
+    DoRasterisation();
 //
 
    // DoRaytracing();
-   //CopyRaytracingOutputToBackbuffer();  
+    //CopyRaytracingOutputToBackbuffer();  
+    
    
     // End frame.
     for (auto& gpuTimer : m_gpuTimers)
@@ -2060,6 +2060,7 @@ void Application::OnRender()
     }
 
     m_deviceResources->Present(D3D12_RESOURCE_STATE_PRESENT);
+
 }
 
 void Application::OnDestroy()
