@@ -636,7 +636,7 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
         //uint dstIndex = 0;
         //photonBufferCounter.InterlockedAdd(0, 1, dstIndex);
       //  AllMemoryBarrier();
-              uint dstIndex = photonBuffer.IncrementCounter();
+        uint dstIndex = photonBuffer.IncrementCounter();
 
               //triangle normal is currently being fucking weird
         Photon p = { float4(pos, raySize), float4(dir, 1), float4(colour, 1), float4(0, 1, 0, 0)};

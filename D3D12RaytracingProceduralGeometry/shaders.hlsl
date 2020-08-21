@@ -64,20 +64,27 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
      //p.x = -p.x;
 
     // p *= scale;
-  
-
+     float cos_theta = saturate(dot(photon.normal, normalize(-photon.direction)));
+     float3 u = normalize(-photon.direction) - cos_theta * photon.normal;
+     float3 toU = dot(u, scaledPos)*u;
+     float3 toT = scaledPos - toU;
+     toT -= dot(toT, photon.normal) * photon.normal;
+     float scaling = min(1.0f / cos_theta, 50);
+     float3 scaled_u = toU * scaling;
     float k = sqrt(dot(-photon.direction, -photon.direction));
+     
     float inv = 1.0 / k;
-    
+    //float kSquash = 1 - minMajKerne
     float pathDensity = k - 1.0;
 
     float majKernelRadius = lerp(maxMajorKernelRadius, minMajKernelRadius, pathDensity);
     float invMajorKernelR = 1.0 / majKernelRadius;
     //multiplied by 1.1 to avoid undersampling
     float4 p = sP * majKernelRadius*1.1;
-    float4 p_i = p + photon.position;
+    float4 p_i = p + photon.position + float4(scaled_u, 0) + float4(toT, 0);
     //float4 p_i = float4(p.xyz * majKernelRadius, 1);
     float4  c = mul(proj, float4(p_i.xyz, 1));
+    //loat ellipse_area = pi*
 
     float majKernel2 = majKernelRadius * majKernelRadius;
     result.majKernelRadius = majKernel2;
@@ -131,7 +138,6 @@ float4 PSMain(PSInput input) : SV_TARGET
     float wp = 1 - sqrt(distance2) / (k * r);
     
 
-
         float4 BRDF = GBufferBRDF[input.position.xy];
 
         float maxima = max(0, dot(input.direction.xyz, normal.xyz));
@@ -140,7 +146,7 @@ float4 PSMain(PSInput input) : SV_TARGET
         // float4 color = BRDF * kernel
         float n_o = wp / normalize;
            //float4 color = (float4(BRDF.x * input.color.x, BRDF.y * input.color.y, BRDF.z * input.color.z, 1));// *maxima * wp) / (1 - 2 / 3 * k) * pi * r * r * r * r;//divided by distance?
-        float4 color = (BRDF * input.color)*max(0, k_L)*wp;
+        float4 color = (BRDF * input.color)*max(0, k_L);
         float totalPower = dot(color.xyz, float3(1.0f, 1.0f, 1.0f));
         float3 weighted_direction = totalPower * input.direction.xyz;
         //return input.direction;
