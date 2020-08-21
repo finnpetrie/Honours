@@ -73,9 +73,9 @@ void Scene::Init(float m_aspectRatio)
     
     // Albedos
     XMFLOAT4 green = XMFLOAT4(0.1f, 1.0f, 0.5f, 1.0f);
-    XMFLOAT4 red = XMFLOAT4(0.5f, 0.5f, 0.5f, 0);
+    XMFLOAT4 grey = XMFLOAT4(2, 2, 2, 0);
     XMFLOAT4 yellow = XMFLOAT4(1.0f, 1.0f, 0.5f, 1.0f);
-    m_planeMaterialCB = {red, 0, 0,  1, 0.4f, 50, 1 };
+    m_planeMaterialCB = {grey, 0, 0,  1, 0.4f, 50, 1 };
 
     UINT offset = 0;
     // Analytic primitives.
@@ -144,7 +144,7 @@ void Scene::Init(float m_aspectRatio)
         lightAmbientColor = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
         m_sceneCB->lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
 
-        float d = 0.6f;
+        float d = 1;
         lightDiffuseColor = XMFLOAT4(d, d, d, 1.0f);
         m_sceneCB->lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
     }
@@ -473,13 +473,13 @@ void Scene::CreateGeometry() {
 
 
 
-    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 0.5, 0, 0), 10, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0, 2, 0, 0), 10, 2.417f, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 0.1, 0.1, 0), 0, 2.4, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0, 2, 2, 0), 0, 2.4, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 1, 0), 1000, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 2, 0), 1000, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.1, 0.0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.5, 0.0, 0.0, 0), 10, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer parab_b = { XMFLOAT4(2, 0.0, 0.0, 0), 10, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 0, 0.0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 0, 0, 1, 0.4f, 50, 1 };
 

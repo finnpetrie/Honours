@@ -46,7 +46,15 @@ namespace GlobalRootSignature_NoScreenSpaceMap {
         };
     }
 }
-
+namespace ComputeCompositeRootSignature {
+    namespace Slot {
+        enum Enum {
+            RayTracingView = 0,
+            RasterView = 1,
+            Count
+        };
+    }
+}
 
 namespace PhotonGlobalRoot {
     namespace Slot {

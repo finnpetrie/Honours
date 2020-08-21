@@ -197,6 +197,9 @@
     <FxCompile Include="PhotonTiling.hlsl">
       <Filter>Assets\Shaders\Util</Filter>
     </FxCompile>
+    <FxCompile Include="CompositeIndirectDirect.hlsl">
+      <Filter>Assets\Shaders\Util</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="PathTracing.hlsl">

@@ -62,6 +62,16 @@ public:
     virtual IDXGISwapChain* GetSwapchain() { return m_deviceResources->GetSwapChain(); }
 
 private:
+
+
+    //values for icosahedron
+    const float X = .525731112119133606f;
+    const float Z = .850650808352039932f;
+    const float N = 0.f;
+
+    ComPtr<ID3D12Resource> icosahedronIndex;
+
+
     static const UINT FrameCount = 3;
     std::vector<float> fpsAverages;
     bool testing = false;
@@ -78,14 +88,19 @@ private:
     ComPtr<ID3D12GraphicsCommandList5> m_dxrCommandList;
     ComPtr<ID3D12StateObject> m_dxrStateObject;
     ComPtr<ID3D12StateObject>  m_photonMapStateObject;
+    ComPtr<ID3D12StateObject>  m_rayCompositeStateObject;
+
     ComPtr<ID3D12PipelineState> m_computeStateObject;
     //Raster Pipeline
     ComPtr<ID3D12PipelineState> m_rasterState;
     // Root signatures
+    ComPtr<ID3D12RootSignature> m_rayCompositeSignature;
     ComPtr<ID3D12RootSignature> m_rasterRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
     ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature[LocalRootSignature::Type::Count];
     ComPtr<ID3D12RootSignature> m_computeRootSignature;
+    ComPtr<ID3D12RootSignature> m_computeCompositeRootSignature;
+    ComPtr<ID3D12PipelineState> m_computeCompositeState;
 
     ComPtr<ID3D12RootSignature> m_photonLocalRootSignature[LocalRootSignature::Type::Count];
     ComPtr<ID3D12RootSignature> m_photonGlobalRootSignature;;
@@ -109,18 +124,20 @@ private:
     
     IDxcBlob* m_rayGenLibrary;
     
+    D3D12_CPU_DESCRIPTOR_HANDLE photonCountCPUDescriptor;
     ComPtr<ID3D12Resource> photonCountBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE photonCountUavGPUDescriptor;
     UINT photonCountUavDescriptorHeapIndex;
 
     ConstantBuffer<ComputeConstantBuffer> m_computeConstantBuffer;
     ConstantBuffer<RasterSceneCB> m_rasterConstantBuffer;
+
     ComPtr<ID3D12Resource> photonStructBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE photonStructGPUDescriptor;
+    D3D12_CPU_DESCRIPTOR_HANDLE photonStructCPUDescriptor;
     UINT photonStructGpuHeapIndex;
 
     ComPtr<ID3D12Resource> photonBuffer;
-    ComPtr<ID3D12Resource> photonCounter;
     D3D12_GPU_DESCRIPTOR_HANDLE photonCounterGpuDescriptor;
     UINT photonCounterDescriptorHeapIndex;
 
@@ -153,12 +170,22 @@ private:
     ComPtr<ID3D12Resource> m_raytracingOutput;
     D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
     UINT m_raytracingOutputResourceUAVDescriptorHeapIndex;
+
+    //Raster output
+    ComPtr<ID3D12Resource> m_rasterOutput;
+    D3D12_GPU_DESCRIPTOR_HANDLE m_rasterOutputResourceUAVGPUDescriptor;
+    UINT m_rasterOutputResourceUAVDescriptorHeapIndex;
     //collection of intersection buffers for writing intersections.
     UINT intersectionIndex = 1;
     // Shader tables
     static const wchar_t* c_hitGroupNames_TriangleGeometry[RayType::Count];
     static const wchar_t* c_hitGroupNames_AABBGeometry[IntersectionShaderType::Count][RayType::Count];
     static const wchar_t* c_raygenShaderName;
+    static const wchar_t* c_compositeRayGen;
+    static const wchar_t* c_compositeMiss;
+    static const wchar_t* c_compositeHit;
+    static const wchar_t* c_compositeHitGroup;
+
     static const wchar_t* c_intersectionShaderNames[IntersectionShaderType::Count];
     static const wchar_t* c_closestHitShaderNames[GeometryType::Count];
     static const wchar_t* c_anyHitShaderNames[GeometryType::Count];
@@ -173,6 +200,11 @@ private:
     ComPtr<ID3D12Resource> m_hitGroupShaderTable;
     UINT m_hitGroupShaderTableStrideInBytes;
     ComPtr<ID3D12Resource> m_rayGenShaderTable;
+    
+    ComPtr<ID3D12Resource> m_compositeRayGenShaderTable;
+    ComPtr<ID3D12Resource> m_missCompositeTable;
+    UINT m_missCompositeTableStrideInBytes;
+
 
     // Application state
     DX::GPUTimer m_gpuTimers[GpuTimers::Count];
@@ -186,7 +218,9 @@ private:
 	void CopyIntersectionToCPU();
     void DoScreenSpacePhotonMapping();
     void DoTiling();
+    void CompositeIndirectAndDirectIllumination();
     void DoTiling(UINT tileX, UINT tileY, UINT tileDepth);
+    void DoCompositing();
     void DoRaytracing();
    
     void CreatePhotonBuffer_2();
@@ -202,6 +236,8 @@ private:
     void CreateRaytracingInterfaces();
     void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC& desc, ComPtr<ID3D12RootSignature>* rootSig);
     void CreatePhotonMappingRootSignatures();
+    void CreateComputeCompositeRootSignature();
+    void CreateCompositeRayRoot();
     void CreateRootSignatures();
     void CreateDxilLibrarySubobject(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
@@ -211,8 +247,10 @@ private:
    
     void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline, ComPtr<ID3D12RootSignature>* rootSig);
     void CreateRasterisationPipeline();
-	void CreatePhotonTilingComptuePassStateObject();
-	void CreatePhotonMappingFirstPassStateObject();
+    void CreateComputeCompositeStateObject();
+    void CreatePhotonTilingComptuePassStateObject();
+    void CreateCompositeRayPipelineStateObject();
+    void CreatePhotonMappingFirstPassStateObject();
     void CreateRaytracingPipelineStateObject();
     void CreateIntersectionVertexBuffer();
     void CreateDeferredGBuffer();
@@ -223,6 +261,7 @@ private:
 	void CreateRasterisationBuffers();
     void CreateRasterConstantBuffer();
     void CreateRaytracingOutputResource();
+    void CreateRasterOutputResource();
     void CreateCountBuffer();
     void CreatePhotonStructuredBuffer();
     void CreateComputeConstantBuffer();
@@ -230,6 +269,8 @@ private:
     void DoRasterisation();
    
    
+    void BuildCompositeTable();
+
     void BuildPhotonShaderTable();
 
     void BuildShaderTables();
