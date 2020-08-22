@@ -331,7 +331,7 @@ void Application::CreateRasterRootSignatures() {
     auto device = m_deviceResources->GetD3DDevice();
 
 
-    CD3DX12_DESCRIPTOR_RANGE ranges[4];
+    CD3DX12_DESCRIPTOR_RANGE ranges[5];
     CD3DX12_ROOT_PARAMETER rootParameters[RasterisationRootSignature::Slot::Count];
 
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
@@ -339,10 +339,12 @@ void Application::CreateRasterRootSignatures() {
     //vertex RW buffer
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 4);
+    ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 8);
 
   //  rootParameters[RasterisationRootSignature::Slot::Constant].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
     rootParameters[RasterisationRootSignature::Slot::Constant].InitAsConstantBufferView(0);
     rootParameters[RasterisationRootSignature::Slot::OutputView].InitAsUnorderedAccessView(0);
+    rootParameters[RasterisationRootSignature::Slot::RasterTarget].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
     //vertex RW buffer
     rootParameters[RasterisationRootSignature::Slot::PhotonBuffer].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
     rootParameters[RasterisationRootSignature::Slot::GBuffer].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_ALL);
@@ -366,7 +368,7 @@ void Application::CreateCompositeRayRoot() {
     auto device = m_deviceResources->GetD3DDevice();
     CD3DX12_DESCRIPTOR_RANGE ranges[2];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 8);
 
     CD3DX12_ROOT_PARAMETER rootParams[2];
     rootParams[0].InitAsDescriptorTable(1, &ranges[0]);
@@ -1444,6 +1446,9 @@ void Application::BuildCompositeTable() {
 
         missShaderID = stateObjectProperties->GetShaderIdentifier(c_compositeMiss);
         shaderIdToStringMap[missShaderID] = c_compositeMiss;
+
+        hitGroupOne = stateObjectProperties->GetShaderIdentifier(c_compositeHitGroup);
+        shaderIdToStringMap[hitGroupOne] = c_compositeHitGroup;
        
     };
 
@@ -1479,6 +1484,22 @@ void Application::BuildCompositeTable() {
          m_missCompositeTable = missShaderTable.GetResource();
     }
 
+
+    {
+
+        UINT numShaderRecords = 1;
+        UINT shaderRecordSize = shaderIDSize;
+        ShaderTable hitGroupShaderTable(device, numShaderRecords, shaderRecordSize, L"PhotonHitGroupTable");
+
+
+        hitGroupShaderTable.push_back(ShaderRecord(hitGroupOne, shaderIDSize, nullptr, 0));
+
+        hitGroupShaderTable.DebugPrint(shaderIdToStringMap);
+        m_compositeHitGroupStrideInBytes = hitGroupShaderTable.GetShaderRecordSize();
+        m_compositeHitGroupShaderTable = hitGroupShaderTable.GetResource();
+      
+     
+    }
 }
 
 void Application::BuildPhotonShaderTable() {
@@ -1807,6 +1828,7 @@ void Application::DoRasterisation() {
     //NOTE THIS DOESN'T WORK?
     commandList->SetGraphicsRootDescriptorTable(RasterisationRootSignature::Slot::PhotonBuffer, photonStructGPUDescriptor);
     commandList->SetGraphicsRootDescriptorTable(RasterisationRootSignature::Slot::GBuffer, geometryBuffers[0].uavGPUDescriptor);
+    commandList->SetGraphicsRootDescriptorTable(RasterisationRootSignature::Slot::RasterTarget, m_raytracingOutputResourceUAVGpuDescriptor);
     m_rasterConstantBuffer.CopyStagingToGpu(frameIndex);
 
     commandList->SetGraphicsRootConstantBufferView(RasterisationRootSignature::Slot::Constant, m_rasterConstantBuffer.GpuVirtualAddress(frameIndex));
@@ -1823,14 +1845,14 @@ void Application::DoRasterisation() {
     //commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
     UINT photonCount = PHOTON_COUNT;
     m_deviceResources->SetRasterRenderTarget();
-  const float clearColor[] = { 0.0f, 0.0f, 0.4f, 1.0f };
+  const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
     commandList->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     commandList->IASetVertexBuffers(0, 1, &rasterVertexView);
     //for now we don't use index buffers - 'cause lazy
     commandList->DrawInstanced(60, photonCount, 0, 0);
 
-    commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    //commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
    // ThrowIfFailed(commandList->Close());
 }
@@ -1986,11 +2008,15 @@ void Application::DoCompositing() {
     commandList->SetComputeRootDescriptorTable(ComputeCompositeRootSignature::Slot::RayTracingView, m_raytracingOutputResourceUAVGpuDescriptor);
     commandList->SetComputeRootDescriptorTable(ComputeCompositeRootSignature::Slot::RasterView, m_rasterOutputResourceUAVGPUDescriptor);
 
-    D3D12_DISPATCH_RAYS_DESC compositeDesc;
+    D3D12_DISPATCH_RAYS_DESC compositeDesc = {};
     compositeDesc.RayGenerationShaderRecord.StartAddress = m_compositeRayGenShaderTable->GetGPUVirtualAddress();
     compositeDesc.RayGenerationShaderRecord.SizeInBytes = m_compositeRayGenShaderTable->GetDesc().Width;
     compositeDesc.MissShaderTable.StartAddress = m_missCompositeTable->GetGPUVirtualAddress();
-    compositeDesc.MissShaderTable.SizeInBytes = m_missCompositeTableStrideInBytes;
+    compositeDesc.MissShaderTable.SizeInBytes = m_missCompositeTable->GetDesc().Width;
+    compositeDesc.MissShaderTable.StrideInBytes = m_missCompositeTableStrideInBytes;
+    compositeDesc.HitGroupTable.StartAddress = m_compositeHitGroupShaderTable->GetGPUVirtualAddress();
+    compositeDesc.HitGroupTable.SizeInBytes = m_compositeHitGroupShaderTable->GetDesc().Width;
+    compositeDesc.HitGroupTable.StrideInBytes = m_compositeHitGroupStrideInBytes;
     compositeDesc.Width = m_width;
     compositeDesc.Height = m_height;
     compositeDesc.Depth = 1;
@@ -2169,7 +2195,7 @@ void Application::CopyRaytracingOutputToBackbuffer()
     commandList->CopyResource(renderTarget, m_raytracingOutput.Get());
 
     D3D12_RESOURCE_BARRIER postCopyBarriers[2];
-    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
     postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
@@ -2375,9 +2401,10 @@ void Application::OnRender()
       DoRaytracing();
    // CopyGBufferToBackBuffer();
     //rasterise photon volumes - indirect lighting
-      CopyRaytracingOutputToBackbuffer();
+     // CopyRaytracingOutputToBackbuffer();
 
     DoRasterisation();
+    CopyRaytracingOutputToBackbuffer();
 
     //DoCompositing();
     //CompositeIndirectAndDirectIllumination();

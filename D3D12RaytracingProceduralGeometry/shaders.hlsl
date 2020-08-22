@@ -31,6 +31,7 @@ RWStructuredBuffer<Photon> photons : register(u2);
 RWTexture2D<float4> GBufferBRDF : register(u4);
 RWTexture2D<float4> GBufferPosition : register(u5);
 RWTexture2D<float4> GBufferNormal : register(u6);
+RWTexture2D<float4> rasterTarget : register(u8);
 //RWTexture1D<float4> photons : register(u0);
 
 
@@ -89,9 +90,9 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
     float majKernel2 = majKernelRadius * majKernelRadius;
     result.majKernelRadius = majKernel2;
     result.invMajKernelRadius = invMajorKernelR;
-    result.position = c;
+    result.position = c + float4(0, 0.1, 0, 0);
     //colour, i.e., power, is divided by kernel radius * pi to normalize
-    result.color = photon.colour*1/ (majKernelRadius*pi);
+    result.color = photon.colour;
     result.direction = photon.direction/inv;
     result.originalPosition = photon.position;
     result.normal = photon.normal;
@@ -107,7 +108,7 @@ float4 PSMain(PSInput input) : SV_TARGET
 
         float4 pos = GBufferPosition[input.position.xy];
         //max distance between photon and position
-        float r = 1000;
+        float r = 200;
 
         float4 axis = pos - input.originalPosition;
 
@@ -117,7 +118,7 @@ float4 PSMain(PSInput input) : SV_TARGET
         float distance2 = dot(axis, axis);
         float p_a = -beta * (distance2 / (2 * r * r));
         float gauss = alpha*(1 - ((1 - exp(p_a)) / (1 - exp(-beta))));
-        
+        float4 colo = normalize(input.color);
         
     // float4 pos = GBufferPosition[input.position.xy];
      //float dist = sqrt(dot(pos - original))
@@ -142,11 +143,11 @@ float4 PSMain(PSInput input) : SV_TARGET
 
         float maxima = max(0, dot(input.direction.xyz, normal.xyz));
         float colourThroughput = dot(input.color.xyz, float3(1.0f, 1.0f, 1.0f));
-        float normalize = (1 - (2 / 3 * k)) * pi * r * r;
+        float nor = (1 - (2 / 3 * k)) * pi * r * r;
         // float4 color = BRDF * kernel
-        float n_o = wp / normalize;
+        float n_o = wp / nor;
            //float4 color = (float4(BRDF.x * input.color.x, BRDF.y * input.color.y, BRDF.z * input.color.z, 1));// *maxima * wp) / (1 - 2 / 3 * k) * pi * r * r * r * r;//divided by distance?
-        float4 color = (BRDF * input.color)*max(0, k_L);
+        float4 color = (BRDF * input.color)*max(0, k_L)*gauss;
         float totalPower = dot(color.xyz, float3(1.0f, 1.0f, 1.0f));
         float3 weighted_direction = totalPower * input.direction.xyz;
         //return input.direction;
@@ -154,7 +155,13 @@ float4 PSMain(PSInput input) : SV_TARGET
        // return float4(color.xyz, weighted_direction.x); / float4(wp, wp, wp, 1);
        // return normal;
         //return float4(gauss, gauss, gauss, 1.0);
-        return float4(color.xyz, weighted_direction.x);
+        //float4 normedCol = normalize(input.color);
+        float4 co = rasterTarget[input.position.xy];
+        float4 outputColour = co += color;
+        outputColour = normalize(outputColour);
+       
+        rasterTarget[input.position.xy] += color;
+        return color;
     
      //return float4(color.xyz, weighted_direction.x)
    // return input.position;

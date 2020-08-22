@@ -16,6 +16,8 @@
 //  l_* - bound via a local root signature.
 RaytracingAccelerationStructure g_scene : register(t0, space0);
 RWTexture2D<float4> g_renderTarget : register(u0);
+RWTexture2D<float4> g_rasterTarget : register(u8);
+
 RWStructuredBuffer<Photon> photonBuffer : register(u1);
 RWByteAddressBuffer photonBufferCounter : register(u2);
 RWTexture2D<uint> tiledPhotonMap : register(u3);
@@ -398,6 +400,13 @@ inline void GetTileIndex(float3 rayHitPosition, out uint tileIndex) {
 [shader("raygeneration")]
 void CompositeRayGen() {
     //add corresponding RTVs together.
+    uint2 index = DispatchRaysIndex().xy;
+   // g_renderTarget[index] += float4(1, 1, 0, 0);
+    //g_rasterTarget[index] = float4(1, 1, 0, 0);
+    //
+  //  g_rasterTarget[index] = g_renderTarget[index];
+    //g_renderTarget[index] += g_rasterTarget[index];
+
 }
 
 [shader("closesthit")]
@@ -432,9 +441,9 @@ void Photon_Ray_Gen() {
     g_renderTarget.GetDimensions(width, height);
     float2 screenDims = float2(width, height);
 
-    float power = dot(g_sceneCB.lightAmbientColor, float3(0.4, 0.4, 0.4))/(2* TWO_PI) *(1/width * height); //number of photons to be emitted
+    float power = dot(g_sceneCB.lightDiffuseColor, float3(1, 1, 1))/(2* TWO_PI) *(1/(width * height)); //number of photons to be emitted
 
-    PhotonPayload payload = { float4(0,0,0,0), g_sceneCB.lightAmbientColor,
+    PhotonPayload payload = { float4(0,0,0,0), g_sceneCB.lightDiffuseColor,
      power, 0 };
 
 
@@ -655,9 +664,9 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
     float3 reflectPos;
 
     float maximumPower = maxValue(payload.colour);
-    if (rand_xorshift() < (1.f - maximumPower)) {
-        return;
-    }
+  //  if (rand_xorshift() < (1.f - maximumPower)) {
+    //    return;
+    //}
     if (l_materialCB.refractiveCoef > 0) {
         //assume refractive glass
         float n1 = 1;
@@ -705,10 +714,10 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
     float3 refractPos;
     float3 reflectPos;
     //payload.colour = l_materialCB.albedo;
-    float3 colour = 2* float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
+    float3 colour =  float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
     payload.colour = float4(colour, 1);
 
-    if (l_materialCB.reflectanceCoef >= 0.0f && l_materialCB.refractiveCoef >= 0 ) {
+    if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth >= 1 ) {
        /*screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
         screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
         screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
@@ -735,9 +744,9 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
 
     //russian roulette
     float maximumPower = maxValue(payload.colour);
-    if (rand_xorshift() < (1.f - maximumPower)) {
-        return;
-    }
+  //  if (rand_xorshift() < (1.f - maximumPower)) {
+    //    return;
+    //}
     //if refractive surface, trace photons based on law of refraction
     if (l_materialCB.refractiveCoef > 0) {
         //assume refractive glass
@@ -1059,7 +1068,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
 
 
     if (!shadowHit) {
-        ambient += PhongLighting(float4(attr.normal, 0), shadowHit);
+        ambient += 0.1*PhongLighting(float4(attr.normal, 0), shadowHit);
     }
     float4 refractionColour = float4(0, 0, 0, 1);
     float3 dir = normalize(WorldRayDirection());

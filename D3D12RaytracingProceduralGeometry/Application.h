@@ -204,6 +204,8 @@ private:
     ComPtr<ID3D12Resource> m_compositeRayGenShaderTable;
     ComPtr<ID3D12Resource> m_missCompositeTable;
     UINT m_missCompositeTableStrideInBytes;
+    ComPtr<ID3D12Resource> m_compositeHitGroupShaderTable;
+    UINT m_compositeHitGroupStrideInBytes;
 
 
     // Application state

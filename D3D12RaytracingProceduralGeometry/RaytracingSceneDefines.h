@@ -97,6 +97,7 @@ namespace RasterisationRootSignature {
             OutputView = 0,
             PhotonBuffer,
             GBuffer,
+            RasterTarget,
             Constant,
             Count
         };
