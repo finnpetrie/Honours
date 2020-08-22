@@ -337,7 +337,7 @@ void Application::CreateRasterRootSignatures() {
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
     //vertex RW buffer
-    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 4);
     ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 8);
 
@@ -767,7 +767,7 @@ void Application::CreateRasterisationPipeline() {
     raster.MultisampleEnable = FALSE;
     raster.AntialiasedLineEnable = FALSE;
     raster.ForcedSampleCount = 0;
-    raster.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON;
+    raster.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
 
     D3D12_BLEND_DESC blender = {};
     blender.AlphaToCoverageEnable = FALSE;
@@ -1174,14 +1174,6 @@ void Application::CreatePhotonStructuredBuffer() {
     auto device = m_deviceResources->GetD3DDevice();
     auto backBufferFormat = m_deviceResources->GetBackBufferFormat();
     {
-        //create counter
-
-
-
-
-    }
-    {
-        //numelements *elementsize
         UINT64 size = sizeof(Photon);
         UINT64 bufferSize = PHOTON_COUNT * size;
         auto uavDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
@@ -1852,7 +1844,7 @@ void Application::DoRasterisation() {
     //for now we don't use index buffers - 'cause lazy
     commandList->DrawInstanced(60, photonCount, 0, 0);
 
-    //commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+    commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
    // ThrowIfFailed(commandList->Close());
 }
@@ -1872,8 +1864,8 @@ void Application::DoScreenSpacePhotonMapping()
         dispatchDesc->MissShaderTable.StrideInBytes = m_missPhotonTableStrideInBytes;
         dispatchDesc->RayGenerationShaderRecord.StartAddress = m_photonRayGenTable->GetGPUVirtualAddress();
         dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_photonRayGenTable->GetDesc().Width;
-        dispatchDesc->Width = m_width;
-        dispatchDesc->Height = m_height;
+        dispatchDesc->Width = 3000;
+        dispatchDesc->Height = 2000;
         dispatchDesc->Depth = 1;
         raytracingCommandList->SetPipelineState1(stateObject);
         
@@ -2404,7 +2396,7 @@ void Application::OnRender()
      // CopyRaytracingOutputToBackbuffer();
 
     DoRasterisation();
-    CopyRaytracingOutputToBackbuffer();
+   //CopyRaytracingOutputToBackbuffer();
 
     //DoCompositing();
     //CompositeIndirectAndDirectIllumination();

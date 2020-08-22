@@ -654,7 +654,8 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
             photonBuffer[dstIndex] = p;
         }
         else {
-         //  uint decr =  photonBuffer.DecrementCounter();
+           uint decr =  photonBuffer.DecrementCounter();
+           return;
 
         }
 
@@ -718,28 +719,19 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
     payload.colour = float4(colour, 1);
 
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth >= 1 ) {
-       /*screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
-        screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
-        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
+      
         uint dstIndex = photonBuffer.IncrementCounter();
-        //int dstIndex = 0;
-        //photonBufferCounter.InterlockedAdd(0, 1, dstIndex);
-      //  photonBufferCount.Consume();
-       //photonBuffer.Consume();
-        //int dstIndex = 0;
-        //photonBufferCounter.InterlockedAdd(0, 1, dstIndex);
-       // AllMemoryBarrier();
         float raySize = sqrt(dot(pos - WorldRayOrigin(), pos - WorldRayOrigin()));
 
         Photon p = { float4(pos, raySize), float4(dir, 1), float4(colour, 1), float4(attr.normal, 1) };
         if (dstIndex < PHOTON_COUNT) {
-
             photonBuffer[dstIndex] = p;
         }
         else {
-          //  uint decr = photonBuffer.DecrementCounter();
+           uint decr = photonBuffer.DecrementCounter();
+           return;
+
         }
-        // return;
     }
 
     //russian roulette
@@ -1001,8 +993,11 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float4 reflectionColour = float4(0, 0, 0, 0);
     if (!shadowHit) {
         //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
-       // ambient += PhongLighting(normal, shadowHit);
+       ambient = 0.1* PhongLighting(normal, shadowHit);
 
+    }
+    else {
+        ambient = float4(0, 0, 0, 0);
     }
   
 
@@ -1030,7 +1025,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
     //rayPayload.color = color;
    // rayPayload.color = float4(colour, 0);
-    rayPayload.color = 0.3* lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t)) + float4(colour, 0);
+    rayPayload.color =  lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t)) + float4(colour, 0);
 
    // rayPayload.intersections[rayPayload.recursionDepth] = color;
 

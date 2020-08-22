@@ -99,9 +99,12 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
                    sdBox(position + float3(1, 1, 1), float3(2, 2, 2)));
     
     case SignedDistancePrimitive::QuaternionJulia: 
-       
-   return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
+        float3 trap;
+       return juliaMap(position.xyz, trap,  float4(0.6, 0.6, 0.6, 0.6));
+       // return sdTorus82(position, float2(0.75, 0.15));
+        //return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
       // return sdGyroid(position);
+
     default: return 0;
     }
 }

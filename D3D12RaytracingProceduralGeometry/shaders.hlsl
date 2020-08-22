@@ -27,7 +27,7 @@ struct Photon {
 
 };
 
-RWStructuredBuffer<Photon> photons : register(u2);
+RWStructuredBuffer<Photon> photons : register(u1);
 RWTexture2D<float4> GBufferBRDF : register(u4);
 RWTexture2D<float4> GBufferPosition : register(u5);
 RWTexture2D<float4> GBufferNormal : register(u6);
@@ -38,21 +38,16 @@ RWTexture2D<float4> rasterTarget : register(u8);
 
 PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, float4 color : COLOR)
 {
-
     float lMax = 50;
-
-    PSInput result;
-
     float maxMajorKernelRadius = 10;
     float minMajKernelRadius = 0.1;
     float pi = 3.1415926535897932384626422832795028841971f;
 
-
-    //data is certainly getting in! WooHoo!
+    PSInput result;
     Photon photon = photons[instanceID];
-   uint decr = photons.DecrementCounter();
-   float raySize = photon.position.w;
-   float scale = min(raySize / lMax, 1);
+    uint decr = photons.DecrementCounter();
+    float raySize = photon.position.w;
+    float scale = min(raySize / lMax, 1);
    //scale position
    float4 scaledPos = scale * float4(position.xyz, 0);
    //squish position
@@ -161,7 +156,7 @@ float4 PSMain(PSInput input) : SV_TARGET
         outputColour = normalize(outputColour);
        
         rasterTarget[input.position.xy] += color;
-        return color;
+        return 5 * color;
     
      //return float4(color.xyz, weighted_direction.x)
    // return input.position;
