@@ -81,12 +81,13 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
     //float4 p_i = float4(p.xyz * majKernelRadius, 1);
     float4  c = mul(proj, float4(p_i.xyz, 1));
     //loat ellipse_area = pi*
-
+    float ellipse_area = pi * length(scaled_u) * length(toT);
     float majKernel2 = majKernelRadius * majKernelRadius;
     result.majKernelRadius = majKernel2;
     result.invMajKernelRadius = invMajorKernelR;
-    result.position = c + float4(0, 0.1, 0, 0);
+    result.position = c;
     //colour, i.e., power, is divided by kernel radius * pi to normalize
+   //UNSURE ABOUT THIS - HOW DO WE COMPUTE THE COLOUR -
     result.color = photon.colour;
     result.direction = photon.direction/inv;
     result.originalPosition = photon.position;
@@ -103,14 +104,14 @@ float4 PSMain(PSInput input) : SV_TARGET
 
         float4 pos = GBufferPosition[input.position.xy];
         //max distance between photon and position
-        float r = 200;
+        float r = 0.5;
 
         float4 axis = pos - input.originalPosition;
 
         float beta = 1.953;
         float alpha = 0.918;
         //float exp = 1 - exp()
-        float distance2 = dot(axis, axis);
+        float distance2 = dot(axis.xyz, axis.xyz);
         float p_a = -beta * (distance2 / (2 * r * r));
         float gauss = alpha*(1 - ((1 - exp(p_a)) / (1 - exp(-beta))));
         float4 colo = normalize(input.color);
@@ -123,7 +124,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     
     float k_L = dot(normal, -input.direction);
     //this is meant to be a means to discard any comparisons, i.e, these points are outside of the kernel's domain
-    if ( (k_L < 0.0)) {
+    if ( (k_L < 0.0) || (distance2 >= 3.0)) {
         //backface
        return float4(0.0, 0.0, 0.0, 0.0);
     }
@@ -155,9 +156,10 @@ float4 PSMain(PSInput input) : SV_TARGET
         float4 outputColour = co += color;
         outputColour = normalize(outputColour);
        
+        
         rasterTarget[input.position.xy] += color;
-        return 5 * color;
-    
+       // return  float4(distance2, distance2, distance2, 0);
+        return 20*color;
      //return float4(color.xyz, weighted_direction.x)
    // return input.position;
 }

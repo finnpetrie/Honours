@@ -1808,6 +1808,7 @@ void Application::DoRasterisation() {
     auto scissorRect = m_deviceResources->GetScissorRect();
     auto rtv = m_deviceResources->GetRenderTargetView();
     auto renderTarget = m_deviceResources->GetRenderTarget();
+    auto commandAllocator = m_deviceResources->GetCommandAllocator();
     commandList->SetPipelineState(m_rasterState.Get());
     commandList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
     
@@ -1843,7 +1844,9 @@ void Application::DoRasterisation() {
     commandList->IASetVertexBuffers(0, 1, &rasterVertexView);
     //for now we don't use index buffers - 'cause lazy
     commandList->DrawInstanced(60, photonCount, 0, 0);
-
+    m_deviceResources->ExecuteCommandList();
+    m_deviceResources->WaitForGpu();
+    commandList->Reset(commandAllocator, nullptr);
     commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
    // ThrowIfFailed(commandList->Close());
@@ -2396,7 +2399,7 @@ void Application::OnRender()
      // CopyRaytracingOutputToBackbuffer();
 
     DoRasterisation();
-   //CopyRaytracingOutputToBackbuffer();
+   // CopyRaytracingOutputToBackbuffer();
 
     //DoCompositing();
     //CompositeIndirectAndDirectIllumination();
