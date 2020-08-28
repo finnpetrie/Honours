@@ -35,8 +35,24 @@ struct IBuffer
     ComPtr<ID3D12Resource> textureResource;
     D3D12_GPU_DESCRIPTOR_HANDLE uavGPUDescriptor;
     UINT uavDescriptorHeapIndex;
+
+    
 };
 
+
+struct TiledBuffer {
+    ComPtr<ID3D12Resource> resource;
+    D3D12_GPU_DESCRIPTOR_HANDLE uavGPUDescriptor;
+    UINT uavDescriptorHeapIndex;
+    D3D12_CPU_DESCRIPTOR_HANDLE tiledBufferCPUDescriptor;
+
+
+
+    D3D12_CPU_DESCRIPTOR_HANDLE tiledCountCPUDescriptor;
+    ComPtr<ID3D12Resource> tilePhotonCounterBuffer;
+    D3D12_GPU_DESCRIPTOR_HANDLE tiledPhotonCountUavGPUDescriptor;
+
+};
 class Application : public DXSample
 {
 public:
@@ -70,7 +86,7 @@ private:
     const float N = 0.f;
 
     ComPtr<ID3D12Resource> icosahedronIndex;
-
+    bool mapped = false;
 
     static const UINT FrameCount = 3;
     std::vector<float> fpsAverages;
@@ -112,7 +128,14 @@ private:
     ComPtr<ID3D12Resource> m_photonRayGenTable;
   
     
-
+    bool tiling = false;
+    //no counter needed?
+    ComPtr<ID3D12Resource> tiledPhotonMapBuffer;
+    D3D12_CPU_DESCRIPTOR_HANDLE tiledPhotonMapCPUDescriptor;
+    //ComPtr<ID3D12Resource> tiledPhotonCounter;
+   // D3D12_CPU_DESCRIPTOR_HANDLE tiledPhotonCountCPUDescriptor;
+    D3D12_GPU_DESCRIPTOR_HANDLE tiledPhotonUAVGpuDescriptor;
+    UINT tiledPhotonMapUAVDescriptorIndex;
 
 
     bool screenSpaceMap = false;
@@ -123,7 +146,8 @@ private:
     UINT m_descriptorSize;
     
     IDxcBlob* m_rayGenLibrary;
-    
+    //std::vector<TiledBuffer> photonTiles;
+
     D3D12_CPU_DESCRIPTOR_HANDLE photonCountCPUDescriptor;
     ComPtr<ID3D12Resource> photonCountBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE photonCountUavGPUDescriptor;
@@ -140,10 +164,7 @@ private:
     ComPtr<ID3D12Resource> photonBuffer;
     D3D12_GPU_DESCRIPTOR_HANDLE photonCounterGpuDescriptor;
     UINT photonCounterDescriptorHeapIndex;
-
-    ComPtr<ID3D12Resource> tiledPhotonMap;
-    D3D12_GPU_DESCRIPTOR_HANDLE tiledPhotonMapGPUDescriptor;
-    UINT tiledPhotonMapDescriptorHeapIndex;
+    
 
     std::vector<IBuffer> intersectionBuffers;
     std::vector<IBuffer> geometryBuffers;
@@ -218,6 +239,7 @@ private:
 	
     void RecreateD3D();
 	void CopyIntersectionToCPU();
+    void CopyBackBufferToRasterBuffer();
     void DoScreenSpacePhotonMapping();
     void DoTiling();
     void CompositeIndirectAndDirectIllumination();

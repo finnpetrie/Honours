@@ -15,11 +15,12 @@ struct Photon {
 };
 //#define HLSL
 //#include "RayTracingHlslCompat.h"
-#define MAX_PHOTONS 10000
+#define MAX_PHOTONS 100000
 RWTexture2D<float4> g_renderTarget : register(u0);
 //note to self - do the register addresses need to be the same as in our other shader?
 RWStructuredBuffer<Photon> photonBuffer : register(u1);
 
+//store indices within each bucket
 RWTexture2D<uint> photonBucket: register(u2);
 //RWTexture1D<float3> photonPosition : register(u8);
 //RWTexture1D<float3> photonColour : register(u9);

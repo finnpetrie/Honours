@@ -64,6 +64,8 @@ const wchar_t* Application::c_compositeRayGen = L"CompositeRayGen";
 const wchar_t* Application::c_compositeMiss = L"CompositeMiss";
 const wchar_t* Application::c_compositeHit = L"CompositeHit";
 const wchar_t* Application::c_compositeHitGroup = L"HitCompositeTri";
+
+
 const wchar_t* Application::c_photon_rayGen = L"Photon_Ray_Gen";
 
 const wchar_t* Application::c_photon_closestHit[] =
@@ -143,11 +145,11 @@ void Application::CreateDeviceDependentResources()
     CreatePhotonMappingRootSignatures();
     CreateRootSignatures();
     CreateCompositeRayRoot();
-    CreateComputePhotonTilingRootSignature();
+    //CreateComputePhotonTilingRootSignature();
 
     // Create a raytracing pipeline state object which defines the binding of shaders, state and resources to be used during raytracing.
     CreateRaytracingPipelineStateObject();
-    CreatePhotonTilingComptuePassStateObject();
+    //CreatePhotonTilingComptuePassStateObject();
     CreatePhotonMappingFirstPassStateObject();
     CreateCompositeRayPipelineStateObject();
     CreateRasterRootSignatures();
@@ -178,8 +180,8 @@ void Application::CreateDeviceDependentResources()
     BuildPhotonShaderTable();
 
     // Create an output 2D texture to store the raytracing result to.
-    CreateRaytracingOutputResource();
-    CreateRasterOutputResource();
+    //CreateRaytracingOutputResource();
+   // CreateRasterOutputResource();
 }
 
 void Application::SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC& desc, ComPtr<ID3D12RootSignature>* rootSig)
@@ -207,8 +209,8 @@ void Application::CreatePhotonMappingRootSignatures()
             //1 output, 6 screen space maps, 3 photon g-buffers, 1 photon count buffer
             //1 output, 6 screen space maps, 1 photon structured buffer, 1 photon count
             ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-            ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
-            ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
+            ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
+            ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
             
             ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3 * MAX_RAY_RECURSION_DEPTH, 4);
             //  ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
@@ -229,21 +231,23 @@ void Application::CreatePhotonMappingRootSignatures()
             SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_photonGlobalRootSignature);
         }
         else {
-            CD3DX12_DESCRIPTOR_RANGE ranges[4];
+            CD3DX12_DESCRIPTOR_RANGE ranges[5];
             ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
             ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
             ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
-            ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
+            ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
+            ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
 
             CD3DX12_ROOT_PARAMETER rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::Count];
             rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::OutputView].InitAsDescriptorTable(1, &ranges[0]);
-            rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::PhotonBuffer].InitAsDescriptorTable(1, &ranges[1]);
-            rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::PhotonCounter].InitAsDescriptorTable(1, &ranges[2]);
+            rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::RasterView].InitAsDescriptorTable(1, &ranges[1]);
+            rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::PhotonBuffer].InitAsDescriptorTable(1, &ranges[2]);
+            rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::PhotonCounter].InitAsDescriptorTable(1, &ranges[3]);
             rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::AccelerationStructure].InitAsShaderResourceView(0);
             rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::SceneConstant].InitAsConstantBufferView(0);
             rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::AABBattributeBuffer].InitAsShaderResourceView(3);
             rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::CSGTree].InitAsShaderResourceView(4);
-            rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::VertexBuffers].InitAsDescriptorTable(1, &ranges[3]);
+            rootParameters[PhotonGlobalRoot_NoScreenSpaceMap::Slot::VertexBuffers].InitAsDescriptorTable(1, &ranges[4]);
             CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
             SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_photonGlobalRootSignature);
 
@@ -306,7 +310,7 @@ void Application::CreateComputePhotonTilingRootSignature() {
     //ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);// 6 + 3, 0); //number of photon buffers + buckets for tiled rendering
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
-    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 9);
     CD3DX12_ROOT_PARAMETER1 rootParameters[4];
     rootParameters[ComputeRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &ranges[0]);
     rootParameters[ComputeRootSignatureParams::PhotonBuffer].InitAsDescriptorTable(1, &ranges[1]);
@@ -337,7 +341,7 @@ void Application::CreateRasterRootSignatures() {
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
     //vertex RW buffer
-    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 4);
     ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 8);
 
@@ -368,7 +372,7 @@ void Application::CreateCompositeRayRoot() {
     auto device = m_deviceResources->GetD3DDevice();
     CD3DX12_DESCRIPTOR_RANGE ranges[2];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 8);
+    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
 
     CD3DX12_ROOT_PARAMETER rootParams[2];
     rootParams[0].InitAsDescriptorTable(1, &ranges[0]);
@@ -398,7 +402,7 @@ void Application::CreateRootSignatures()
         //photon buffer
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
         //photon tiled map
-        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
+        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 9);
         //3 sets of photon buffers
         ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 4);
         ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH*3, 7);
@@ -420,23 +424,27 @@ void Application::CreateRootSignatures()
         SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_raytracingGlobalRootSignature);
         }
         else {
-            CD3DX12_DESCRIPTOR_RANGE ranges[5];
+            CD3DX12_DESCRIPTOR_RANGE ranges[7];
             ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
             ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
-            ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
-            ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 4);
-            ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
+            ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
+            ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 9);
+            ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 4);
+            ranges[5].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
+            ranges[6].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
 
             CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::Count];
             rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::OutputView].InitAsDescriptorTable(1, &ranges[0]);
-            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::PhotonBuffer].InitAsDescriptorTable(1, &ranges[1]);
-            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::TiledPhotonMap].InitAsDescriptorTable(1, &ranges[2]);
-            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::GBuffer].InitAsDescriptorTable(1, &ranges[3]);
+            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::RasterView].InitAsDescriptorTable(1, &ranges[1]);
+            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::PhotonBuffer].InitAsDescriptorTable(1, &ranges[2]);
+            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::PhotonCounter].InitAsDescriptorTable(1, &ranges[6]);
+            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::TiledPhotonMap].InitAsDescriptorTable(1, &ranges[3]);
+            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::GBuffer].InitAsDescriptorTable(1, &ranges[4]);
             rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::AccelerationStructure].InitAsShaderResourceView(0);
             rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::SceneConstant].InitAsConstantBufferView(0);
             rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::AABBattributeBuffer].InitAsShaderResourceView(3);
             rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::CSGTree].InitAsShaderResourceView(4);
-            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::VertexBuffers].InitAsDescriptorTable(1, &ranges[4]);
+            rootParameters[GlobalRootSignature_NoScreenSpaceMap::Slot::VertexBuffers].InitAsDescriptorTable(1, &ranges[5]);
             CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
 
             SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_raytracingGlobalRootSignature);
@@ -557,7 +565,7 @@ void Application::CreateCompositeRayPipelineStateObject() {
     auto hitGroup = composteRay.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
     hitGroup->SetClosestHitShaderImport(c_compositeHit);
     hitGroup->SetHitGroupExport(c_compositeHitGroup);
-     hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+    hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
     // Shader config
     // Defines the maximum sizes in bytes for the ray rayPayload and attribute structure.
     auto shaderConfig = composteRay.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
@@ -662,84 +670,7 @@ void Application::CreateRasterisationPipeline() {
     auto commandAllocator = m_deviceResources->GetCommandAllocator();
     auto commandList = m_deviceResources->GetCommandList();
 
-    /**
-    CComPtr<IDxcLibrary> library;
-    HRESULT hr = DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(&library));
-    ThrowIfFailed(hr);
-
-
-
-    CComPtr<IDxcCompiler> compiler;
-    hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
-    ThrowIfFailed(hr);
-    LPCWSTR shaderPath = L"/Users/endev/Documents/Honours/DirectX-Graphics-Samples-master/DirectX-Graphics-Samples-master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry/shaders.hlsl";
-  /*  LPCWSTR compatPath = L"/Users/endev/Documents/Honours/DirectX-Graphics-Samples-master/DirectX-Graphics-Samples-master/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingProceduralGeometry/RaytracingHlslCompat.h";
-
-    CComPtr<IDxcIncludeHandler> includeHandler;
-    ThrowIfFailed(library->CreateIncludeHandler(&includeHandler));
-    CComPtr<IDxcBlob> includeSource;
-    includeHandler->LoadSource(compatPath, &includeSource);
-    
-    uint32_t codePage = CP_UTF8;
-    CComPtr<IDxcBlobEncoding> sourceBlob;
-    hr = library->CreateBlobFromFile(shaderPath, &codePage, &sourceBlob);
-
-    CComPtr<IDxcOperationResult> result;
-    hr = compiler->Compile(sourceBlob, shaderPath, L"VSMain", L"vs_6_0", NULL, 0, NULL, 0, NULL, &result);
-
-
-
-    if (SUCCEEDED(hr)) {
-        result->GetStatus(&hr);
-    }
-
-    if (FAILED(hr)) {
-        if (result) {
-            CComPtr<IDxcBlobEncoding> errorsBlob;
-            hr = result->GetErrorBuffer(&errorsBlob);
-            if (SUCCEEDED(hr) && errorsBlob) {
-                const char* error = (const char*)errorsBlob->GetBufferPointer();
-                wchar_t wtext[10000];
-                std::mbstowcs(wtext, error, strlen(error) + 1);
-                LPCWSTR ptr = wtext;
-                OutputDebugString(wtext);
-                ThrowIfFalse(false);
-            }
-        }
-    }
-
-
-    CComPtr<IDxcBlob> code;
-    result->GetResult(&code);
-
-    hr = compiler->Compile(sourceBlob, shaderPath, L"PSMain", L"ps_6_0", NULL, 0, NULL, 0, NULL, &result);
-    if (SUCCEEDED(hr)) {
-        result->GetStatus(&hr);
-    }
-
-    if (FAILED(hr)) {
-        if (result) {
-            CComPtr<IDxcBlobEncoding> errorsBlob;
-            hr = result->GetErrorBuffer(&errorsBlob);
-            if (SUCCEEDED(hr) && errorsBlob) {
-                const char* error = (const char*)errorsBlob->GetBufferPointer();
-                wchar_t wtext[10000];
-                std::mbstowcs(wtext, error, strlen(error) + 1);
-                LPCWSTR ptr = wtext;
-                OutputDebugString(wtext);
-                ThrowIfFalse(false);
-            }
-        }
-    }
-
-    CComPtr<IDxcBlob> psCode;
-    result->GetResult(&psCode);
-
-
-    auto device = m_deviceResources->GetD3DDevice();
-    auto commandAllocator = m_deviceResources->GetCommandAllocator();
-    auto commandList = m_deviceResources->GetCommandList();
-    */
+   
     ComPtr<ID3DBlob> vertexShader;
     ComPtr<ID3DBlob> pixelShader;
 
@@ -793,11 +724,11 @@ void Application::CreateRasterisationPipeline() {
     psoDesc.VS = CD3DX12_SHADER_BYTECODE(vertexShader.Get());
     //psoDesc.PS.BytecodeLength = psCode->GetBufferSize();
     //psoDesc.PS.pShaderBytecode = psCode->GetBufferPointer();
-   psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
-   psoDesc.RasterizerState = raster;
-   //CD3DX12_BLEND_DESC(D3D12_BLEND)
+    psoDesc.PS = CD3DX12_SHADER_BYTECODE(pixelShader.Get());
+    psoDesc.RasterizerState = raster;
+    //CD3DX12_BLEND_DESC(D3D12_BLEND)
    //CD3DX12_BLEND_DESC()
-   psoDesc.BlendState = blender;
+     psoDesc.BlendState = blender;
     psoDesc.DepthStencilState.DepthEnable = FALSE;
     psoDesc.DepthStencilState.StencilEnable = FALSE;
     psoDesc.SampleMask = UINT_MAX;
@@ -990,7 +921,7 @@ void Application::CreatePhotonMappingFirstPassStateObject() {
 
     PrintStateObjectDesc(photonMapping);
 
-    // Create the state object.
+    // Create the state object.y
     ThrowIfFailed(m_dxrDevice->CreateStateObject(photonMapping, IID_PPV_ARGS(&m_photonMapStateObject)), L"Couldn't create DirectX Raytracing state object.\n");
 
 }
@@ -1050,22 +981,33 @@ void Application::CreateRaytracingPipelineStateObject()
 }
 
 void Application::CreateTiledPhotonMap() {
-
     auto device = m_deviceResources->GetD3DDevice();
-    auto backBufferFormat = m_deviceResources->GetBackBufferFormat();
-    {
-        UINT photonsPerTile = 1000;
-        UINT tiles = 20;
-        auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(backBufferFormat, photonsPerTile, 20, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-        auto defaultHeap = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-        ThrowIfFailed(device->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&tiledPhotonMap)));
-        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle; 
-        tiledPhotonMapDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, tiledPhotonMapDescriptorHeapIndex);
-        D3D12_UNORDERED_ACCESS_VIEW_DESC unorderedViewDescription = {};
-        unorderedViewDescription.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-        device->CreateUnorderedAccessView(tiledPhotonMap.Get(), nullptr, &unorderedViewDescription, uavDescriptorHandle);
-        tiledPhotonMapGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), tiledPhotonMapDescriptorHeapIndex, m_descriptorSize);
-    }
+    UINT numTiles = m_width * m_height / 8;
+    UINT numPhotonsPerTile = 1000;
+    //just create RWStructuredBuffer of indices
+
+    { 
+            UINT64 size = sizeof(UINT);
+            UINT64 bufferSize = 20*PHOTON_COUNT * size;
+           /// auto uavDesc = CD3DX12_RESOURCE_DESC::Tex1D(DXGI_FORMAT_R32G32B32_FLOAT, size, 1, 1, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+             auto uavDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+            ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&tiledPhotonMapBuffer)));
+            NAME_D3D12_OBJECT(tiledPhotonMapBuffer);
+
+            tiledPhotonMapUAVDescriptorIndex = AllocateDescriptor(&tiledPhotonMapCPUDescriptor, tiledPhotonMapUAVDescriptorIndex);
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uavPhotonDesc = {};
+            uavPhotonDesc.Buffer.NumElements = PHOTON_COUNT;
+            uavPhotonDesc.Buffer.FirstElement = 0;
+            uavPhotonDesc.Buffer.StructureByteStride = size;
+            uavPhotonDesc.Buffer.CounterOffsetInBytes = 0;
+            uavPhotonDesc.Format = DXGI_FORMAT_UNKNOWN;
+            uavPhotonDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            device->CreateUnorderedAccessView(tiledPhotonMapBuffer.Get(), nullptr, &uavPhotonDesc, tiledPhotonMapCPUDescriptor);
+            tiledPhotonUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), tiledPhotonMapUAVDescriptorIndex, m_descriptorSize);
+        }
+
 }
 void Application::CreatePhotonCountTest() {
     auto device = m_deviceResources->GetD3DDevice();
@@ -1125,7 +1067,8 @@ void Application::CreateRasterOutputResource()
 
 
     D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
-    m_rasterOutputResourceUAVDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, m_rasterOutputResourceUAVDescriptorHeapIndex);
+    //for some reason passing the descriptorheapindex uninitialised messes things up?
+    m_rasterOutputResourceUAVDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, 10);
     D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
     UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
     device->CreateUnorderedAccessView(m_rasterOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
@@ -1205,12 +1148,15 @@ void Application::CreateDeferredGBuffer() {
     auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
     auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
     geometryBuffers.clear();
+    auto firstUav = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UINT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
     for (int i = 0; i < 3; i++) {
         IBuffer geometryBuffer = {};
+   
         ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&geometryBuffer.textureResource)));
         NAME_D3D12_OBJECT(geometryBuffer.textureResource);
         geometryBuffer.uavDescriptorHeapIndex = UINT_MAX;
+        
 
         D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
         geometryBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, geometryBuffer.uavDescriptorHeapIndex);
@@ -1222,37 +1168,7 @@ void Application::CreateDeferredGBuffer() {
         geometryBuffers.push_back(geometryBuffer);
     }
 }
-void Application::CreateIntersectionBuffers() {
-    auto device = m_deviceResources->GetD3DDevice();
-    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
 
-    //want to have dimension = MAX_RAY_RECURSION
-    //format DXGI_FORMAT_R32G32B32A32_FLOAT
-    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-    intersectionBuffers.clear();
-
-    for (int i = 0; i < MAX_RAY_RECURSION_DEPTH*3; i++) {
-        IBuffer intersectionBuffer = {};
-
-        
-        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&intersectionBuffer.textureResource)));
-        NAME_D3D12_OBJECT(intersectionBuffer.textureResource);
-        intersectionBuffer.uavDescriptorHeapIndex = UINT_MAX;
-         
-        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
-        intersectionBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, intersectionBuffer.uavDescriptorHeapIndex);
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-        uavDesc.Texture2DArray.ArraySize = 1;
-        device->CreateUnorderedAccessView(intersectionBuffer.textureResource.Get(), nullptr, &uavDesc, uavDescriptorHandle);
-        intersectionBuffer.uavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), intersectionBuffer.uavDescriptorHeapIndex, m_descriptorSize);
-
-        intersectionBuffers.push_back(intersectionBuffer);
-
-    }
-
-}
 
 
 // Create a 2D output texture for raytracing.
@@ -1277,7 +1193,7 @@ void Application::CreateDescriptorHeap()
     auto device = m_deviceResources->GetD3DDevice();
 
     D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
-    // Allocate a heap for (3 + RAY_DEPTH) descriptors:
+    // Allocate a heap for (3* RAY_DEPTH) descriptors:
     // 2 - vertex and index  buffer SRVs
     // 1 - raytracing output texture SRV
     // n - Interesection Buffers
@@ -1288,7 +1204,8 @@ void Application::CreateDescriptorHeap()
     //2 v, i buffers, 1 output, 1
     //+ 1 raster constant buffer view
     // 1 pixel shader UAV for indirect illumination
-    descriptorHeapDesc.NumDescriptors = 6 + 3*MAX_RAY_RECURSION_DEPTH + 1 + 1 + 3 + 1;
+    //add 20 
+    descriptorHeapDesc.NumDescriptors = 6 + 3*MAX_RAY_RECURSION_DEPTH + 1 + 1 + 3 + 1 + 20;
     descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     descriptorHeapDesc.NodeMask = 0;
@@ -1456,7 +1373,7 @@ void Application::BuildCompositeTable() {
         UINT numShaderRecords = 1;
         UINT shaderRecordSize = shaderIDSize; // No root arguments
 
-        ShaderTable rayGenShaderTable(device, numShaderRecords, shaderRecordSize, L"PhotonRayGenTable");
+        ShaderTable rayGenShaderTable(device, numShaderRecords, shaderRecordSize, L"CompositRayGenTable");
         rayGenShaderTable.push_back(ShaderRecord(rayGenShaderID, shaderRecordSize, nullptr, 0));
         rayGenShaderTable.DebugPrint(shaderIdToStringMap);
         m_compositeRayGenShaderTable = rayGenShaderTable.GetResource();
@@ -1466,7 +1383,7 @@ void Application::BuildCompositeTable() {
         UINT numShaderRecords = 1;
         UINT shaderRecordSize = shaderIDSize; // No root arguments
 
-        ShaderTable missShaderTable(device, numShaderRecords, shaderRecordSize, L"MissPhotonTable");
+        ShaderTable missShaderTable(device, numShaderRecords, shaderRecordSize, L"MissCompositTable");
     
         
             missShaderTable.push_back(ShaderRecord(missShaderID, shaderIDSize, nullptr, 0));
@@ -1481,7 +1398,7 @@ void Application::BuildCompositeTable() {
 
         UINT numShaderRecords = 1;
         UINT shaderRecordSize = shaderIDSize;
-        ShaderTable hitGroupShaderTable(device, numShaderRecords, shaderRecordSize, L"PhotonHitGroupTable");
+        ShaderTable hitGroupShaderTable(device, numShaderRecords, shaderRecordSize, L"CompositHitGroupTable");
 
 
         hitGroupShaderTable.push_back(ShaderRecord(hitGroupOne, shaderIDSize, nullptr, 0));
@@ -1847,7 +1764,7 @@ void Application::DoRasterisation() {
     m_deviceResources->ExecuteCommandList();
     m_deviceResources->WaitForGpu();
     commandList->Reset(commandAllocator, nullptr);
-    commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+  // commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
    // ThrowIfFailed(commandList->Close());
 }
@@ -1867,7 +1784,7 @@ void Application::DoScreenSpacePhotonMapping()
         dispatchDesc->MissShaderTable.StrideInBytes = m_missPhotonTableStrideInBytes;
         dispatchDesc->RayGenerationShaderRecord.StartAddress = m_photonRayGenTable->GetGPUVirtualAddress();
         dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_photonRayGenTable->GetDesc().Width;
-        dispatchDesc->Width = 3000;
+        dispatchDesc->Width = 2000;
         dispatchDesc->Height = 2000;
         dispatchDesc->Depth = 1;
         raytracingCommandList->SetPipelineState1(stateObject);
@@ -1977,7 +1894,7 @@ void Application::DoTiling(UINT tileX, UINT tileY, UINT tileDepth) {
     commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
     commandList->SetComputeRootDescriptorTable(ComputeRootSignatureParams::OutputViewSlot, m_raytracingOutputResourceUAVGpuDescriptor);
     commandList->SetComputeRootDescriptorTable(ComputeRootSignatureParams::PhotonBuffer, photonStructGPUDescriptor);
-    commandList->SetComputeRootDescriptorTable(ComputeRootSignatureParams::TiledPhotonMap, tiledPhotonMapGPUDescriptor);
+    commandList->SetComputeRootDescriptorTable(ComputeRootSignatureParams::TiledPhotonMap, tiledPhotonUAVGpuDescriptor);
 
     
     {
@@ -2001,7 +1918,7 @@ void Application::DoCompositing() {
 
     commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
     commandList->SetComputeRootDescriptorTable(ComputeCompositeRootSignature::Slot::RayTracingView, m_raytracingOutputResourceUAVGpuDescriptor);
-    commandList->SetComputeRootDescriptorTable(ComputeCompositeRootSignature::Slot::RasterView, m_rasterOutputResourceUAVGPUDescriptor);
+   commandList->SetComputeRootDescriptorTable(ComputeCompositeRootSignature::Slot::RasterView, m_rasterOutputResourceUAVGPUDescriptor);
 
     D3D12_DISPATCH_RAYS_DESC compositeDesc = {};
     compositeDesc.RayGenerationShaderRecord.StartAddress = m_compositeRayGenShaderTable->GetGPUVirtualAddress();
@@ -2063,8 +1980,12 @@ void Application::DoRaytracing()
             commandList->SetComputeRootDescriptorTable(GlobalRootSignature_NoScreenSpaceMap::Slot::VertexBuffers, scene->m_indexBuffer.gpuDescriptorHandle);
             commandList->SetComputeRootDescriptorTable(GlobalRootSignature_NoScreenSpaceMap::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
             commandList->SetComputeRootDescriptorTable(GlobalRootSignature_NoScreenSpaceMap::Slot::GBuffer, geometryBuffers[0].uavGPUDescriptor);
-
+            commandList->SetComputeRootDescriptorTable(GlobalRootSignature_NoScreenSpaceMap::Slot::PhotonCounter, photonCounterGpuDescriptor);
             commandList->SetComputeRootDescriptorTable(GlobalRootSignature_NoScreenSpaceMap::Slot::PhotonBuffer, photonStructGPUDescriptor);
+           // commandList->SetComputeRootDescriptorTable(GlobalRootSignature_NoScreenSpaceMap::Slot::RasterView, m_rasterOutputResourceUAVGPUDescriptor);
+            if (tiling) {
+                commandList->SetComputeRootDescriptorTable(GlobalRootSignature_NoScreenSpaceMap::Slot::TiledPhotonMap, tiledPhotonUAVGpuDescriptor);
+            }
            // commandList->SetComputeRootDescriptorTable(GlobalRootSignature_NoScreenSpaceMap::Slot::TiledPhotonMap, tiledPhotonMapGPUDescriptor);
         }
        // commandList->SetComputeRootDescriptorTable(GlobalRootSignature::Slot::TiledPhotonMap, tiledPhotonMapGPUDescriptor);
@@ -2206,16 +2127,18 @@ void Application::CreateWindowSizeDependentResources()
 {
     auto device = m_deviceResources->GetD3DDevice();
     CreateRaytracingOutputResource();
-    CreateCountBuffer();
-    CreatePhotonStructuredBuffer();
-    CreateDeferredGBuffer();
-    if (screenSpaceMap) {
-        CreateIntersectionBuffers();
-    }
-    else {
+    CreateRasterOutputResource();
 
-        //CreateTiledPhotonMap();
+    CreateCountBuffer();
+
+    CreatePhotonStructuredBuffer();
+
+    CreateDeferredGBuffer();
+
+    if (tiling) {
+       /// CreateTiledPhotonMap();
     }
+ 
     //for compute and final gathering stage
    //CreateTiledPhotonMap();
     // CreatePhotonBuffer_2();
@@ -2227,10 +2150,10 @@ void Application::CreateWindowSizeDependentResources()
     //CreatePhotonStructuredBuffer();
     //CreatePhotonBuffer();
     scene->sceneUpdates(0, m_deviceResources, m_rasterConstantBuffer);
-    m_computeConstantBuffer.Create(device, FrameCount, L"ComputeConstants");
+    /*m_computeConstantBuffer.Create(device, FrameCount, L"ComputeConstants");
     m_computeConstantBuffer->cameraDirection = scene->getCameraDirection();
     m_computeConstantBuffer->cameraPos = scene->getCameraPosition();
-    m_computeConstantBuffer->projectionToWorld = XMMatrixInverse(nullptr, scene->GetMVP());
+    m_computeConstantBuffer->projectionToWorld = XMMatrixInverse(nullptr, scene->GetMVP());*/
     //memcpy
   
 }
@@ -2260,7 +2183,13 @@ void Application::ReleaseDeviceDependentResources()
     m_dxrDevice.Reset();
     m_dxrCommandList.Reset();
     m_dxrStateObject.Reset();
+    m_photonMapStateObject.Reset();
+    m_rasterState.Reset();
+    m_rasterRootSignature.Reset();
 
+    m_photonGlobalRootSignature.Reset();
+    ResetComPtrArray(&m_photonLocalRootSignature);
+    
     m_raytracingGlobalRootSignature.Reset();
     ResetComPtrArray(&m_raytracingLocalRootSignature);
 
@@ -2274,13 +2203,16 @@ void Application::ReleaseDeviceDependentResources()
     m_raytracingOutput.Reset();
     m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 
+    m_rasterOutput.Reset();
+    m_rasterOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
+
     photonStructBuffer.Reset();
     photonStructGpuHeapIndex = UINT_MAX;
     photonCountBuffer.Reset();
     photonCountUavDescriptorHeapIndex = UINT_MAX;
 
-    tiledPhotonMap.Reset();
-    tiledPhotonMapDescriptorHeapIndex = UINT_MAX;
+    tiledPhotonMapBuffer.Reset();
+    tiledPhotonMapUAVDescriptorIndex = UINT_MAX;
     for (auto& I : intersectionBuffers) {
         I.textureResource.Reset();
         I.uavDescriptorHeapIndex = UINT_MAX;
@@ -2305,71 +2237,27 @@ void Application::RecreateD3D()
 }
 
 
-void Application::CopyIntersectionToCPU() {
-    auto queue = m_deviceResources->GetCommandQueue();
-    auto device = m_deviceResources->GetD3DDevice();
+
+void Application::CopyBackBufferToRasterBuffer() {
+    auto commandList = m_deviceResources->GetCommandList();
     auto renderTarget = m_deviceResources->GetRenderTarget();
-   
-    
-   /* ComPtr<ID3D12CommandAllocator> commandAlloc;
-    ComPtr<ID3D12GraphicsCommandList> commandList;
-    ComPtr<ID3D12Fence> fence;
-    ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&commandAlloc)));
-    ThrowIfFailed(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAlloc.Get(), nullptr, IID_PPV_ARGS(&commandList)));
-    ThrowIfFailed(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
-
-    UINT fenceValue = 0;
-    queue->Signal(fence.Get(), fenceValue);
-  
+    auto commandAllocator = m_deviceResources->GetCommandAllocator();
     D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-    D3D12_RESOURCE_BARRIER gBufferBarrier{
-        CD3DX12_RESOURCE_BARRIER::Transition(intersectionBuffers[1].textureResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE)
-    };
-    commandList->ResourceBarrier(1, &gBufferBarrier);
-    
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT bufferFootPrint = {};
-    bufferFootPrint.Footprint.Width = m_width;
-    bufferFootPrint.Footprint.Height = m_height;
-    bufferFootPrint.Footprint.Depth = 1;
-    bufferFootPrint.Footprint.RowPitch = sizeof(XMFLOAT4) * m_width;
-    bufferFootPrint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_rasterOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
+    commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
 
-    CD3DX12_TEXTURE_COPY_LOCATION copyDest(outputBuffer.Get(), bufferFootPrint);
-    CD3DX12_TEXTURE_COPY_LOCATION copySrc(intersectionBuffers[1].textureResource.Get(), 0);
+    commandList->CopyResource(m_rasterOutput.Get(), renderTarget);
 
-    commandList->CopyTextureRegion(&copyDest, 0, 0, 0, &copySrc, nullptr);
+    D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_rasterOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
-    D3D12_RESOURCE_BARRIER reTrans{
-    CD3DX12_RESOURCE_BARRIER::Transition(intersectionBuffers[1].textureResource.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-    };
-    commandList->ResourceBarrier(1, &reTrans);
-    ThrowIfFailed(commandList->Close());
-    queue->ExecuteCommandLists(1, CommandListCast(commandList.GetAddressOf()));
+    commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+    m_deviceResources->ExecuteCommandList();
+
     m_deviceResources->WaitForGpu();
-
-
-    XMFLOAT4* readBack;
-    outputBuffer->Map(0, nullptr, reinterpret_cast<void**>(&readBack));
-    
-    std::vector<XMFLOAT4> values;
-    for (int i = 0; i < m_width * m_height; i++) {
-        values.push_back(readBack[i]);
-    }
-
-    D3D12_RANGE empty{ 0, 0 };
-    outputBuffer->Unmap(0, &empty);
-    
-   */std::vector<float> pixelData;
-    
-     ScratchImage result;
-     auto c = CaptureTexture(queue, m_raytracingOutput.Get(), false, result, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-      const DirectX::Image *image = result.GetImages();
-    
-      //auto pixels = result.GetPixels();
-
-      //ThrowIfFailed(DirectX::SaveToDDSFile(result.GetImages(), result.GetImageCount(), result.GetMetadata(), DDS_FLAGS_NONE, L"File.DDS"));
-
-      
+    commandList->Reset(commandAllocator, nullptr);
 }
 
 // Render the scene.
@@ -2390,19 +2278,24 @@ void Application::OnRender()
         gpuTimer.BeginFrame(commandList);
     }
 
-    DoScreenSpacePhotonMapping();
- //  DoTiling(1024, 720, 1);
+   if (!mapped) {
+       DoScreenSpacePhotonMapping();
+       mapped = true;
+   }
+   //  DoTiling(1024, 720, 1);
     //deferred rendering + direct lighting
       DoRaytracing();
    // CopyGBufferToBackBuffer();
     //rasterise photon volumes - indirect lighting
-     // CopyRaytracingOutputToBackbuffer();
+    //  CopyRaytracingOutputToBackbuffer();
 
     DoRasterisation();
-   // CopyRaytracingOutputToBackbuffer();
+    CopyBackBufferToRasterBuffer();
+    DoCompositing();
+
+   CopyRaytracingOutputToBackbuffer();
 
     //DoCompositing();
-    //CompositeIndirectAndDirectIllumination();
 //
 
    // DoRaytracing();

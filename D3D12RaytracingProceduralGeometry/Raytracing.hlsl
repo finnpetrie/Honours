@@ -16,35 +16,21 @@
 //  l_* - bound via a local root signature.
 RaytracingAccelerationStructure g_scene : register(t0, space0);
 RWTexture2D<float4> g_renderTarget : register(u0);
-RWTexture2D<float4> g_rasterTarget : register(u8);
+RWTexture2D<float4> g_rasterTarget : register(u1);
 
-RWStructuredBuffer<Photon> photonBuffer : register(u1);
-RWByteAddressBuffer photonBufferCounter : register(u2);
-RWTexture2D<uint> tiledPhotonMap : register(u3);
+RWStructuredBuffer<Photon> photonBuffer : register(u2);
+RWByteAddressBuffer photonBufferCounter : register(u3);
+RWStructuredBuffer<uint> tiledPhotonMap : register(u9);
 
 RWTexture2D<float4> GBufferBRDF : register(u4);
 RWTexture2D<float4> GBufferPosition : register(u5);
 RWTexture2D<float4> GBufferNormal : register(u6);
-//RWTexture2D<float4> screenSpacePhoton[5] : register(u4);
-//RWTexture2D<float4> screenSpacePhotonColour[5]: register(u10);
-//RWTexture2D<float4> screenSpacePhotonDirection[5] : register(u15);
+
 
 ConstantBuffer<SceneConstantBuffer> g_sceneCB : register(b0);
 
 
-//ConstantBuffer<CSGNode> g_CSGBuffer : register(b1);
-//RWTexture2D<float4> screenSpacePhotonMap [5]: register(u1);
-//RWBuffer<float4> g_buffer : register(u7);
-//we assume the first index is a counter
 
-//RWTexture1D<float4> photonBuffer : register(u1);
-
-//RWBuffer<uint> photonCount : register(u3);
-/*RWTexture1D<float3> photonPosition : register(u7);
-RWTexture1D<float3> photonColour : register(u8);
-RWTexture1D<float3> photonDirection : register(u9);*/
-
-//RWTexture1D<uint> photonMount : register (u1);
 // Triangle resources
 ByteAddressBuffer g_indices : register(t1, space0);
 StructuredBuffer<Vertex> g_vertices : register(t2, space0);
@@ -401,6 +387,15 @@ inline void GetTileIndex(float3 rayHitPosition, out uint tileIndex) {
 void CompositeRayGen() {
     //add corresponding RTVs together.
     uint2 index = DispatchRaysIndex().xy;
+    g_renderTarget[index] += g_rasterTarget[index];
+   /* for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+            uint2 i = uint2(dx, dy);
+            g_renderTarget[index] += g_renderTarget[i];
+        }
+    }
+
+    g_renderTarget[index] = normalize(g_renderTarget[index]);*/
    // g_renderTarget[index] += float4(1, 1, 0, 0);
     //g_rasterTarget[index] = float4(1, 1, 0, 0);
     //
@@ -419,7 +414,8 @@ void CompositeMiss(inout RayPayload rayPayload) {
 }
 [shader("raygeneration")]
 void Photon_Ray_Gen() {
-    g_renderTarget[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
+
+    //g_renderTarget[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
   /* for (int i = 0; i < 6; i++) {
         screenSpacePhoton[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
         screenSpacePhotonColour[i][DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
@@ -441,7 +437,7 @@ void Photon_Ray_Gen() {
     g_renderTarget.GetDimensions(width, height);
     float2 screenDims = float2(width, height);
 
-    float power = dot(g_sceneCB.lightDiffuseColor, float3(1, 1, 1))/(2* TWO_PI) *(1/(width * height)); //number of photons to be emitted
+    float power = 1/(width * height); //number of photons to be emitted
 
     PhotonPayload payload = { float4(0,0,0,0), g_sceneCB.lightDiffuseColor,
      power, 0 };
@@ -689,6 +685,7 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
         }
         else {
             Ray r = { pos, reflect(dir, normal) };
+            TracePhotonRay(r, payload);
             // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
         }
         float reflectMulti = FresnelAmount(n1, n2, normal, dir);
@@ -756,7 +753,8 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
             index = n1 / n2;
             if (refractTest(dir, outwardNormal, index, refracted)) {
                 Ray r = { pos, refracted };
-                refractPos = TracePhotonRay(r, payload).position;
+                payload.colour *= 2 * l_materialCB.refractiveCoef;
+                TracePhotonRay(r, payload);
             }
             else {
                 Ray r = { pos, reflect(dir, attr.normal) };
@@ -769,7 +767,7 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
         //if reflective surface, trace photons based on specular reflections.
         if (l_materialCB.reflectanceCoef > 0.1f) {
             Ray r = { pos, reflect(dir, attr.normal) };
-            payload.colour *= l_materialCB.reflectanceCoef;
+          //  payload.colour *= 2*l_materialCB.reflectanceCoef;
 
             reflectPos = TracePhotonRay(r, payload).position;
         }
@@ -894,7 +892,11 @@ void PathTracingClosestHitProcedural(inout RayPayload rayPayload, in ProceduralP
 //***************************************************************************
 [shader("raygeneration")]
 void MyRaygenShader()
-{
+{    
+    g_renderTarget[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
+
+   // g_rasterTarget[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
+
    // photonBufferCounter.Store(0, 0);
 
     //photonBuffer.DecrementCounter();
@@ -910,7 +912,7 @@ void MyRaygenShader()
     GBufferNormal[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
 
 
- /*   for (int i = 0; i < 100; i++) {
+    /*  for (int i = 0; i < 100; i++) {
         Photon p = photonBuffer[i + DispatchRaysIndex().x + i*DispatchRaysIndex().y];
         VisualizePhoton(p.position, p.colour, screenDims);
     }*/
@@ -935,7 +937,7 @@ void MyRaygenShader()
     RayPayload traced = TraceRadianceRay(r, payload);
 
     // Write the raytraced color to the output texture.
-    g_renderTarget[DispatchRaysIndex().xy] +=  traced.color; //+ screenSpacePhotonMap[0][samplePoint];
+    g_renderTarget[DispatchRaysIndex().xy] =  traced.color; //+ screenSpacePhotonMap[0][samplePoint];
     //uint offset = 0;
 
     //if drawing rays,   need to write the intersections for this ray into a 3D tensor.
@@ -984,7 +986,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
     uint depth = rayPayload.recursionDepth;
 
-
+   
     Ray shadowRay;
     shadowRay.origin = HitWorldPosition();
     shadowRay.direction = dir;
@@ -993,7 +995,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float4 reflectionColour = float4(0, 0, 0, 0);
     if (!shadowHit) {
         //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
-       ambient = 0.1* PhongLighting(normal, shadowHit);
+       ambient += 0.1* PhongLighting(normal, shadowHit);
 
     }
     else {

@@ -17,6 +17,7 @@ namespace GlobalRootSignature {
     namespace Slot {
         enum Enum {
             OutputView = 0,
+            RasterView,
             PhotonBuffer,
             TiledPhotonMap,
             SceenSpaceMap,
@@ -34,14 +35,17 @@ namespace GlobalRootSignature_NoScreenSpaceMap {
     namespace Slot {
         enum Enum {
             OutputView = 0,
+            RasterView,
             PhotonBuffer,
-            TiledPhotonMap,
+            PhotonCounter,
             GBuffer,
             AccelerationStructure,
             SceneConstant,
             AABBattributeBuffer,
             VertexBuffers,
             CSGTree,
+            TiledPhotonMap,
+
             Count
         };
     }
@@ -60,6 +64,7 @@ namespace PhotonGlobalRoot {
     namespace Slot {
         enum Enum {
             OutputView = 0,
+            RasterView,
             PhotonBuffer,
             PhotonCounter,
             ScreenSpaceMap,
@@ -78,6 +83,7 @@ namespace PhotonGlobalRoot_NoScreenSpaceMap {
     namespace Slot {
         enum Enum {
             OutputView = 0,
+            RasterView,
             PhotonBuffer,
             PhotonCounter,
             AccelerationStructure,

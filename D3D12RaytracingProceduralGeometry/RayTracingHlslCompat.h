@@ -40,7 +40,7 @@ typedef UINT32 Vertex_Index;
 // PERFORMANCE TIP: Set max recursion depth as low as needed
 // as drivers may apply optimization strategies for low recursion depths.
 #define MAX_RAY_RECURSION_DEPTH 6    // ~ primary rays + reflections + shadow rays from reflected geometry.
-#define PHOTON_COUNT 1000000
+#define PHOTON_COUNT 10000
 
 struct ProceduralPrimitiveAttributes
 {
