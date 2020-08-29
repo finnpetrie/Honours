@@ -44,8 +44,8 @@ RWTexture2D<float4> rasterTarget : register(u8);
 PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, float4 color : COLOR)
 {
         float lMax = 100;
-        float maxMajorKernelRadius = 20;
-        float minMajKernelRadius = 0.01;
+        float maxMajorKernelRadius = 40;
+        float minMajKernelRadius = 0.1;
         float pi = 3.1415926535897932384626422832795028841971f;
 
         PSInput result;
@@ -134,7 +134,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     
      float r_1 = input.u_radius;
      float r_2 = input.t_radius;
-     float r = 0.18;
+     float r = 0.12;
      // float r = input.kernelMinor + (sqrt(input.majKernelRadius) - )
      //float r = input.majKernelRadiusSquared;
      float p_a = -beta * (distance2 / (2 * r * r));

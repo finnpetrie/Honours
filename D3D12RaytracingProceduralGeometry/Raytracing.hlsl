@@ -157,7 +157,7 @@ PhotonPayload TracePhotonRay(in Ray ray, in PhotonPayload payload) {
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.001;
+    rayDesc.TMin = 0.01;
     rayDesc.TMax = 10000;
 
     payload.recursionDepth += 1;
@@ -187,7 +187,7 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.001;
+    rayDesc.TMin = 0.01;
     rayDesc.TMax = 10000;
   
     payload.recursionDepth += 1;
@@ -215,7 +215,7 @@ bool ShadowRay(in Ray ray, in UINT currentRayRecursionDepth) {
     RayDesc rayDesc;
     rayDesc.Origin = ray.origin;
     rayDesc.Direction = ray.direction;
-    rayDesc.TMin = 1;
+    rayDesc.TMin = 0.1;
     rayDesc.TMax = 10000;
 
     ShadowRayPayload shadow = { true };
@@ -1250,43 +1250,6 @@ CSGNode Pop(inout CSGNode csgStack[15], inout int nodePointer) {
     nodePointer -= 1;
     return popped;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 void CSGCombine(in int operation, in intersectionInterval left, in intersectionInterval right, inout float tmin, inout float tmax, inout float3 normal, inout bool hit) {
