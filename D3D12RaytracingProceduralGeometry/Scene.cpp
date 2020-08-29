@@ -93,7 +93,7 @@ void Scene::Init(float m_aspectRatio)
     {
         if (quatJulia) {
             using namespace SignedDistancePrimitive;
-            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.2, 0.1, 0.2, 0),10, 2.4, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.2, 0.1, 0.2, 0),0, 2.4, 1.0f, 0.7f, 50, 1.0f);
 
         }
         offset += SignedDistancePrimitive::Count;
@@ -479,7 +479,7 @@ void Scene::CreateGeometry() {
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.2, 0.1, 0), 1, 1.5, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.2, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.2, 0.0, 0.1, 0), 1, 1, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.1, 0.01, 0.4, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.4, 0.01, 0.1, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 0, 0.0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 0, 0, 1, 0.4f, 50, 1 };
 

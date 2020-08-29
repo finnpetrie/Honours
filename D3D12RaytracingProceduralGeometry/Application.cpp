@@ -1821,13 +1821,17 @@ void Application::DoScreenSpacePhotonMapping()
         
     };
 
+    CreateCountBuffer();
+
+    CreatePhotonStructuredBuffer();
+
     const FLOAT f[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     //const INT values[4] = { 0, 0, 0, 0 };
     //commandList->ClearUnorderedAccessViewUint(photonCounterGpuDescriptor, photonCountCPUDescriptor , photonCountBuffer.Get(), 0, 0, nullptr);
    // commandList->ClearUnorderedAccessViewFloat(photonStructGPUDescriptor, photonStructCPUDescriptor , photonStructBuffer.Get(),f , 0, nullptr);
 //commandList->
     commandList->SetComputeRootSignature(m_photonGlobalRootSignature.Get());
-
+   
     // Copy dynamic buffers to GPU.
     {
         if (screenSpaceMap) {
@@ -2278,10 +2282,8 @@ void Application::OnRender()
         gpuTimer.BeginFrame(commandList);
     }
 
-   if (!mapped) {
-       DoScreenSpacePhotonMapping();
-       mapped = true;
-   }
+      DoScreenSpacePhotonMapping();
+   
    //  DoTiling(1024, 720, 1);
     //deferred rendering + direct lighting
       DoRaytracing();

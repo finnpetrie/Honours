@@ -180,7 +180,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // rasterTarget[input.position.xy] += color;
     // return  input.color;
      // return  float4(distance2, distance2, distance2, 0);
-     return color;
+     return 2*color;
      // return 22*float4(n_o, n_o, n_o, n_o);//float4(gauss, gauss, gauss, gauss);//float4(gauss, gauss, gauss, gauss);
       //return float4(color.xyz, weighted_direction.x)
     // return input.position;*/
