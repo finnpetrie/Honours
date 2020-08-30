@@ -44,7 +44,7 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     case AnalyticPrimitive::Paraboloid: return RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::Cylinder: return RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::Cone: return  RayQuadric(ray, thit, attr, analyticPrimitive);
-    case AnalyticPrimitive::Plane: return rayPlane(ray, t_min, t_max, thit, attr, float3(1, 0, 0), 1, float3(0, 0, 0));
+    case AnalyticPrimitive::Plane: return rayPlane(ray, t_min, t_max, thit, attr, float3(1, 0, 0), 20, float3(0, 0, 0));
 
     default: return false;
     }
@@ -100,7 +100,7 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
     
     case SignedDistancePrimitive::QuaternionJulia: 
         float3 trap;
-       return juliaMap(position.xyz, trap,  float4(0.6, 0.6, 0.6, 0.6));
+       return juliaMap(position.xyz, trap,  float4(0, 0, 0, 0));
        // return sdTorus82(position, float2(0.75, 0.15));
         //return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
       // return sdGyroid(position);

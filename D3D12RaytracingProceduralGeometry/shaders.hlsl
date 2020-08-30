@@ -20,7 +20,7 @@ struct PSInput
     nointerpolation float kernelMinor : SMALL_RADIUS;
     nointerpolation float u_radius : U_AXIS;
     nointerpolation float t_radius : T_AXIS;
-
+    nointerpolation float3x3 eInverse : ELLIPSOID_INVERSE;
 
 };
 
@@ -97,7 +97,14 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
         float majKernel2 = majKernelRadius * majKernelRadius;
 
         float4 projectedPos = mul(proj, float4(photon.position.xyz, 1));
-   
+    
+
+        float3x3 ellipsoidBasis = float3x3(normalize(u), normalize(photon.normal.xyz), normalize(toT) );
+
+
+        //we know the ellipsoid basis is orthnormal (at least we can make it orthonormal), therefore its tranpose is its inverse
+        float3x3 eInverse = transpose(ellipsoidBasis);
+        
         result.majKernelRadiusSquared = majKernel2;
         result.invMajKernelRadius = invMajorKernelR;
         result.position = c;
@@ -110,7 +117,7 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
         result.normal = photon.normal;
         result.u_radius = length(scaled_u);
         result.t_radius = length(toT);
-
+        result.eInverse = eInverse;
         return result;
 
 }
@@ -122,9 +129,11 @@ float4 PSMain(PSInput input) : SV_TARGET
 
      float4 pos = GBufferPosition[input.position.xy];
      //max distance between photon and position
-
+     float3x3 eInverse = input.eInverse;
 
      float4 axis = pos - input.originalPosition;
+     //map axis to the standard basis
+     float3 axisE = mul(eInverse, axis.xyz);
 
      float beta = 1.953;
      float alpha = 0.918;
@@ -133,12 +142,16 @@ float4 PSMain(PSInput input) : SV_TARGET
     // float relativeDistance = sqrt(distance2 * dot(axis.xyz, input.normal.xyz) * dot(axis.xyz, input.normal.xyz));
     
      float r_1 = input.u_radius;
-     float r_2 = input.t_radius;
+     float r_3 = input.t_radius;
+     float r_2 = 1;
+
      float r = 0.12;
      // float r = input.kernelMinor + (sqrt(input.majKernelRadius) - )
      //float r = input.majKernelRadiusSquared;
      float p_a = -beta * (distance2 / (2 * r * r));
-     float exponentCoeff = -((axis.x * axis.x) / (2 * r_1 * r_1) + (axis.y * axis.y) / (2 * r_2 * r_2) + (axis.z * axis.z) / (2 * r * r));
+     float exponentCoeff = -((axisE.x * axisE.x) / (2 * r_1 * r_1) + (axisE.y * axisE.y) / (2 *r_2 * r_2) + (axisE.z * axisE.z) / (2 * r_3 * r_3));
+     
+     float expOther = -((axis.x * axis.x) / (2 * r_1 * r_1) + (axis.y * axis.y) / (2 * r_2 * r_2) + (axis.z * axis.z) / (2 * r * r));
      float symExponent = -(distance2) / (2 * r * r);
      // float gaussianExponent = exp(-())
     // float gauss = 1/(2*pi)*r
@@ -147,7 +160,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      float JensenGauss = alpha*(1 - ((1 - exp(p_a)) / (1 - exp(-p_a))));
 
      // float4 pos = GBufferPosition[input.position.xy];
-      //float dist = sqrt(dot(pos - original))
+      //float dist = sqrt(dot(pos - original)) 
 
      float4 normal = GBufferNormal[input.position.xy];
 
@@ -171,7 +184,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      // float4 color = BRDF * kernel
      float n_o = wp / nor;
          //float4 color = (float4(BRDF.x * input.color.x, BRDF.y * input.color.y, BRDF.z * input.color.z, 1));// *maxima * wp) / (1 - 2 / 3 * k) * pi * r * r * r * r;//divided by distance?
-     float4 color = (BRDF * input.color) * max(0, k_L) * symmetricGauss;
+     float4 color = ( BRDF*input.color) * max(0, k_L) * symmetricGauss;
      float totalPower = dot(color.xyz, float3(1.0f, 1.0f, 1.0f));
      float3 weighted_direction = totalPower * input.direction.xyz;
     
@@ -180,7 +193,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // rasterTarget[input.position.xy] += color;
     // return  input.color;
      // return  float4(distance2, distance2, distance2, 0);
-     return 2*color;
+     return color;
      // return 22*float4(n_o, n_o, n_o, n_o);//float4(gauss, gauss, gauss, gauss);//float4(gauss, gauss, gauss, gauss);
       //return float4(color.xyz, weighted_direction.x)
     // return input.position;*/
