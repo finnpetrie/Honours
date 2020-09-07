@@ -161,6 +161,25 @@ inline Ray GenerateCameraRay(uint2 index, in float3 cameraPosition, in float4x4 
     return ray;
 }
 
+inline Ray GenerateCameraPath(uint2 index, in float3 cameraPosition, in float4x4 projectionToWorld)
+{
+    float2 xy = index; 
+    float2 screenPos = xy / DispatchRaysDimensions().xy * 2.0 - 1.0;
+
+    // Invert Y for DirectX-style coordinates.
+    screenPos.y = -screenPos.y;
+
+    // Unproject the pixel coordinate into a world positon.
+    float4 world = mul(float4(screenPos, 0, 1), projectionToWorld);
+    world.xyz /= world.w;
+
+    Ray ray;
+    ray.origin = cameraPosition;
+    ray.direction = normalize(world.xyz - ray.origin);
+
+    return ray;
+}
+
 // Test if a hit is culled based on specified RayFlags.
 bool IsCulled(in Ray ray, in float3 hitSurfaceNormal)
 {

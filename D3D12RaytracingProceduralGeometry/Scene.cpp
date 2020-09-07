@@ -22,6 +22,12 @@ Scene::Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources)
     m_sceneCB.Create(device, frameCount, L"Scene Constant Buffer");
     m_sceneCB->accumulatedFrames = 0;
     m_sceneCB->spp = 12;
+    m_sceneCB->frameNumber = frameCount;
+    srand((unsigned int)time(NULL));
+    m_sceneCB->rand1 = rand();
+    m_sceneCB->rand2 = rand() % 1000000;;
+    m_sceneCB->rand3 = rand() % 1000000;;
+    m_sceneCB->rand4 = rand() % 1000000;;
 }
 
 
@@ -94,7 +100,7 @@ void Scene::Init(float m_aspectRatio)
     {
         if (quatJulia) {
             using namespace SignedDistancePrimitive;
-            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.1, 0.1, 0.1, 0),1, 2, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.0, 0.1, 0.1, 0),1, 2, 1.0f, 0.7f, 50, 1.0f);
 
         }
         offset += SignedDistancePrimitive::Count;
@@ -392,7 +398,8 @@ void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResource
 {
     camera->Update(m_sceneCB, m_rasterConstantBuffer);
     UpdateAABBPrimitiveAttributes(animationTime, m_deviceResources);
-
+    m_sceneCB->frameNumber = frameCount;
+    frameCount += 1;
     if (m_animateLights)
     {
         float secondsToRotateAround = 8.0f;
@@ -401,14 +408,24 @@ void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResource
         const XMVECTOR& prevLightPosition = m_sceneCB->lightPosition;
         //
         m_sceneCB->lightPosition = XMVector3Transform(prevLightPosition, rotate);
-        if (camera->moving) {
-            m_sceneCB->accumulatedFrames = 0;
-            camera->moving = false;
-        }
-        else {
-            m_sceneCB->accumulatedFrames += 1;
-        }
+
     }
+
+    srand((unsigned int)time);
+   
+    m_sceneCB->rand1 = rand() ;
+    m_sceneCB->rand2 = rand();
+    m_sceneCB->rand3 = rand();
+    m_sceneCB->rand4 = rand();
+    if (camera->moving) {
+        m_sceneCB->accumulatedFrames = 0;
+        camera->moving = false;
+    }
+    else {
+        m_sceneCB->accumulatedFrames += 1;
+    }
+   // LPCSTR s = LPCSTR(m_sceneCB->accumulatedFrames);
+   // OutputDebugStringA(s);
  //   m_sceneCB->lightPosition = camera->getPosition();
 }
 

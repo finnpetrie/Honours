@@ -1968,7 +1968,6 @@ void Application::OnUpdate()
     float elapsedTime = static_cast<float>(m_timer.GetElapsedSeconds());
     auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
     auto prevFrameIndex = m_deviceResources->GetPreviousFrameIndex();
-   
     scene->sceneUpdates(m_animateGeometryTime, m_deviceResources, m_rasterConstantBuffer, m_animateLight, elapsedTime);
    //_rasterConstantBuffer->mvp = scene->GetMVP();
     //upload compute constants

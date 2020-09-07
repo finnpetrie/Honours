@@ -426,8 +426,28 @@ inline void GeneratePhoton(float2 samplePoint, float2 sampleSpace, out float3 or
     float2 randomSample = float2(rand_xorshift(), rand_xorshift());
     rayDir = SquareToSphereUniform(randomSample);
 }
-uint wang_hash(uint seed)
+uint wang_hash_original(uint seed)
 {
+    seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
+    seed *= uint(9);
+    seed = seed ^ (seed >> 4);
+    seed *= uint(0x27d4eb2d);
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
+
+uint wang_hasher(uint seed)
+{
+    seed = (seed ^ 61) ^ (seed >> 16);
+    seed *= 9;
+    seed = seed ^ (seed >> 4);
+    seed *= 0x27d4eb2d;
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
+uint wang_hash(uint seed, int x , int y)
+{
+    seed = seed + 76.897898 * 48.789789 * cos(x) * sin(y) * 20.79797;
     seed = (seed ^ 61) ^ (seed >> 16);
     seed *= 9;
     seed = seed ^ (seed >> 4);
@@ -438,7 +458,7 @@ uint wang_hash(uint seed)
 float chessBoard(float3 pos) {
 
     float chess = floor(sqrt(pos.x * pos.x + pos.z * pos.z)) + floor(atan(pos.z / pos.x));
-    // chess = floor(pos.x) + floor(pos.z);
+    chess = floor(pos.x) + floor(pos.z);
     chess = frac(chess * 0.5);
     chess *= 2;
     if (chess == 0.0) {
@@ -628,7 +648,7 @@ void Photon_Ray_Gen() {
 
     for (int i = 0; i < 1; i++) {
        // float3 direction = randomDirection(DispatchRaysIndex().xy + i);
-        rng_state = uint(wang_hash(samplePoint.x + i + DispatchRaysDimensions().x * samplePoint.y));
+        rng_state = uint(wang_hash_original(samplePoint.x + i + DispatchRaysDimensions().x * samplePoint.y));
 
         float2 rand = float2(rand_xorshift(), rand_xorshift());
         float3 dir = normalize(SquareToSphereUniform(rand));
@@ -909,7 +929,7 @@ PathTracingPayload TraceForwardPath(in Ray ray, in PathTracingPayload payload)
 {
     if (payload.recursionDepth >= MAX_RAY_RECURSION_DEPTH)
     {
-        payload.colour = float4(1, 1, 1, 1);
+        //payload.colour = float4(1, 1, 1, 1);
         return payload;
     }
 
@@ -936,23 +956,58 @@ PathTracingPayload TraceForwardPath(in Ray ray, in PathTracingPayload payload)
 }
 
 
+
+// "GPU Random Numbers via the Tiny Encryption Algorithm"
+uint tea(uint val0, uint val1)
+{
+    uint v0 = val0;
+    uint v1 = val1;
+    uint s0 = 0;
+
+    for (uint n = 0; n < 16; n++)
+    {
+        s0 += 0x9e3779b9;
+        v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);
+        v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);
+    }
+
+    return v0;
+}
+
+// Generate a random unsigned int in [0, 2^24) given the previous RNG state
+// using the Numerical Recipes linear congruential generator
+uint lcg(inout uint prev)
+{
+    uint LCG_A = 1664525u;
+    uint LCG_C = 1013904223u;
+    prev = (LCG_A * prev + LCG_C);
+    return prev & 0x00FFFFFF;
+}
+
+// Generate a random float in [0, 1) given the previous RNG state
+float rando(inout uint prev)
+{
+    return (float(lcg(prev)) / float(0x01000000));
+}
+float reseed(inout uint seed) {
+    float r = wang_hasher(seed) * (1.0 / 4294967296.0);
+    seed += 2000;
+    return r;
+}
+
+float InterleavedGradientNoise(float2 xy) {
+    return frac(52.9829189f
+        * frac(xy.x * 0.06711056f
+            + xy.y * 0.00583715f));
+}
+
+
 [shader("raygeneration")]
 void ForwardPathTracingRayGen() {
     float2 samplePoint = DispatchRaysIndex().xy;
     uint spp = g_sceneCB.spp;
 
-    /*  for (int i = 0; i < 100; i++) {
-        Photon p = photonBuffer[i + DispatchRaysIndex().x + i*DispatchRaysIndex().y];
-        VisualizePhoton(p.position, p.colour, screenDims);
-    }*/
 
-    /*  for (int i = 0; i < 6; i++) {
-          float4 photon = screenSpacePhoton[i][samplePoint];
-          float4 colour = screenSpacePhotonColour[i][samplePoint];
-          VisualizePhoton(photon, colour, screenDims);
-      }*/
-
-      // VisualizePhotonBuffer( screenDims);
 
     uint accumulatedFrames = g_sceneCB.accumulatedFrames;
    
@@ -961,41 +1016,101 @@ void ForwardPathTracingRayGen() {
     if (accumulatedFrames == 0) {
         spp = 4;
     }
-    for (int i = 0; i < spp; i++) {
-        rng_state = uint(wang_hash(samplePoint.x + DispatchRaysDimensions().x * samplePoint.y + accumulatedFrames + i));
+    uint ran = uint(uint(samplePoint.x) * uint(1973) + uint(samplePoint.y) * uint(9277) + uint(g_sceneCB.frameNumber) * uint(26699)) | uint(1);
+    for (int i = 0; i < 1; i++) {
+        //uint random_state = uint(wang_hasher(samplePoint.x + i* DispatchRaysDimensions().y + samplePoint.y * DispatchRaysDimensions().x)) * 100;
 
-        float2 rand = float2(rand_xorshift(), rand_xorshift());
-
-        float2 screen_coord = float2(samplePoint)+rand;
+        //float r1 = reseed(random_state);
+        //float r2 = reseed(random_state);
+        //float2 rado = float2(r1, r2);
+        //uint4 state = (g_sceneCB.rand1 + samplePoint.x, g_sceneCB.rand2 + samplePoint.y, g_sceneCB.rand3 + samplePoint.x * samplePoint.y, g_sceneCB.rand4 + i + samplePoint.x * samplePoint.y * accumulatedFrames);
+        //RandomResult ra = Random(state);
+        //RandomResult r2 = Random(state);
+       // uint seed = tea(samplePoint.y * DispatchRaysDimensions().x + samplePoint.x , g_sceneCB.rand1);
+        //float r1 = rando(seed);
+        //float r2 = rand(seed);
+        //float2 rand = float2(wang_hash_original(rng_state), wang_hash_original(rng_state));
+        
+        float2 screen_coord = float2(samplePoint) ;
 
         
-        Ray r = GenerateCameraRay(screen_coord, g_sceneCB.cameraPosition.xyz, g_sceneCB.projectionToWorld);
+        Ray r = GenerateCameraPath(screen_coord, g_sceneCB.cameraPosition.xyz, g_sceneCB.projectionToWorld);
 
         //set seed.
-        PathTracingPayload payload = { float4(0,0,0,0),rand.x, 0 };
-        PathTracingPayload traced = TraceRadianceRay(r, payload);
+        PathTracingPayload payload = { float4(0,0,0,0), 0, ran };
+        PathTracingPayload traced = TraceForwardPath(r, payload);
 
        radiance += traced.colour;
+       //g_renderTarget[DispatchRaysIndex().xy] = float4(r1, r1, r1, 1.0f);
+
     }
 
-    radiance *= 1.0f / float(spp);
-    float3 averageRadiance;
+    radiance *= 1.0f / float(1);
+    float3 averageRadiance = radiance;
+    float3 previousRadiance = g_renderTarget[DispatchRaysIndex().xy];
     if (accumulatedFrames == 0) {
         averageRadiance = radiance;
     }
     else {
-        averageRadiance = lerp(g_renderTarget[DispatchRaysIndex().xy], radiance, 1.0f / (accumulatedFrames + 1.0f));
+        averageRadiance = lerp(previousRadiance, radiance, 1.0f / (accumulatedFrames + 1.0f));
     }
-    g_renderTarget[DispatchRaysIndex().xy] = float4(averageRadiance, 1.0f);
+    //averageRadiance = radiance;
+
+   // averageRadiance = lerp(g_renderTarget[DispatchRaysIndex().xy], radiance, 1.0f / (accumulatedFrames + 1.0f));
+
+    // g_renderTarget[DispatchRaysIndex().xy] = normalize(float4(accumulatedFrames, accumulatedFrames, accumulatedFrames, 0));
+     g_renderTarget[DispatchRaysIndex().xy] = float4(averageRadiance, 1.0f);
 
 }
 
 
+float3x3 GetTangentSpace(float3 normal)
+{
+    // Choose a helper vector for the cross product
+    float3 helper = float3(1, 0, 0);
+    if (abs(normal.x) > 0.99f)
+        helper = float3(0, 0, 1);
+    // Generate vectors
+    float3 tangent = normalize(cross(normal, helper));
+    float3 binormal = normalize(cross(normal, tangent));
+    return float3x3(tangent, binormal, normal);
+}
+
+float rand(inout uint seed)
+{
+    float result = frac(sin(seed / 100.0f * dot(DispatchRaysIndex().xy, float2(12.9898f, 78.233f))) * 43758.5453f);
+    seed += 1.0f;
+    return result;
+}
+float3 SampleHemisphere(float3 normal, inout uint seed)
+{
+    // Uniformly sample hemisphere direction
+    float cosTheta = rand(seed);
+    float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+    float phi = 2 * PI * rand(seed);
+    float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+    // Transform direction to world space
+    return mul(tangentSpaceDir, GetTangentSpace(normal));
+}
+
+float RandomFloat01(inout uint state)
+{
+    return float(wang_hash_original(state)) / 4294967296.0;
+}
+
+float3 RandomUnitVector(inout uint state)
+{
+    float z = RandomFloat01(state) * 2.0f - 1.0f;
+    float a = RandomFloat01(state) * TWO_PI;
+    float r = sqrt(1.0f - z * z);
+    float x = r * cos(a);
+    float y = r * sin(a);
+    return float3(x, y, z);
+}
 
 
 
 [shader("closesthit")]
-
 void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in BuiltInTriangleIntersectionAttributes attr) {
 
     //sammple the hemisphere of the BRDF and connect it to the light
@@ -1003,6 +1118,7 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     //want to connect this path to the light, evaluate radiance
     //L(x ,w ) = L_e(x, w) + L_dir(x, w) + L_indir(x, w)
     float3 normal = float3(0, 1, 0);
+    float3 pos = HitWorldPosition();
 
     uint indexSizeInBytes = 4;
     uint indicesPerTriangle = 3;
@@ -1019,7 +1135,12 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     };
 
     float3 triangleNormal = HitAttribute(triangleNormals, attr.barycentrics);
-    float3 pos = HitWorldPosition();
+
+    float3 tangent = normalize(float3(pos.x + 2, pos.y, pos.z) - pos);
+    float3 bitangent = normalize(cross(tangent, normal));
+
+   float3x3 tangentToWorld = float3x3(tangent, bitangent, normal);
+   float3x3 worldToTangent = transpose(tangentToWorld);
     float3 l_dir = g_sceneCB.lightPosition - pos;
     float c = chessBoard(pos);
 
@@ -1042,21 +1163,33 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
 
 
     if (l_materialCB.reflectanceCoef > 0) {
-        Ray r = { HitWorldPosition(), reflect(WorldRayDirection(), triangleNormal) };
+        Ray r = { HitWorldPosition(), reflect(WorldRayDirection(), normal) };
         reflectionColour += TraceForwardPath(r, rayPayload).colour;
 
     }
     else {
+      /*  float rand(in float2 uv) {
+            float2 noise = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
+            return abs(noise.x + noise.y) * 0.5;
+        }*/
+        uint seed = rayPayload.randomSeed;
+        float3 dir = normalize(normal + RandomUnitVector(seed));
+        rayPayload.randomSeed = seed;
+    // float3 dir = SampleHemisphere(normal,seed);
+    // rayPayload.randomSeed = seed;
+     
 
-        rng_state = wang_hash(length(pos));
-        float3 randomDirectionInHemisphere = calculateRandomDirectionInHemisphere(normal);
-
-        Ray r = { HitWorldPosition(), randomDirectionInHemisphere };
+      //  float3 randomDirectionInHemisphere = randomDirection(rand);
+       //    float3 rDir = SampleHemisphere(normal, rayPayload.randomSeed);
+        
+        Ray r = { HitWorldPosition(), dir };
         randomSampleColour += TraceForwardPath(r, rayPayload).colour;
+         //randomSampleColour = normalize(float4(dir, 0));
     }
 
     //color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t))
-    rayPayload.colour = float4(diffuseColour, 0) + randomSampleColour;
+    //rayPayload.colour = randomSampleColour;
+    rayPayload.colour += float4(diffuseColour, 0) + randomSampleColour + reflectionColour;
 
 }
 
@@ -1065,8 +1198,75 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
 
 void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in ProceduralPrimitiveAttributes attr) {
     //want to connect this path to the light, evaluate radiance
+    float3 pos = HitWorldPosition();
+  
+    float3 l_dir = normalize(g_sceneCB.lightPosition.xyz - pos);
+    float4 reflectionColour = float4(0, 0, 0, 1);
+    Ray shadowRay = { pos, l_dir };
+    float3 currentDir = RayTCurrent() * WorldRayDirection();
+    currentDir += WorldRayOrigin();
 
-    rayPayload.colour = float4(0.43, 1, 0, 0);
+    bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
+
+    float3 hitColour = float3(0, 0, 0);
+    if (!shadowHit) {
+        //ambient += 0.1*PhongLighting(float4(attr.normal, 0), shadowHit);
+    }
+
+    float3 dir = normalize(WorldRayDirection());
+    float4 refractColour = float4(0, 0, 0, 0);
+    if (l_materialCB.reflectanceCoef > 0.0f && l_materialCB.refractiveCoef <= 0.0f) {
+        Ray r = { pos, reflect(dir, attr.normal) };
+        reflectionColour = TraceForwardPath(r, rayPayload).colour;
+        hitColour += reflectionColour;
+
+    }
+    else if (l_materialCB.refractiveCoef > 0.0f) {
+        float fresnel = Fresnel(dir, attr.normal, l_materialCB.refractiveCoef);
+        bool outside = dot(dir, attr.normal) < 0 ? false : true;
+        float n1 = 1;
+        float n2 = l_materialCB.refractiveCoef;
+        float3 outwardNormal;
+        float index;
+        float3 refracted;
+        if (dot(dir, attr.normal) > 0) {
+            outwardNormal = -attr.normal;
+            index = n2;
+        }
+        else {
+            outwardNormal = attr.normal;
+            index = n1 / n2;
+        }
+        refractTest(dir, outwardNormal, index, refracted);
+        if (fresnel < 1) {
+
+            Ray r = { pos, refracted };
+            refractColour = TraceForwardPath(r, rayPayload).colour;
+            //setup refracted ray
+
+        }
+
+        float3 reflected = normalize(reflect(dir, attr.normal));
+        Ray r = { pos, reflected };
+        reflectionColour = TraceForwardPath(r, rayPayload).colour;
+
+        hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel);
+    }
+    else {
+        hitColour = l_materialCB.albedo * orenNayar(normalize(WorldRayDirection()), attr.normal, normalize(l_dir), 1);
+        // hitColour =   lambertian(attr.normal, pos, l_materialCB.albedo);
+    }
+    float re = reflectionBRDF(dir, attr.normal);
+
+    float4 colour = l_materialCB.albedo + float4(hitColour.xyz, 0);
+
+    //ray
+    //float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor.xyz);
+
+    float t = RayTCurrent();
+    float4 backColour = float4(getColour(normalize(WorldRayDirection())), 1);
+    //rayPayload.color = lerp(colour, backColour, 1.0 - exp(-0.000002 * t * t * t));
+    rayPayload.colour = colour;
 
 
 }
@@ -1220,7 +1420,7 @@ void MyRaygenShader()
        
    // VisualizePhotonBuffer( screenDims);
 
-    rng_state = uint(wang_hash(samplePoint.x + DispatchRaysDimensions().x * samplePoint.y));
+    rng_state = uint(wang_hash_original(samplePoint.x + DispatchRaysDimensions().x * samplePoint.y));
 
     UINT currentRecursionDepth = 0;
   Ray r = GenerateCameraRay(DispatchRaysIndex().xy, g_sceneCB.cameraPosition.xyz, g_sceneCB.projectionToWorld);

@@ -74,7 +74,11 @@ struct ShadowRayPayload
     bool hit;
 
 };
-
+struct RandomResult
+{
+    XMFLOAT4 state;
+    float value;
+};
 struct Photon {
     XMFLOAT4 position;
     XMFLOAT4 direction;
@@ -95,6 +99,11 @@ struct SceneConstantBuffer
     XMVECTOR lightDiffuseColor;
     UINT accumulatedFrames;
     UINT spp;
+    UINT frameNumber;
+    float rand1;
+    float rand2;
+    float rand3;
+    float rand4;
     float    reflectance;
     float    elapsedTime;
     // Elapsed application time.

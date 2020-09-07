@@ -23,7 +23,7 @@ private:
 		
 
 public:
-
+	UINT frameCount = 0;
 
 	D3DBuffer m_aabbBuffer;
 	D3DBuffer m_vertexBuffer;

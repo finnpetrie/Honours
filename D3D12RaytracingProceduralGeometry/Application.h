@@ -80,7 +80,6 @@ public:
 
 private:
 
-
     //values for icosahedron
     const float X = .525731112119133606f;
     const float Z = .850650808352039932f;
