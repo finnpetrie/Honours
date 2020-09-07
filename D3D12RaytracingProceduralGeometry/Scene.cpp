@@ -21,6 +21,7 @@ Scene::Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources)
 
     m_sceneCB.Create(device, frameCount, L"Scene Constant Buffer");
     m_sceneCB->accumulatedFrames = 0;
+    m_sceneCB->spp = 12;
 }
 
 
@@ -400,7 +401,13 @@ void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResource
         const XMVECTOR& prevLightPosition = m_sceneCB->lightPosition;
         //
         m_sceneCB->lightPosition = XMVector3Transform(prevLightPosition, rotate);
-
+        if (camera->moving) {
+            m_sceneCB->accumulatedFrames = 0;
+            camera->moving = false;
+        }
+        else {
+            m_sceneCB->accumulatedFrames += 1;
+        }
     }
  //   m_sceneCB->lightPosition = camera->getPosition();
 }
@@ -477,19 +484,19 @@ void Scene::CreateGeometry() {
 
 
 
-    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.2, 0.24, 0.13, 0), 0, 1.5, 1, 0.4f, 50, 1 };
-    Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.3, 0.3, 0.3, 0), 0, 1.5, 1, 0.4f, 50, 1 };
+    Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.1, 0.2, 0.3, 0), 1, 1.5, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.2, 0.1, 0), 1, 1.5, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.5, 0.2, 0.5, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.01, 0.01, 0.4, 0), 2, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.8, 0.64, 0.12, 0), 2, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.4, 0.01, 0.1, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.5, 0.2, 0, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 2, 2, 1, 0.4f, 50, 1 };
 
     PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
-    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.4f, 0), XMFLOAT3(9, 9, 9));
+    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 0), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 2, -2), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(-2, -0.4f, 2.0f ), XMFLOAT3(6, 6, 6));
     Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, -0.5f, 0.0f), XMFLOAT3(6, 6, 6));
@@ -504,7 +511,7 @@ void Scene::CreateGeometry() {
     Primitive plane(AnalyticPrimitive::Plane, parab_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive plane2(AnalyticPrimitive::Plane, AABB_b, XMFLOAT3(1, 3.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive cornellInner(AnalyticPrimitive::CornellBack, cone_b, XMFLOAT3(0, 0, 0.0f), XMFLOAT3(3, 3, 3));
-    analyticalObjects = {Sphere, hyperboloid};
+    analyticalObjects = {hyperboloid, Sphere,    AABB};
 
 }
 

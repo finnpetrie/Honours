@@ -31,6 +31,20 @@ namespace GlobalRootSignature {
     }
 }
 
+//for forward and backward bidirectional path-tracing
+namespace GlobalRootSignature_Bidirectional {
+    namespace Slot {
+        enum Enum {
+            OutputView = 0,
+            AccelerationStructure,
+            SceneConstant,
+            AABBattributeBuffer,
+            VertexBuffers,
+            CSGTree,
+            Count
+        };
+    }
+}
 namespace GlobalRootSignature_NoScreenSpaceMap {
     namespace Slot {
         enum Enum {

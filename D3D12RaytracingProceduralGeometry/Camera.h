@@ -21,7 +21,6 @@ private:
 	XMVECTOR m_cameraUp;
 
 	XMMATRIX view;
-
 	//camera input variables
 	UINT lastX = 400;
 	UINT lastY = 300;
@@ -34,6 +33,7 @@ private:
 
 
 public:
+	bool moving = false;
 
 
 	void Update(ConstantBuffer<SceneConstantBuffer>& scene, ConstantBuffer<RasterSceneCB> &m_rasterConstantBuffer);

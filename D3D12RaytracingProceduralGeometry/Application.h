@@ -69,6 +69,7 @@ public:
 
     // Messages
     virtual void OnInit();
+    void BuildForwardPathShaderTables();
     virtual void OnKeyDown(UINT8 key);
     virtual void OnUpdate();
     virtual void OnRender();
@@ -92,7 +93,9 @@ private:
     std::vector<float> fpsAverages;
     bool testing = false;
     bool drawRays = false;
+    bool photonMapping = false;
     bool recordIntersections = true;
+    bool biPathTracing = true;
     // Constants.
     UINT photonCount = 1000;
     UINT NUM_BLAS = 100000;          // Triangle + AABB bottom-level AS.
@@ -105,6 +108,10 @@ private:
     ComPtr<ID3D12StateObject> m_dxrStateObject;
     ComPtr<ID3D12StateObject>  m_photonMapStateObject;
     ComPtr<ID3D12StateObject>  m_rayCompositeStateObject;
+
+    //Bi-Directional Path Tracing State Objects
+    ComPtr<ID3D12StateObject> m_forwardPathState;
+    ComPtr<ID3D12StateObject> m_lightPathState;
 
     ComPtr<ID3D12PipelineState> m_computeStateObject;
     //Raster Pipeline
@@ -120,6 +127,9 @@ private:
 
     ComPtr<ID3D12RootSignature> m_photonLocalRootSignature[LocalRootSignature::Type::Count];
     ComPtr<ID3D12RootSignature> m_photonGlobalRootSignature;;
+
+    ComPtr<ID3D12RootSignature> m_bidirectionalForwardRootSignature;
+    ComPtr<ID3D12RootSignature> m_bidirectionalForwardLocalRoot[LocalRootSignature::Type::Count];
 
     ComPtr<ID3D12Resource> m_missPhotonTable;
     UINT m_missPhotonTableStrideInBytes;
@@ -207,6 +217,11 @@ private:
     static const wchar_t* c_compositeHit;
     static const wchar_t* c_compositeHitGroup;
 
+    static const wchar_t* c_forwardPathTracingRayGen;
+    static const wchar_t* c_forwardPathTracingClosestHit[GeometryType::Count];
+    static const wchar_t* c_missPathShaders[RayType::Count];
+
+
     static const wchar_t* c_intersectionShaderNames[IntersectionShaderType::Count];
     static const wchar_t* c_closestHitShaderNames[GeometryType::Count];
     static const wchar_t* c_anyHitShaderNames[GeometryType::Count];
@@ -221,6 +236,14 @@ private:
     ComPtr<ID3D12Resource> m_hitGroupShaderTable;
     UINT m_hitGroupShaderTableStrideInBytes;
     ComPtr<ID3D12Resource> m_rayGenShaderTable;
+    
+
+    ComPtr<ID3D12Resource> m_forwardPathRayGenShaderTable;
+    ComPtr<ID3D12Resource> m_forwardPathMissShaderTable;
+    UINT m_forwardPathRayMissShaderTableStrideInBytes;
+    ComPtr<ID3D12Resource> m_forwardPathHitGroupShaderTable;
+    UINT m_forwardPathHitGroupShaderTableStrideInBytes;
+
     
     ComPtr<ID3D12Resource> m_compositeRayGenShaderTable;
     ComPtr<ID3D12Resource> m_missCompositeTable;
@@ -246,7 +269,8 @@ private:
     void DoTiling(UINT tileX, UINT tileY, UINT tileDepth);
     void DoCompositing();
     void DoRaytracing();
-   
+    void DoForwardPathTracing();
+
     void CreatePhotonBuffer_2();
 
     void CreatePhotonBuffer();
@@ -259,12 +283,14 @@ private:
     void ReleaseWindowSizeDependentResources();
     void CreateRaytracingInterfaces();
     void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC& desc, ComPtr<ID3D12RootSignature>* rootSig);
+    void CreateForwardBidirectionalRootSignatures();
     void CreatePhotonMappingRootSignatures();
     void CreateComputeCompositeRootSignature();
     void CreateCompositeRayRoot();
     void CreateRootSignatures();
     void CreateDxilLibrarySubobject(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
+    void CreateHitGroupSubobjectsPathTracing(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjectsPhotonPass(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
 	void CreateComputePhotonTilingRootSignature();
 	void CreateRasterRootSignatures();
@@ -275,6 +301,7 @@ private:
     void CreatePhotonTilingComptuePassStateObject();
     void CreateCompositeRayPipelineStateObject();
     void CreatePhotonMappingFirstPassStateObject();
+    void CreateBiDirectionalPathTracingStateObjects();
     void CreateRaytracingPipelineStateObject();
     void CreateIntersectionVertexBuffer();
     void CreateDeferredGBuffer();

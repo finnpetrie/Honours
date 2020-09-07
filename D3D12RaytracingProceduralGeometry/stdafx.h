@@ -18,7 +18,7 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers.
 #endif
-
+#define N_DEBUG
 #include <windows.h>
 
 // C RunTime Header Files

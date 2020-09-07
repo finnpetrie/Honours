@@ -52,8 +52,13 @@ struct RayPayload
     XMFLOAT4 color;
     UINT   recursionDepth;
 
-
     UINT seed;
+};
+
+struct PathTracingPayload {
+    XMFLOAT4 colour;
+    UINT recursionDepth;
+    UINT randomSeed;
 };
 
 
@@ -89,8 +94,10 @@ struct SceneConstantBuffer
     XMVECTOR lightAmbientColor;
     XMVECTOR lightDiffuseColor;
     UINT accumulatedFrames;
+    UINT spp;
     float    reflectance;
-    float    elapsedTime;                 // Elapsed application time.
+    float    elapsedTime;
+    // Elapsed application time.
 };
 
 struct ComputeConstantBuffer {
@@ -200,6 +207,7 @@ namespace TraceRayParameters
 static const XMFLOAT4 ChromiumReflectance = XMFLOAT4(0.549f, 0.556f, 0.554f, 1.0f);
 
 static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
+static const XMFLOAT4 SkyColour = XMFLOAT4(0.4f, 0.4f, 1.0f, 1.0f);
 //static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
 //static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.0, 0.0, 0.0, 1.0f);
 static const float InShadowRadiance = 0.35f;

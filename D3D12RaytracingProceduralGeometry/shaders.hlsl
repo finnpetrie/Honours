@@ -180,7 +180,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      }
 
      //cone filter
-     float k = 0.6;
+     float k = 1.1;
      //falloff
      float wp = 1 - sqrt(distance2) / (k * r);
      //wp = min(1 / 5, wp);
@@ -200,7 +200,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // rasterTarget[input.position.xy] += color;
     // return  input.color;
      // return  float4(distance2, distance2, distance2, 0);
-     return 20*color;
+     return 10*color;
      // return 22*float4(n_o, n_o, n_o, n_o);//float4(gauss, gauss, gauss, gauss);//float4(gauss, gauss, gauss, gauss);
       //return float4(color.xyz, weighted_direction.x)
     // return input.position;*/

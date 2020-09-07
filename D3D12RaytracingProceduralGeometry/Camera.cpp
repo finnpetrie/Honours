@@ -83,6 +83,7 @@ void Camera::OnKeyDown(UINT8 key) {
         }
         break;
     }
+    moving = true;
 }
 
 XMMATRIX Camera::getMVP() {
@@ -126,5 +127,5 @@ void Camera::OnMouseMove(float dx, float dy) {
     float yawRad = XMConvertToRadians(yaw);
     XMVECTOR new_Front = { cos(pitchRad) * cos(yawRad), sin(pitchRad), cos(pitchRad) * sin(yawRad) };
     m_front = XMVector3Normalize(new_Front);
-
+    moving = true;
 }

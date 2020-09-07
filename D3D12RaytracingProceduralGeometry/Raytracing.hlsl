@@ -85,6 +85,40 @@ float3 lambertian(float3 normal, float3 pos, float3 materialColour) {
     return  colour;
 }
 
+inline float3 calculateRandomDirectionInHemisphere(in float3 normal) {
+
+    float up = sqrt(rand_xorshift()); // cos(theta)
+    float over = sqrt(1 - up * up); // sin(theta)
+    float around = rand_xorshift() * TWO_PI;
+
+    // Find a direction that is not the normal based off of whether or not the
+    // normal's components are all equal to sqrt(1/3) or whether or not at
+    // least one component is less than sqrt(1/3). Learned this trick from
+    // Peter Kutz.
+
+    float3 directionNotNormal;
+    if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
+        directionNotNormal = float3(1, 0, 0);
+    }
+    else if (abs(normal.y) < SQRT_OF_ONE_THIRD) {
+        directionNotNormal = float3(0, 1, 0);
+    }
+    else {
+        directionNotNormal = float3(0, 0, 1);
+    }
+
+    // Use not-normal direction to generate two perpendicular directions
+    float3 perpendicularDirection1 =
+        normalize(cross(normal, directionNotNormal));
+    float3 perpendicularDirection2 =
+        normalize(cross(normal, perpendicularDirection1));
+
+    return up * normal
+        + cos(around) * over * perpendicularDirection1
+        + sin(around) * over * perpendicularDirection2;
+}
+
+
 float orenNayar(float3 v, float3 light, float3 normal, float roughness) {
 
     float roughness2 = roughness * roughness;
@@ -144,6 +178,83 @@ float3 randomDirection(float2 ra) {
     return dir;
 }
 
+
+
+inline float3 SquareToDiskConcentric(in float2 sample)
+{
+    // Used Peter Shirley's concentric disk warp
+    float radius;
+    float angle;
+    float a = (2 * sample[0]) - 1;
+    float b = (2 * sample[1]) - 1;
+
+    if (a > -b) {
+        if (a > b) {
+            radius = a;
+            angle = (PI / 4.f) * (b / a);
+        }
+        else {
+            radius = b;
+            angle = (PI / 4.f) * (2 - (a / b));
+        }
+    }
+    else {
+        if (a < b) {
+            radius = -a;
+            angle = (PI / 4.f) * (4 + (b / a));
+        }
+        else {
+            radius = -b;
+            if (b != 0) {
+                angle = (PI / 4.f) * (6 - (a / b));
+            }
+            else {
+                angle = 0;
+            }
+        }
+    }
+    return float3(radius * cos(angle), radius * sin(angle), 0);
+}
+
+inline float3 SquareToHemisphereCosine(in float2 sample)
+{
+    // Used Peter Shirley's cosine hemisphere
+    float3 disk = SquareToDiskConcentric(sample);
+    return float3(disk[0], disk[1], sqrt(1.f - pow(length(disk), 2.f)));
+}
+
+
+inline float AbsCosTheta(in float3 w) {
+    return abs(w.z);
+}
+
+inline bool SameHemisphere(in float3 w, in float3 wp) {
+    return w.z * wp.z > 0;
+}
+
+inline float3 Lambert_Sample_f(in float3 wo, out float3 wi, in float2 samplePt, out float pdf, in float3 albedo) {
+    wi = SquareToHemisphereCosine(samplePt);
+    if (wo.z < 0) wi.z *= -1;
+    wi = normalize(wi);
+    pdf = SameHemisphere(wo, wi) ? INV_PI * AbsCosTheta(wi) : 0;
+
+    return INV_PI * albedo;
+}
+
+float reflectionBRDF(float3 incomingDirection, float3 normal) {
+    float3 n_in = normalize(-incomingDirection);
+    float3 outgoing = reflect(n_in, normal);
+
+    float thetaI = atan(n_in.y / n_in.x);
+    float phiI = acos(n_in.z);
+
+
+    float thetaO = atan(outgoing.y / outgoing.x);
+    float phiO = acos(outgoing.z);
+
+    float f_rs = 2 * (sin(thetaO) * sin(thetaO) - sin(thetaI) * sin(thetaI)) * (phiO - phiI);
+    return f_rs;
+}
 
 float FresnelAmount(float n1, float n2, float3 normal, float3 incident) {
     float r0 = (n1 - n2) / (n1 + n2);
@@ -323,6 +434,23 @@ uint wang_hash(uint seed)
     seed *= 0x27d4eb2d;
     seed = seed ^ (seed >> 15);
     return seed;
+}
+float chessBoard(float3 pos) {
+
+    float chess = floor(sqrt(pos.x * pos.x + pos.z * pos.z)) + floor(atan(pos.z / pos.x));
+    // chess = floor(pos.x) + floor(pos.z);
+    chess = frac(chess * 0.5);
+    chess *= 2;
+    if (chess == 0.0) {
+        chess = 0.5;
+    }
+    return chess;
+}
+
+float3 getColour(float3 nDir) {
+    float3 dir = normalize(WorldRayDirection());
+    float t = 0.5 * (dir.y + 1.0);
+    return (1.0 - t) * float3(1.0, 1.0, 1.0) + t * float3(0.52941176471, 0.80784313725, 0.98039215686);
 }
 
 inline void VisualizePhotonBuffer(float2 screenDims)
@@ -563,114 +691,6 @@ void Photon_Shadow_Miss(inout ShadowRayPayload payload) {
     payload.hit = false;
 }
 
-inline float3 calculateRandomDirectionInHemisphere(in float3 normal) {
-
-    float up = sqrt(rand_xorshift()); // cos(theta)
-    float over = sqrt(1 - up * up); // sin(theta)
-    float around = rand_xorshift() * TWO_PI;
-
-    // Find a direction that is not the normal based off of whether or not the
-    // normal's components are all equal to sqrt(1/3) or whether or not at
-    // least one component is less than sqrt(1/3). Learned this trick from
-    // Peter Kutz.
-
-    float3 directionNotNormal;
-    if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
-        directionNotNormal = float3(1, 0, 0);
-    }
-    else if (abs(normal.y) < SQRT_OF_ONE_THIRD) {
-        directionNotNormal = float3(0, 1, 0);
-    }
-    else {
-        directionNotNormal = float3(0, 0, 1);
-    }
-
-    // Use not-normal direction to generate two perpendicular directions
-    float3 perpendicularDirection1 =
-        normalize(cross(normal, directionNotNormal));
-    float3 perpendicularDirection2 =
-        normalize(cross(normal, perpendicularDirection1));
-
-    return up * normal
-        + cos(around) * over * perpendicularDirection1
-        + sin(around) * over * perpendicularDirection2;
-}
-
-inline float3 SquareToDiskConcentric(in float2 sample)
-{
-    // Used Peter Shirley's concentric disk warp
-    float radius;
-    float angle;
-    float a = (2 * sample[0]) - 1;
-    float b = (2 * sample[1]) - 1;
-
-    if (a > -b) {
-        if (a > b) {
-            radius = a;
-            angle = (PI / 4.f) * (b / a);
-        }
-        else {
-            radius = b;
-            angle = (PI / 4.f) * (2 - (a / b));
-        }
-    }
-    else {
-        if (a < b) {
-            radius = -a;
-            angle = (PI / 4.f) * (4 + (b / a));
-        }
-        else {
-            radius = -b;
-            if (b != 0) {
-                angle = (PI / 4.f) * (6 - (a / b));
-            }
-            else {
-                angle = 0;
-            }
-        }
-    }
-    return float3(radius * cos(angle), radius * sin(angle), 0);
-}
-
-inline float3 SquareToHemisphereCosine(in float2 sample)
-{
-    // Used Peter Shirley's cosine hemisphere
-    float3 disk = SquareToDiskConcentric(sample);
-    return float3(disk[0], disk[1], sqrt(1.f - pow(length(disk), 2.f)));
-}
-
-
-inline float AbsCosTheta(in float3 w) {
-    return abs(w.z);
-}
-
-inline bool SameHemisphere(in float3 w, in float3 wp) {
-    return w.z * wp.z > 0;
-}
-
-inline float3 Lambert_Sample_f(in float3 wo, out float3 wi, in float2 samplePt, out float pdf, in float3 albedo) {
-    wi = SquareToHemisphereCosine(samplePt);
-    if (wo.z < 0) wi.z *= -1;
-    wi = normalize(wi);
-    pdf = SameHemisphere(wo, wi) ? INV_PI * AbsCosTheta(wi) : 0;
-
-    return INV_PI * albedo;
-}
-
-float reflectionBRDF(float3 incomingDirection, float3 normal) {
-    float3 n_in = normalize(-incomingDirection);
-    float3 outgoing = reflect(n_in, normal);
-    
-    float thetaI = atan(n_in.y / n_in.x);
-    float phiI = acos(n_in.z);
-
-
-    float thetaO = atan(outgoing.y / outgoing.x);
-    float phiO = acos(outgoing.z);
-
-    float f_rs = 2 * (sin(thetaO) * sin(thetaO) - sin(thetaI) * sin(thetaI)) * (phiO - phiI);
-    return f_rs;
-}
 
 [shader("closesthit")]
 void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
@@ -885,10 +905,180 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
     }
 
 
+PathTracingPayload TraceForwardPath(in Ray ray, in PathTracingPayload payload)
+{
+    if (payload.recursionDepth >= MAX_RAY_RECURSION_DEPTH)
+    {
+        payload.colour = float4(1, 1, 1, 1);
+        return payload;
+    }
+
+    // Set the ray's extents.
+    RayDesc rayDesc;
+    rayDesc.Origin = ray.origin;
+    rayDesc.Direction = ray.direction;
+    // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
+    // Note: make sure to enable face culling so as to avoid surface face fighting.
+    rayDesc.TMin = 0.01;
+    rayDesc.TMax = 10000;
+
+    payload.recursionDepth += 1;
+
+    //need to generate a new seed given the current seed.
+    TraceRay(g_scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+        TraceRayParameters::InstanceMask,
+        TraceRayParameters::HitGroup::Offset[RayType::Radiance],
+        TraceRayParameters::HitGroup::GeometryStride,
+        TraceRayParameters::MissShader::Offset[RayType::Radiance],
+        rayDesc, payload);
+
+    return payload;
+}
 
 
 [shader("raygeneration")]
-void PathTracingRayGen() {
+void ForwardPathTracingRayGen() {
+    float2 samplePoint = DispatchRaysIndex().xy;
+    uint spp = g_sceneCB.spp;
+
+    /*  for (int i = 0; i < 100; i++) {
+        Photon p = photonBuffer[i + DispatchRaysIndex().x + i*DispatchRaysIndex().y];
+        VisualizePhoton(p.position, p.colour, screenDims);
+    }*/
+
+    /*  for (int i = 0; i < 6; i++) {
+          float4 photon = screenSpacePhoton[i][samplePoint];
+          float4 colour = screenSpacePhotonColour[i][samplePoint];
+          VisualizePhoton(photon, colour, screenDims);
+      }*/
+
+      // VisualizePhotonBuffer( screenDims);
+
+    uint accumulatedFrames = g_sceneCB.accumulatedFrames;
+   
+    UINT currentRecursionDepth = 0;
+    float3 radiance = 0.0f;
+    if (accumulatedFrames == 0) {
+        spp = 4;
+    }
+    for (int i = 0; i < spp; i++) {
+        rng_state = uint(wang_hash(samplePoint.x + DispatchRaysDimensions().x * samplePoint.y + accumulatedFrames + i));
+
+        float2 rand = float2(rand_xorshift(), rand_xorshift());
+
+        float2 screen_coord = float2(samplePoint)+rand;
+
+        
+        Ray r = GenerateCameraRay(screen_coord, g_sceneCB.cameraPosition.xyz, g_sceneCB.projectionToWorld);
+
+        //set seed.
+        PathTracingPayload payload = { float4(0,0,0,0),rand.x, 0 };
+        PathTracingPayload traced = TraceRadianceRay(r, payload);
+
+       radiance += traced.colour;
+    }
+
+    radiance *= 1.0f / float(spp);
+    float3 averageRadiance;
+    if (accumulatedFrames == 0) {
+        averageRadiance = radiance;
+    }
+    else {
+        averageRadiance = lerp(g_renderTarget[DispatchRaysIndex().xy], radiance, 1.0f / (accumulatedFrames + 1.0f));
+    }
+    g_renderTarget[DispatchRaysIndex().xy] = float4(averageRadiance, 1.0f);
+
+}
+
+
+
+
+
+[shader("closesthit")]
+
+void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in BuiltInTriangleIntersectionAttributes attr) {
+
+    //sammple the hemisphere of the BRDF and connect it to the light
+
+    //want to connect this path to the light, evaluate radiance
+    //L(x ,w ) = L_e(x, w) + L_dir(x, w) + L_indir(x, w)
+    float3 normal = float3(0, 1, 0);
+
+    uint indexSizeInBytes = 4;
+    uint indicesPerTriangle = 3;
+    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
+    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+
+    // Load up three 16 bit indices for the triangle.
+    const uint3 indices = Load3x16BitIndices(baseIndex, g_indices);
+
+    // Retrieve corresponding vertex normals for the triangle vertices.
+    float3 triangleNormals[3] = { g_vertices[indices[0]].normal,
+                                   g_vertices[indices[1]].normal,
+                                    g_vertices[indices[2]].normal
+    };
+
+    float3 triangleNormal = HitAttribute(triangleNormals, attr.barycentrics);
+    float3 pos = HitWorldPosition();
+    float3 l_dir = g_sceneCB.lightPosition - pos;
+    float c = chessBoard(pos);
+
+    Ray shadowRay;
+    shadowRay.origin = HitWorldPosition();
+    shadowRay.direction = l_dir;
+    bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
+    float4 reflectionColour = float4(0, 0, 0, 0);
+
+    float3 diffuseColour = float4(c, c, c, 0);
+
+    float4 randomSampleColour = float4(0, 0, 0, 0);
+    if (shadowHit) {
+        diffuseColour *= 0.5;
+    }
+    diffuseColour *= orenNayar(normalize(WorldRayDirection()), normal, normalize(l_dir), 1);
+
+  
+
+
+
+    if (l_materialCB.reflectanceCoef > 0) {
+        Ray r = { HitWorldPosition(), reflect(WorldRayDirection(), triangleNormal) };
+        reflectionColour += TraceForwardPath(r, rayPayload).colour;
+
+    }
+    else {
+
+        rng_state = wang_hash(length(pos));
+        float3 randomDirectionInHemisphere = calculateRandomDirectionInHemisphere(normal);
+
+        Ray r = { HitWorldPosition(), randomDirectionInHemisphere };
+        randomSampleColour += TraceForwardPath(r, rayPayload).colour;
+    }
+
+    //color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t))
+    rayPayload.colour = float4(diffuseColour, 0) + randomSampleColour;
+
+}
+
+
+[shader("closesthit")]
+
+void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in ProceduralPrimitiveAttributes attr) {
+    //want to connect this path to the light, evaluate radiance
+
+    rayPayload.colour = float4(0.43, 1, 0, 0);
+
+
+}
+
+[shader("miss")]
+
+void MissPathTracing(inout PathTracingPayload rayPayload) {
+
+}
+
+[shader("raygeneration")]
+void LightTracingRayGen() {
 
 
 }
@@ -899,7 +1089,7 @@ void PathTracingRayGen() {
 
 [shader("closesthit")]
 
-void PathTracingClosestHitTriangle(inout RayPayload rayPayload, in BuiltInTriangleIntersectionAttributes attr) {
+void LightTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in BuiltInTriangleIntersectionAttributes attr) {
 
 
 }
@@ -907,11 +1097,10 @@ void PathTracingClosestHitTriangle(inout RayPayload rayPayload, in BuiltInTriang
 
 [shader("closesthit")]
 
-void PathTracingClosestHitProcedural(inout RayPayload rayPayload, in ProceduralPrimitiveAttributes attr) {
+void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in ProceduralPrimitiveAttributes attr) {
 
 
 }
-
 
 
 
@@ -1051,15 +1240,6 @@ void MyRaygenShader()
 }
 
 
-float chessBoard(float3 pos) {
-    float chess = floor(sqrt(pos.x*pos.x + pos.z*pos.z)) + floor(atan(pos.z/pos.x));
-    chess = frac(chess * 0.5);
-    chess *= 2;
-    if (chess == 0.0) {
-        chess = 0.5;
-    }
-    return chess;
-}
 
 //***************************************************************************
 //******************------ Closest hit shaders -------***********************
@@ -1118,11 +1298,11 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     }
 
     if (shadowHit) {
-        diffuseColour = float3(0, 0, 0);
+        diffuseColour *= 0.5;
     }
-    else {
-        diffuseColour *= orenNayar(normalize(WorldRayDirection()), normal, normalize(l_dir), 0.5);
-    }
+   diffuseColour *= orenNayar(normalize(WorldRayDirection()), normal, normalize(l_dir), 1);
+    
+
 
 
     
@@ -1139,7 +1319,9 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
     //rayPayload.color = color;
    // rayPayload.color = float4(colour, 0);
-    rayPayload.color =  lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t)) + float4(colour, 0);
+    float4 backColour = float4(getColour(normalize(WorldRayDirection())), 1);
+    rayPayload.color = color;
+    //rayPayload.color =  lerp(color, backColour, 1.0 - exp(-0.000002 * t * t * t)) + float4(colour, 0);
 
    // rayPayload.intersections[rayPayload.recursionDepth] = color;
 
@@ -1233,24 +1415,33 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
 float4 colour =  l_materialCB.albedo + float4(hitColour.xyz, 0);
 
 //ray
-float t = RayTCurrent();
-rayPayload.color = lerp(colour, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
+//float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor.xyz);
 
+float t = RayTCurrent();
+float4 backColour = float4(getColour(normalize(WorldRayDirection())), 1);
+//rayPayload.color = lerp(colour, backColour, 1.0 - exp(-0.000002 * t * t * t));
+rayPayload.color = colour;
 }
 
 //***************************************************************************
 //**********************------ Miss shaders -------**************************
 //***************************************************************************
 
+
+
 [shader("miss")]
 void MyMissShader(inout RayPayload rayPayload)
 {
    // float transition = pow(smoothstep(0.02, .5, d.y), 0.4);
 //
-   // float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor);
+    float3 ndir = normalize(WorldRayDirection());
+   
+    rayPayload.color = float4(getColour(ndir), 1);
    // float4 backgroundColor = float4(BackgroundColor);
     uint depth = rayPayload.recursionDepth;
-    rayPayload.color = float4(BackgroundColor);
+    //float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor);
+  //  rayPayload.color = BackgroundColor;
+    //rayPayload.color =  float4(lerp(SkyColour.xyz, float3(0.4, 0.4, 0.4), float4(BackgroundColor)), 1);
     //g_renderTarget[DispatchRaysIndex().xy] = rayPayload.color;
    // intersectionBuffer[depth][DispatchRaysIndex().xy] = float4(0,0,0,0);
 

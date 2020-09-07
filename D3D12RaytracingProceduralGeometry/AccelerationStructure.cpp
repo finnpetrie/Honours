@@ -117,7 +117,7 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
 
     // Width of a bottom-level AS geometry.
     // Make the plane a little larger than the actual number of primitives in each dimension.
-    const XMUINT3 NUM_AABB = XMUINT3(700, 1, 700);
+    const XMUINT3 NUM_AABB = XMUINT3(25, 1, 25);
     const XMFLOAT3 fWidth = XMFLOAT3(
         NUM_AABB.x * scene->c_aabbWidth + (NUM_AABB.x - 1) * scene->c_aabbDistance,
         NUM_AABB.y * scene->c_aabbWidth + (NUM_AABB.y - 1) * scene->c_aabbDistance,
