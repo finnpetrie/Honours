@@ -61,6 +61,7 @@ struct PhotonPayload {
     XMFLOAT4 position;
     XMFLOAT4 colour;
     float intensity;
+    float probability;
     UINT recursionDepth;
 };
 struct ShadowRayPayload
@@ -198,8 +199,8 @@ namespace TraceRayParameters
 // From: http://blog.selfshadow.com/publications/s2015-shading-course/hoffman/s2015_pbs_physics_math_slides.pdf
 static const XMFLOAT4 ChromiumReflectance = XMFLOAT4(0.549f, 0.556f, 0.554f, 1.0f);
 
-//static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
-static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
+static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
+//static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
 //static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.0, 0.0, 0.0, 1.0f);
 static const float InShadowRadiance = 0.35f;
 namespace CSGState {
@@ -223,6 +224,11 @@ namespace AnalyticPrimitive {
         Hyperboloid,
         Cylinder,
         Paraboloid,
+        CornellBack,
+        CornellTop,
+        CornellBottom,
+        CornellLeft,
+        CornellRight,
         CSG_Difference,
         CSG_Intersection,
         CSG_Union,

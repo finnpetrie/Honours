@@ -77,6 +77,61 @@ inline float3 SquareToSphereUniform(float2 samplePoint)
     return result;
 }
 
+
+float3 lambertian(float3 normal, float3 pos, float3 materialColour) {
+    //float3 lightDir =  normalize(g_sceneCB.lightPosition.xyz - pos);
+    float3 lightDir = normalize(g_sceneCB.lightPosition - pos);
+    float3 colour = materialColour / M_PI * g_sceneCB.lightDiffuseColor * max(0.f, dot(normal, lightDir));
+    return  colour;
+}
+
+float orenNayar(float3 v, float3 light, float3 normal, float roughness) {
+
+    float roughness2 = roughness * roughness;
+    float2 oren_nayar_fraction = roughness2 / (roughness2 + float2(0.33, 0.09));
+    float2 oren_nayar = float2(1, 0) + float2(-0.5, 0.45) * oren_nayar_fraction;
+
+    float2 cos_theta = saturate(float2(dot(normal, light), dot(normal, v)));
+    float2 cos_theta2 = cos_theta * cos_theta;
+    float sin_theta = sqrt((1 - cos_theta2.x) * (1 - cos_theta2.y));
+    float3 light_plane = normalize(light - cos_theta.x * normal);
+    float3 view_plane = normalize(v - cos_theta.y * normal);
+    float cos_phi = saturate(dot(light_plane, view_plane));
+
+    float diffuse_oren_nayar = cos_phi * sin_theta / max(cos_theta.x, cos_theta.y);
+    float diffuse = cos_theta.x * (oren_nayar.x + oren_nayar.y * diffuse_oren_nayar);
+
+    return diffuse;
+}
+
+
+float Fresnel(float3 wi, float3 normal, float3 eta) {
+    float cosIncident = clamp(-1, 1, dot(wi, normal));
+    float etaI = 1, etaT = eta;
+    if (cosIncident > 0) {
+        float temp = etaT;
+        etaT = etaI;
+        etaI = temp;
+    }
+
+    float sinT = etaI / etaT * sqrt(max(0.0f, 1 - cosIncident * cosIncident));
+
+    if (sinT >= 1) {
+
+        //total internal reflection, return probability of reflection = 1
+        return 1;
+    }
+    else {
+        float cosT = sqrt(max(0.0f, 1 - sinT * sinT));
+        float cosI = abs(cosIncident);
+        float Rs = ((etaT * cosI) - (etaI * cosT)) / ((etaT * cosI) + (etaI * cosT));
+        float Rp = ((etaI * cosI) - (etaT * cosT)) / ((etaI * cosI) + (etaT * cosT));
+
+        float fresn = (Rs * Rs + Rp * Rp) / 2;
+        return fresn;
+    }
+}
+
 float rand(in float2 uv) {
     float2 noise = (frac(sin(dot(uv, float2(12.9898, 78.233) * 2.0)) * 43758.5453));
     return abs(noise.x + noise.y) * 0.5;
@@ -440,7 +495,7 @@ void Photon_Ray_Gen() {
     float power = 1/(width * height); //number of photons to be emitted
 
     PhotonPayload payload = { float4(0,0,0,0), g_sceneCB.lightDiffuseColor,
-     power, 0 };
+     power, 1, 0 };
 
 
     for (int i = 0; i < 1; i++) {
@@ -602,6 +657,20 @@ inline float3 Lambert_Sample_f(in float3 wo, out float3 wi, in float2 samplePt, 
     return INV_PI * albedo;
 }
 
+float reflectionBRDF(float3 incomingDirection, float3 normal) {
+    float3 n_in = normalize(-incomingDirection);
+    float3 outgoing = reflect(n_in, normal);
+    
+    float thetaI = atan(n_in.y / n_in.x);
+    float phiI = acos(n_in.z);
+
+
+    float thetaO = atan(outgoing.y / outgoing.x);
+    float phiO = acos(outgoing.z);
+
+    float f_rs = 2 * (sin(thetaO) * sin(thetaO) - sin(thetaI) * sin(thetaI)) * (phiO - phiI);
+    return f_rs;
+}
 
 [shader("closesthit")]
 void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
@@ -624,27 +693,23 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
 
     float raySize = sqrt(dot(pos - WorldRayOrigin(), pos - WorldRayOrigin()));
     float3 normal = HitAttribute(triangleNormals, attr.barycentrics);
-    float3 refractionColour;
-    float3 reflectionColour;
+    
+
+
     float3 randDir = calculateRandomDirectionInHemisphere(normal);
     //compute cosine 
     float3 colour = float3(l_materialCB.albedo.x * payload.colour.x, l_materialCB.albedo.y * payload.colour.y, l_materialCB.albedo.z * payload.colour.z);
     payload.colour = float4(colour, 1);
     float3 dir = normalize(WorldRayDirection());
+
+    //compute path probability
+    
+    //if diffuse surface, store photon
     if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth > 1) {
 
-       /*screenSpacePhoton[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(pos, 1);
-       screenSpacePhotonColour[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(colour, 1);
-        screenSpacePhotonDirection[payload.recursionDepth - 1][DispatchRaysIndex().xy] = float4(dir, 1);*/
-        //uint tileIndex;
-      //  GetTileIndex(HitWorldPosition(), tileIndex);
-        //uint dstIndex = 0;
-        //photonBufferCounter.InterlockedAdd(0, 1, dstIndex);
-      //  AllMemoryBarrier();
+    
         uint dstIndex = photonBuffer.IncrementCounter();
-
-              //triangle normal is currently being fucking weird
-        Photon p = { float4(pos, raySize), float4(dir, 1), float4(colour, 1), float4(0, 1, 0, 0)};
+        Photon p = { float4(pos, raySize), float4(dir, 1), float4(colour, 1), float4(0, 1, 0, payload.probability)};
 
         if (dstIndex < PHOTON_COUNT) {
             photonBuffer[dstIndex] = p;
@@ -681,7 +746,7 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
         }
         if (refractTest(dir, outwardNormal, index, refracted)) {
             Ray r = { pos, refracted };
-            refractPos=  TracePhotonRay(r, payload).position;
+            refractPos =  TracePhotonRay(r, payload).position;
         }
         else {
             Ray r = { pos, reflect(dir, normal) };
@@ -720,7 +785,7 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
         uint dstIndex = photonBuffer.IncrementCounter();
         float raySize = sqrt(dot(pos - WorldRayOrigin(), pos - WorldRayOrigin()));
 
-        Photon p = { float4(pos, raySize), float4(dir, 1), float4(colour, 1), float4(attr.normal, 1) };
+        Photon p = { float4(pos, raySize), float4(dir, 1), float4(colour, 1), float4(attr.normal, payload.probability) };
         if (dstIndex < PHOTON_COUNT) {
             photonBuffer[dstIndex] = p;
         }
@@ -736,8 +801,50 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
   //  if (rand_xorshift() < (1.f - maximumPower)) {
     //    return;
     //}
+
+    if (l_materialCB.reflectanceCoef > 0.0f && l_materialCB.refractiveCoef <= 0.0f) {
+        Ray r = { pos, reflect(dir, attr.normal) };
+        reflectPos = TracePhotonRay(r, payload).position;
+    }
+    else if (l_materialCB.refractiveCoef > 0.0f) {
+        float fresnel = Fresnel(dir, attr.normal, l_materialCB.refractiveCoef);
+        bool outside = dot(dir, attr.normal) < 0 ? false : true;
+        float n1 = 1;
+        float n2 = l_materialCB.refractiveCoef;
+        float3 outwardNormal;
+        float index;
+        float3 refracted;
+        if (dot(dir, attr.normal) > 0) {
+            outwardNormal = -attr.normal;
+            index = n2;
+        }
+        else {
+            outwardNormal = attr.normal;
+            index = n1 / n2;
+        }
+        refractTest(dir, outwardNormal, index, refracted);
+        if (fresnel < 1) {
+
+            Ray r = { pos, refracted };
+            float temp = payload.probability;
+            payload.probability = 2*(1 - fresnel);
+
+            refractPos = TracePhotonRay(r, payload).position;
+            payload.probability = temp;
+            //setup refracted ray
+
+        }
+
+        float3 reflected = normalize(reflect(dir, attr.normal));
+        Ray r = { pos, reflected };
+        payload.probability = (fresnel);
+        refractPos  = TracePhotonRay(r, payload).position;
+
+        //hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel);
+    }
+
     //if refractive surface, trace photons based on law of refraction
-    if (l_materialCB.refractiveCoef > 0) {
+   /* if (l_materialCB.refractiveCoef > 0) {
         //assume refractive glass
         float n1 = 1;
         float n2 = l_materialCB.refractiveCoef;
@@ -773,10 +880,9 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
         }
 
         // payload.position = float4(refractPos, 1);
-
+        */
 
     }
-}
 
 
 
@@ -945,19 +1051,21 @@ void MyRaygenShader()
 }
 
 
-float3 lambertian(float3 normal, float3 pos) {
-    //float3 lightDir =  normalize(g_sceneCB.lightPosition.xyz - pos);
-    float3 lightDir = normalize(g_sceneCB.lightPosition - pos);
-    float3 colour = l_materialCB.albedo / M_PI * g_sceneCB.lightDiffuseColor * max(0.f, dot(normal, lightDir));
-    return  colour;
+float chessBoard(float3 pos) {
+    float chess = floor(sqrt(pos.x*pos.x + pos.z*pos.z)) + floor(atan(pos.z/pos.x));
+    chess = frac(chess * 0.5);
+    chess *= 2;
+    if (chess == 0.0) {
+        chess = 0.5;
+    }
+    return chess;
 }
-
-
 
 //***************************************************************************
 //******************------ Closest hit shaders -------***********************
 //***************************************************************************
 
+//implement a BRDF microfacet for the ground
 [shader("closesthit")]
 void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangleIntersectionAttributes attr)
 {
@@ -981,46 +1089,50 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float3 pos = HitWorldPosition();
     float3 dir = normalize(g_sceneCB.lightPosition.xyz - pos);
     float3 r_dir = randomDirection(HitWorldPosition().xy);
- 
+    float3 l_dir = g_sceneCB.lightPosition.xyz - hitPos;
     float3 pos_n =normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
 
    
+    float c = chessBoard(pos);
+
     Ray shadowRay;
     shadowRay.origin = HitWorldPosition();
     shadowRay.direction = dir;
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
     float3 normal = float3(0, 1, 0);
     float4 reflectionColour = float4(0, 0, 0, 0);
-    if (!shadowHit) {
-        //float distance = length(g_sceneCB.lightPosition - HitWorldPosition());
-       ambient += 0.1* PhongLighting(normal, shadowHit);
+    
+    float3 diffuseColour = float4(c, c, c, 0);
 
-    }
-    else {
-        ambient = float4(0, 0, 0, 0);
-    }
-  
-
+   
         //if immediate ray - i.e., recursion depth = 1
     if (rayPayload.recursionDepth == 1) {
         //store normal, and other elements in relevant GBuffer
 
         //for some reason the triangle normal is not working??! - for now just suppose n = (0, -1, 0)
-        float3 l = lambertian(float4(normal, 0), pos);
-        GBufferBRDF[DispatchRaysIndex().xy] = float4(l, 1);
+        GBufferBRDF[DispatchRaysIndex().xy] = float4(diffuseColour, 1);
         GBufferPosition[DispatchRaysIndex().xy] = float4(pos, 0);
         GBufferNormal[DispatchRaysIndex().xy] = float4(0, 1, 0, 0);
     }
 
+    if (shadowHit) {
+        diffuseColour = float3(0, 0, 0);
+    }
+    else {
+        diffuseColour *= orenNayar(normalize(WorldRayDirection()), normal, normalize(l_dir), 0.5);
+    }
+
+
+    
       if(l_materialCB.reflectanceCoef > 0){
         Ray r = { HitWorldPosition(), reflect(WorldRayDirection(), triangleNormal) };
         reflectionColour = TraceRadianceRay(r, rayPayload).color;
 
     }
 
-    float4 color = ambient + 0.15*reflectionColour;
+    float4 color =  float4(diffuseColour.xyz, 0) + 0.15*reflectionColour;
     float t = RayTCurrent();
   //color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002 * t * t * t));
     float3 colour;
@@ -1033,6 +1145,10 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
 
 }
+
+//implement fresnel
+
+
 
 
 [shader("closesthit")]
@@ -1050,28 +1166,33 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     Ray shadowRay = { pos, l_dir };
     float3 currentDir = RayTCurrent() * WorldRayDirection();
     currentDir += WorldRayOrigin();
-
-    float4 ambient = l_materialCB.albedo;
     
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
 
+
     if (rayPayload.recursionDepth == 1) {
         //store normal, and other elements in relevant GBuffer
-        float3 l = lambertian(attr.normal, pos);
+        float3 l = lambertian(attr.normal, pos, l_materialCB.albedo);
         GBufferBRDF[DispatchRaysIndex().xy] = float4(l, 0);
         GBufferPosition[DispatchRaysIndex().xy] = float4(pos, 0);
         GBufferNormal[DispatchRaysIndex().xy] = float4(attr.normal, 0);
     }
 
-
+    float3 hitColour = float3(0, 0, 0);
     if (!shadowHit) {
-        ambient += 0.1*PhongLighting(float4(attr.normal, 0), shadowHit);
+        //ambient += 0.1*PhongLighting(float4(attr.normal, 0), shadowHit);
     }
-    float4 refractionColour = float4(0, 0, 0, 1);
     float3 dir = normalize(WorldRayDirection());
-   
-    if (l_materialCB.refractiveCoef > 0) {
-        //assume refractive glass
+    float4 refractColour = float4(0, 0, 0, 0);
+    if (l_materialCB.reflectanceCoef > 0.0f && l_materialCB.refractiveCoef <= 0.0f) {
+        Ray r = { pos, reflect(dir, attr.normal) };
+        reflectionColour = TraceRadianceRay(r, rayPayload).color;
+        hitColour += reflectionColour;
+
+    }
+    else if (l_materialCB.refractiveCoef > 0.0f) {
+        float fresnel = Fresnel(dir, attr.normal, l_materialCB.refractiveCoef);
+        bool outside = dot(dir, attr.normal) < 0 ? false : true;
         float n1 = 1;
         float n2 = l_materialCB.refractiveCoef;
         float3 outwardNormal;
@@ -1085,26 +1206,31 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
             outwardNormal = attr.normal;
             index = n1 / n2;
         }
-        if (refractTest(dir, outwardNormal, index, refracted)) {
-            Ray r = { pos, refracted };
-            refractionColour = TraceRadianceRay(r, rayPayload).color;
-        }
-        else {
-            Ray r = { pos, reflect(dir, attr.normal) };
-            // refractionColour = TraceRadianceRay(r, rayPayload.recursionDepth);
-        }
-        float reflectMulti = FresnelAmount(n1, n2, attr.normal, dir);
-    }
-    if (l_materialCB.reflectanceCoef > 0.1f) {
-        Ray r = { pos, reflect(dir, attr.normal) };
-        reflectionColour = TraceRadianceRay(r, rayPayload).color;
-    }
+        refractTest(dir, outwardNormal, index, refracted);
+        if (fresnel < 1) {
 
- 
+            Ray r = { pos, refracted };
+            refractColour = TraceRadianceRay(r, rayPayload).color;
+            //setup refracted ray
+        
+        }
+
+        float3 reflected = normalize(reflect(dir, attr.normal));
+        Ray r = { pos, reflected };
+        reflectionColour = TraceRadianceRay(r, rayPayload).color;
+
+        hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel);
+    }
+    else {
+        hitColour = l_materialCB.albedo * orenNayar(normalize(WorldRayDirection()), attr.normal, normalize(l_dir), 1);
+       // hitColour =   lambertian(attr.normal, pos, l_materialCB.albedo);
+    }
+    float re = reflectionBRDF(dir, attr.normal);
+
 //0.1f is a good coefficient for reflectioncolour.
  // rayPayload.color += refractionColour + 0.1*reflectionColour;
 //  rayPayload.color = refractionColour;
-float4 colour = ambient + refractionColour +  0.1*reflectionColour;
+float4 colour =  l_materialCB.albedo + float4(hitColour.xyz, 0);
 
 //ray
 float t = RayTCurrent();
@@ -1401,6 +1527,9 @@ bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttribute
     CSGNode current = csgTree[0];
     int i = 0;
     int depth = 1;
+    uint num;
+    uint stride;
+    csgTree.GetDimensions(num, stride);
     while(i < 7) {
         //need to record depth
         if (current.boolValue == -1) {

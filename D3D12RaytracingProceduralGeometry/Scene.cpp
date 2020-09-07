@@ -93,7 +93,7 @@ void Scene::Init(float m_aspectRatio)
     {
         if (quatJulia) {
             using namespace SignedDistancePrimitive;
-            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.2, 0.1, 0.2, 0),0, 2.4, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.1, 0.1, 0.1, 0),1, 2, 1.0f, 0.7f, 50, 1.0f);
 
         }
         offset += SignedDistancePrimitive::Count;
@@ -105,7 +105,7 @@ void Scene::Init(float m_aspectRatio)
 
         if (CSG) {
             using namespace CSGPrimitive;
-            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0, 0, 0.0, 0), 1, 0, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0.1, 0.1, 0.1, 0), 1, 2.4, 1.0f, 0.7f, 50, 1.0f);
         }
     }
 
@@ -167,14 +167,18 @@ void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResou
     //SetNodeValues(1, -1, -1, -1, 1, 3, XMFLOAT3(0.5, 0.5, 0));
     //SetNodeValues(2, 0, 1,1, 1, -1, XMFLOAT3(0, 0, 0));
 
-
-    SetNodeValues(0, -1, -1, -1, 1, 3, XMFLOAT3(0,0,0));
-    SetNodeValues(1, -1, -1, -1, 1, 6, XMFLOAT3(0, 0, 0));
+   /* SetNodeValues(0, -1, -1, -1, 1, 6, XMFLOAT3(0, 0, 0));
+    SetNodeValues(1, -1, -1, -1, 1, 4, XMFLOAT3(0, 0, 0));
+    SetNodeValues(2, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
+   */ SetNodeValues(0, -1, -1, -1, 2, 3, XMFLOAT3(0,0,0));
+    SetNodeValues(1, -1, -1, -1, 2, 6, XMFLOAT3(0, 0, 0));
     SetNodeValues(2, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
     SetNodeValues(3, -1, -1, -1, -1, 5, XMFLOAT3(0, 0, 0));
     SetNodeValues(4, -1, -1, -1, -1, 4, XMFLOAT3(0, 0, 0));
     SetNodeValues(5, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
     SetNodeValues(6, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
+
+   // U(HyperBoloid, Sphere) Intersection U(Cone, Ellipsoid)
     /**
      int boolValue;
     //pertains to the geometry described by the AABB encodings
@@ -184,14 +188,14 @@ void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResou
     int rightNodeIndex;
     UINT myIndex;*/
 
-   /* SetNodeValues(0, 1, 2, 1, -1, -1);
-    SetNodeValues(1, 3, 4, 1, 0, -1);
-    SetNodeValues(2, 5, 6, 1, 0, -1);
-    SetNodeValues(3, -1, -1, -1, 1, 2);
-    SetNodeValues(4, -1, -1, -1, 1, 7);
-    SetNodeValues(5, -1, -1, -1, 2, 5);
-    SetNodeValues(6, -1, -1, -1, 2, 4);
-    /*
+   /* SetNodeValues(0, 1, 2, 1, -1, -1, XMFLOAT3(0,0,0));
+    SetNodeValues(1, 3, 4, 1, 0, -1, XMFLOAT3(0, 0, 0));
+    SetNodeValues(2, 5, 6, 1, 0, -1, XMFLOAT3(0, 0, 0));
+    SetNodeValues(3, -1, -1, -1, 1, 2, XMFLOAT3(0, 0, 0));
+    SetNodeValues(4, -1, -1, -1, 1, 7, XMFLOAT3(0, 0, 0));
+    SetNodeValues(5, -1, -1, -1, 2, 5, XMFLOAT3(0, 0, 0));
+    SetNodeValues(6, -1, -1, -1, 2, 4, XMFLOAT3(0, 0, 0));
+    /**
     
     SetNodeValues(0, 1, 2, 1, -1, -1);
     SetNodeValues(2, -1, -1, -1, 0, 5);
@@ -366,7 +370,7 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
             if (quatJulia) {
                 using namespace SignedDistancePrimitive;
 
-                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(0,0, 0), XMFLOAT3(9, 9, 9));
+                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(0 ,0, 0), XMFLOAT3(9, 9, 9));
             }
             offset += SignedDistancePrimitive::Count;
 
@@ -473,15 +477,15 @@ void Scene::CreateGeometry() {
 
 
 
-    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.2, 0.5, 0.2, 0), 0, 1.5, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.2, 0.24, 0.13, 0), 0, 1.5, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.1, 0.2, 0.3, 0), 0, 1.5, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.1, 0.2, 0.3, 0), 1, 1.5, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.2, 0.1, 0), 1, 1.5, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.0, 0.0, 0.2, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.2, 0.0, 0.1, 0), 0, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.5, 0.2, 0.5, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.01, 0.01, 0.4, 0), 2, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.4, 0.01, 0.1, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.05, 0.0, 0, 0), 0, 0.0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 0, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.5, 0.2, 0, 0), 0, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 2, 2, 1, 0.4f, 50, 1 };
 
     PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
@@ -490,17 +494,17 @@ void Scene::CreateGeometry() {
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(-2, -0.4f, 2.0f ), XMFLOAT3(6, 6, 6));
     Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, -0.5f, 0.0f), XMFLOAT3(6, 6, 6));
 
-    Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(1.0f, 0.5f, 0.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
-    Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, -0.75, -2.0f), XMFLOAT3(6, 6, 6));
-    Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(0, 0.0, 0), XMFLOAT3(6, 6, 6));
-    Primitive difference(AnalyticPrimitive::Enum::CSG_Difference, CSG, XMFLOAT3(0.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
-    Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(-2.0f, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
-    Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(-1, 0.0f, -2.0f), XMFLOAT3(6, 6, 6));
-    Primitive plane(AnalyticPrimitive::Plane, cylin_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, -0.75, -2.0f), XMFLOAT3(2, 2, 2));
+    Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(3, -0.2, 0), XMFLOAT3(10, 2, 10));
+    Primitive difference(AnalyticPrimitive::Enum::CSG_Difference, CSG, XMFLOAT3(0.0f, 0.0f, -2.0f), XMFLOAT3(2, 2, 2));
+    Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(0, 0.0f, 0), XMFLOAT3(10, 10, 10));
+    Primitive plane(AnalyticPrimitive::Plane, parab_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive plane2(AnalyticPrimitive::Plane, AABB_b, XMFLOAT3(1, 3.0f, 0.0f), XMFLOAT3(6, 6, 6));
-
-    analyticalObjects = {Sphere, hyperboloid, AABB };
+    Primitive cornellInner(AnalyticPrimitive::CornellBack, cone_b, XMFLOAT3(0, 0, 0.0f), XMFLOAT3(3, 3, 3));
+    analyticalObjects = {Sphere, hyperboloid};
 
 }
 

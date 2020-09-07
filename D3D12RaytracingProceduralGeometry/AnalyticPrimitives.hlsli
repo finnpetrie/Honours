@@ -103,6 +103,78 @@ bool SolveRayQuadricInteresection(in Ray ray, out float tmin, out float tmax, in
 }
 
 
+bool cornellBoxUnColoured(in Ray r, inout float tmin, inout float tmax, out float thit, out ProceduralPrimitiveAttributes attr) {
+    //intersect ray with plane at 
+    float eps = 0.001;
+    //first normal 
+    float3 n1 = float3(0, -1, 0);
+    float3 n2 = float3(0, 1, 0);
+    float3 n3 = float3(0, 0, 1);
+
+    float d1 = dot(r.direction, n1);
+    float d2 = dot(r.direction, n2);
+    float d3 = dot(r.direction, n3);
+
+    float3 p_1 = -(r.origin - float3(0, 2, 0));
+    float3 p_2 = -(r.origin - float3(0, -2, 0));
+    float3 p_3 = -(r.origin - float3(0, 0, -2));
+
+    float t1 = dot(p_1, n1) / d1;
+    float t2 = dot(p_2, n2) / d2;
+    float t3 = dot(p_3, n3) / d3;
+    
+    float3 i1, i2, i3;
+
+    bool inter1, inter2, inter3 = false;
+    
+    if (t1 > eps) {
+        i1 = r.origin + t1 * r.direction;
+        if ((abs(i1.x <= 2)) && abs((i1.z <= 2))) {
+            inter1 = true;
+        }
+    }
+
+    if (t2 > eps) {
+        i2 = r.origin + t2 * r.direction;
+        if ((abs(i2.x <= 2)) && (abs( i2.z <= 2))) {
+            inter2 = true;
+        }
+    }
+
+    if (t3 > eps) {
+        i3 = r.origin + t3 * r.direction;
+        if ((abs(i3.y <= 2)) && (abs(i3.x <= 2))) {
+            inter3 = true;
+        }
+    }
+
+
+
+
+    if (t1 < t2 && t1 < t3 && inter1) {
+        attr.normal = n1;
+        thit = t1;
+        tmin = tmax = t1;
+        return true;
+
+    }
+    else if (t2 < t1 && t2 < t3 && inter2) {
+        attr.normal = n2;
+        thit = t2;
+        tmin = tmax = t2;
+        return true;
+
+    }
+    else if (t3 < t2 && t3 < t1 && inter3) {
+        attr.normal = n3;
+        thit = t3;
+        tmin = tmax = t3;
+        return true;
+    }
+    return false;
+    //figure out which hit point was closest
+}
+
 bool rayPlane(in Ray r, inout float tmin, inout float tmax, out float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float3 translation) {
     float epsilon = 0.001;
     float denominator = dot(r.direction, normal);
@@ -118,17 +190,17 @@ bool rayPlane(in Ray r, inout float tmin, inout float tmax, out float thit, out 
     float3 intersectionPoint;
     if (t1 > epsilon) {
         intersectionPoint = r.origin + t1 * r.direction;
-        if ((abs(intersectionPoint.y < 1)) && (abs(intersectionPoint.z) < 1)) {
-          if (sqrt(intersectionPoint.y * intersectionPoint.y + intersectionPoint.z * intersectionPoint.z) < radius) {
+        if ((abs(intersectionPoint.x < 1)) && (abs(intersectionPoint.z) < 1)) {
+         
                 thit = t1;
                 tmin = tmax = t1;
-                attr.normal = float3(1, 0, 0);
+                attr.normal = normal;
                 if (dot(attr.normal, r.direction) > 0) {
                     attr.normal = -attr.normal;
                 }
                 return true;
             }
-        }
+        
 
     }
     return false;
@@ -173,19 +245,29 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
     if (analyticPrimitive == AnalyticPrimitive::Paraboloid || analyticPrimitive == AnalyticPrimitive::Cone) {
         if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2)) {
             thit = tmax;
+            tmin = tmax;
         }
     }
-
+    if (analyticPrimitive == AnalyticPrimitive::Cylinder) {
+        if ((abs(intersectionPoint.y) > 0.5) || (abs(intersectionPoint.z) > 2)) {
+            thit = tmax;
+            tmin = tmax;
+        }
+    }
     intersectionPoint = r.origin + thit * r.direction;
 
-    attr.normal = CalculateNormalForARayQuadricHit(r, thit, Q);
 
 
     //bound along x-axis
     if (abs(intersectionPoint.x) > 2) {
         return false;
     }
-   
+    //bound y for cylinder
+    if (analyticPrimitive == AnalyticPrimitive::Cylinder) {
+        if ((abs(intersectionPoint.y) > 0.5) || (abs(intersectionPoint.z) > 2)) {
+            return false;
+        }
+   }
     //todo -- add caps - intersect planes
     
     /*if(analyticPrimitive == AnalyticPrimitive::Cylinder) {
@@ -201,7 +283,7 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
     //bound paraboloid in all axes
     
     if (analyticPrimitive == AnalyticPrimitive::Cone) {
-        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2) || intersectionPoint.y > 0) {
+        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2)) {
             return false;
         }
     }    if (analyticPrimitive == AnalyticPrimitive::Paraboloid) {
@@ -209,6 +291,9 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
             return false;
         }
     }
+
+    attr.normal = CalculateNormalForARayQuadricHit(r, thit, Q);
+
     tmin = thit;
     return true;
 }
@@ -235,10 +320,10 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
                                                  0.0f, 0.0f, 1.0f / 1.5f, 0.0f,
                                                    0.0f, -0.1f, 0.0f, 0.0f );
         break;
-    case AnalyticPrimitive::Cylinder: Q = float4x4( 0.0f, 0.0f, 0.0f, 0.0f,
-                                        0.0f, 1.0f, 0.0f, 0.0f,
+    case AnalyticPrimitive::Cylinder: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
+                                        0.0f, 0.0f, 0.0f, 0.0f,
                                         0.0f, 0.0f, 1.0f, 0.0f,
-                                        0.0f, 0.0f, 0.0f, -1.0f );
+                                        0.0f, 0.0f, 0.0f, -3.0f );
         break;
     case AnalyticPrimitive::Cone: Q = float4x4 (-1.0f, 0.0f, 0.0f, 0.0f,
                                                 0.0f, 1.0f, 0.0f, 0.0f,
@@ -268,7 +353,7 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
         
     }
 
-    float left_tmin, left_tmax, left_thit, right_tmin, right_tmax, right_thit;
+   /* float left_tmin, left_tmax, left_thit, right_tmin, right_tmax, right_thit;
     ProceduralPrimitiveAttributes leftPlane, rightPlane;
     if(type == AnalyticPrimitive::Cylinder) {
         //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
@@ -286,7 +371,7 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
                hitFound = true;
            }
        }
-    }
+    }*/
  
     return hitFound;
 

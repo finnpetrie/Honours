@@ -56,9 +56,10 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
         float raySize = photon.position.w;
         float scale = min(raySize / lMax, 1);
        //scale position
-        float4 scaledPos = scale * float4(position.xyz, 0);
        //squish position
        //multiplied by some scaling factor
+        float radius = minMajKernelRadius + (maxMajorKernelRadius - minMajKernelRadius) * sqrt(1 - photon.normal.w);
+        float4 scaledPos = scale * float4(position.xyz, 0);
 
        float k = sqrt(dot(-photon.direction, -photon.direction));
 
@@ -89,7 +90,7 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
         float oversize = 1.1;
         //multiplied by 1.1 to avoid undersampling
         float4 p = sP * majKernelRadius*oversize;
-        float4 p_i = p + photon.position; //+ float4(scaled_u, 0) + float4(toT, 0);
+        float4 p_i = p + photon.position + float4(scaled_u, 0) + float4(toT, 0);
         //float4 p_i = float4(p.xyz * majKernelRadius, 1);
         float4  c = mul(proj, float4(p_i.xyz, 1));
         //loat ellipse_area = pi*
@@ -98,8 +99,12 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
 
         float4 projectedPos = mul(proj, float4(photon.position.xyz, 1));
     
+        float3 uN = normalize(u);
+        float3 pN = normalize(photon.normal.xyz);
+        float3 tN = normalize(toT);
 
-        float3x3 ellipsoidBasis = float3x3(normalize(u), normalize(photon.normal.xyz), normalize(toT) );
+        float3x3 ellipsoidBasis = float3x3(uN.x, pN.x, tN.x,uN.y, pN.y, tN.y,
+                                            uN.z, pN.z, tN.z);
 
 
         //we know the ellipsoid basis is orthnormal (at least we can make it orthonormal), therefore its tranpose is its inverse
@@ -108,16 +113,16 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
         result.majKernelRadiusSquared = majKernel2;
         result.invMajKernelRadius = invMajorKernelR;
         result.position = c;
-        result.kernelMinor = kSquash;
+        result.kernelMinor = radius;
         //colour, i.e., power, is divided by kernel radius * pi to normalize
         //UNSURE ABOUT THIS - HOW DO WE COMPUTE THE COLOUR -
         result.color = photon.colour*=inv;
         result.direction = photon.direction;
         result.originalPosition = photon.position;
         result.normal = photon.normal;
-        result.u_radius = length(scaled_u);
-        result.t_radius = length(toT);
-        result.eInverse = eInverse;
+        result.u_radius = length(scaled_u) *majKernelRadius * oversize;
+        result.t_radius = length(toT) * majKernelRadius * oversize;
+        result.eInverse = ellipsoidBasis;
         return result;
 
 }
@@ -140,14 +145,16 @@ float4 PSMain(PSInput input) : SV_TARGET
      //float exp = 1 - exp()
      float distance2 = dot(axis.xyz, axis.xyz);
     // float relativeDistance = sqrt(distance2 * dot(axis.xyz, input.normal.xyz) * dot(axis.xyz, input.normal.xyz));
-    
+     float probability = input.normal.w;
      float r_1 = input.u_radius;
      float r_3 = input.t_radius;
      float r_2 = 1;
 
-     float r = 0.12;
+     float r = 1/probability;
      // float r = input.kernelMinor + (sqrt(input.majKernelRadius) - )
      //float r = input.majKernelRadiusSquared;
+
+
      float p_a = -beta * (distance2 / (2 * r * r));
      float exponentCoeff = -((axisE.x * axisE.x) / (2 * r_1 * r_1) + (axisE.y * axisE.y) / (2 *r_2 * r_2) + (axisE.z * axisE.z) / (2 * r_3 * r_3));
      
@@ -155,7 +162,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      float symExponent = -(distance2) / (2 * r * r);
      // float gaussianExponent = exp(-())
     // float gauss = 1/(2*pi)*r
-     float gauss = 1 / (r_1*r_2*r* sqrt(2 * pi)) * exp(exponentCoeff);
+     float gauss = 1 / (r_1*r_2*r_3* sqrt(2 * pi)) * exp(exponentCoeff);
      float symmetricGauss = 1 / (r * r * sqrt(2 * pi)) * exp(symExponent);
      float JensenGauss = alpha*(1 - ((1 - exp(p_a)) / (1 - exp(-p_a))));
 
@@ -173,18 +180,18 @@ float4 PSMain(PSInput input) : SV_TARGET
      }
 
      //cone filter
-     float k = 0.5;
+     float k = 0.6;
      //falloff
      float wp = 1 - sqrt(distance2) / (k * r);
      //wp = min(1 / 5, wp);
 
      float4 BRDF = GBufferBRDF[input.position.xy];
 
-     float nor = (1 - (2 / 3 * k)) * pi * r * r;
+     float nor = (1 - (2 / 3 * k))*pi*r*r;
      // float4 color = BRDF * kernel
      float n_o = wp / nor;
          //float4 color = (float4(BRDF.x * input.color.x, BRDF.y * input.color.y, BRDF.z * input.color.z, 1));// *maxima * wp) / (1 - 2 / 3 * k) * pi * r * r * r * r;//divided by distance?
-     float4 color = ( BRDF*input.color) * max(0, k_L) * symmetricGauss;
+     float4 color = (BRDF*input.color) * max(0, k_L)* n_o;
      float totalPower = dot(color.xyz, float3(1.0f, 1.0f, 1.0f));
      float3 weighted_direction = totalPower * input.direction.xyz;
     
@@ -193,7 +200,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // rasterTarget[input.position.xy] += color;
     // return  input.color;
      // return  float4(distance2, distance2, distance2, 0);
-     return color;
+     return 20*color;
      // return 22*float4(n_o, n_o, n_o, n_o);//float4(gauss, gauss, gauss, gauss);//float4(gauss, gauss, gauss, gauss);
       //return float4(color.xyz, weighted_direction.x)
     // return input.position;*/

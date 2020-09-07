@@ -1784,8 +1784,8 @@ void Application::DoScreenSpacePhotonMapping()
         dispatchDesc->MissShaderTable.StrideInBytes = m_missPhotonTableStrideInBytes;
         dispatchDesc->RayGenerationShaderRecord.StartAddress = m_photonRayGenTable->GetGPUVirtualAddress();
         dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_photonRayGenTable->GetDesc().Width;
-        dispatchDesc->Width = 1000;
-        dispatchDesc->Height = 1000;
+        dispatchDesc->Width = 800;
+        dispatchDesc->Height = 800;
         dispatchDesc->Depth = 1;
         raytracingCommandList->SetPipelineState1(stateObject);
         
@@ -2292,8 +2292,8 @@ void Application::OnRender()
     //  CopyRaytracingOutputToBackbuffer();
 
     DoRasterisation();
-    CopyBackBufferToRasterBuffer();
-    DoCompositing();
+   CopyBackBufferToRasterBuffer();
+   DoCompositing();
 
    CopyRaytracingOutputToBackbuffer();
 

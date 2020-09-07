@@ -191,14 +191,14 @@
     <FxCompile Include="RayPixel.hlsl">
       <Filter>Assets\Shaders\Rasterisation</Filter>
     </FxCompile>
-    <FxCompile Include="shaders.hlsl">
-      <Filter>Assets\Shaders\Rasterisation</Filter>
-    </FxCompile>
     <FxCompile Include="PhotonTiling.hlsl">
       <Filter>Assets\Shaders\Util</Filter>
     </FxCompile>
     <FxCompile Include="CompositeIndirectDirect.hlsl">
       <Filter>Assets\Shaders\Util</Filter>
+    </FxCompile>
+    <FxCompile Include="shaders.hlsl">
+      <Filter>Assets\Shaders\Rasterisation</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
