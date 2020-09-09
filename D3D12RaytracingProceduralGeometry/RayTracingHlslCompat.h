@@ -57,6 +57,7 @@ struct RayPayload
 
 struct PathTracingPayload {
     XMFLOAT4 colour;
+    XMFLOAT3 energy;
     UINT recursionDepth;
     UINT randomSeed;
 };
@@ -100,6 +101,7 @@ struct SceneConstantBuffer
     UINT accumulatedFrames;
     UINT spp;
     UINT frameNumber;
+    float lightPower;
     float rand1;
     float rand2;
     float rand3;

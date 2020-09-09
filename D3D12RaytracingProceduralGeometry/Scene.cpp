@@ -147,8 +147,8 @@ void Scene::Init(float m_aspectRatio)
      
         lightPosition = XMFLOAT4(18, 10, -18, 0.0f);
         m_sceneCB->lightPosition = XMLoadFloat4(&lightPosition);
-
-        lightAmbientColor = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
+        m_sceneCB->lightPower = 2;
+        lightAmbientColor = XMFLOAT4(1, 1, 1, 1.0f);
         m_sceneCB->lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
 
         float d = 0.5;
@@ -377,7 +377,7 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
             if (quatJulia) {
                 using namespace SignedDistancePrimitive;
 
-                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(0 ,0, 0), XMFLOAT3(9, 9, 9));
+                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(2 ,0, -4), XMFLOAT3(9, 9, 9));
             }
             offset += SignedDistancePrimitive::Count;
 
@@ -501,34 +501,34 @@ void Scene::CreateGeometry() {
 
 
 
-    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.3, 0.3, 0.3, 0), 0, 1.5, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.3, 0.01, 0.2, 0), 0, 1.6f, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.1, 0.2, 0.3, 0), 1, 1.5, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.2, 0.1, 0), 1, 1.5, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.5, 0.2, 0.5, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.8, 0.64, 0.12, 0), 2, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.1, 0.2, 0.3, 0), 1, 1.6, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.2, 0.1, 0), 1.7, 1.5, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.5, 0.2, 0.5, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.8, 0.64, 0.12, 0), 1, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.4, 0.01, 0.1, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.5, 0.2, 0, 0), 0, 0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 2, 2, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 2, 0, 1, 0.4f, 50, 1 };
 
     PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
     Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 0), XMFLOAT3(9, 9, 9));
-    Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(1, 2, -2), XMFLOAT3(9, 9, 9));
+    Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(3, -0.4, 5), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(-2, -0.4f, 2.0f ), XMFLOAT3(6, 6, 6));
-    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, -0.5f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, -0.4, 0.0f), XMFLOAT3(6, 6, 6));
 
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(1.0f, 0.5f, 0.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
-    Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, -0.75, -2.0f), XMFLOAT3(2, 2, 2));
-    Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(3, -0.2, 0), XMFLOAT3(10, 2, 10));
+    Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(3.0f, 0, -2.0f), XMFLOAT3(2, 2, 2));
+    Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(5, -0.2, -3), XMFLOAT3(10, 2, 10));
     Primitive difference(AnalyticPrimitive::Enum::CSG_Difference, CSG, XMFLOAT3(0.0f, 0.0f, -2.0f), XMFLOAT3(2, 2, 2));
     Primitive csg_union(AnalyticPrimitive::Enum::CSG_Union, CSG, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive intersection(AnalyticPrimitive::Enum::CSG_Intersection, CSG, XMFLOAT3(0, 0.0f, 0), XMFLOAT3(10, 10, 10));
     Primitive plane(AnalyticPrimitive::Plane, parab_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive plane2(AnalyticPrimitive::Plane, AABB_b, XMFLOAT3(1, 3.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive cornellInner(AnalyticPrimitive::CornellBack, cone_b, XMFLOAT3(0, 0, 0.0f), XMFLOAT3(3, 3, 3));
-    analyticalObjects = {hyperboloid, Sphere,    AABB};
+    analyticalObjects = { Sphere, ellipsoid, hyperboloid,  AABB};
 
 }
 

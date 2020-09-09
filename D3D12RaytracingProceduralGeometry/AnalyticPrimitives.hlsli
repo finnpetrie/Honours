@@ -262,6 +262,7 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
     if (abs(intersectionPoint.x) > 2) {
         return false;
     }
+
     //bound y for cylinder
     if (analyticPrimitive == AnalyticPrimitive::Cylinder) {
         if ((abs(intersectionPoint.y) > 0.5) || (abs(intersectionPoint.z) > 2)) {
@@ -286,8 +287,9 @@ bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, ou
         if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2)) {
             return false;
         }
-    }    if (analyticPrimitive == AnalyticPrimitive::Paraboloid) {
-        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2)) {
+    }  
+    if (analyticPrimitive == AnalyticPrimitive::Paraboloid) {
+        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.x) > 2)) {
             return false;
         }
     }
