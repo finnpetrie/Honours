@@ -59,6 +59,11 @@ const wchar_t* Application::c_hitGroupNames_AABBGeometry[][RayType::Count] =
 
 };
 
+const wchar_t* Application::c_lightPathTracingRayGen = L"LightTracingRayGen";
+const wchar_t* Application::c_lightPathTracingClosestHit[] = {
+    L"LightTracingClosestHitTriangle",
+    L"LightTracingClosestHitProcedural"
+};
 const wchar_t* Application::c_forwardPathTracingRayGen = L"ForwardPathTracingRayGen";
 const wchar_t* Application::c_forwardPathTracingClosestHit[] = {
     L"ForwardPathTracingClosestHitTriangle",
@@ -141,6 +146,7 @@ void Application::OnInit()
 
 
 
+
 // Create resources that depend on the device.
 void Application::CreateDeviceDependentResources()
 {
@@ -166,12 +172,15 @@ void Application::CreateDeviceDependentResources()
         CreateCompositeRayPipelineStateObject();
         CreateRasterRootSignatures();
         CreateRasterisationPipeline();
+        CreateForwardBidirectionalRootSignatures();
+        CreateBiDirectionalPathTracingStateObjects(false);
+
     }
     else {
-        CreateForwardBidirectionalRootSignatures();
-
+        CreateLightBidirectionalRootSignatures();
         //CreatePhotonTilingComptuePassStateObject();
-        CreateBiDirectionalPathTracingStateObjects();
+        CreateForwardBidirectionalRootSignatures();
+        CreateBiDirectionalPathTracingStateObjects(true);
     }
      //createRayTracingPipeline_Two();
 
@@ -196,6 +205,8 @@ void Application::CreateDeviceDependentResources()
     scene->CreateCSGTree(m_deviceResources);
     scene->convertCSGToArray(10, m_deviceResources);
     // Build shader tables, which define shaders and their local root arguments.
+    BuildForwardPathShaderTables();
+
     if (photonMapping) {
         BuildShaderTables();
 
@@ -203,7 +214,7 @@ void Application::CreateDeviceDependentResources()
         BuildPhotonShaderTable();
     }
     else {
-        BuildForwardPathShaderTables();
+        BuildLightPathShaderTable();
 
     }
 
@@ -222,23 +233,81 @@ void Application::SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE
     ThrowIfFailed(device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&(*rootSig))));
 }
 
+void Application::CreateLightBidirectionalRootSignatures()
+{
+    auto device = m_deviceResources->GetD3DDevice();
+    CD3DX12_DESCRIPTOR_RANGE ranges[4];
+    ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4*MAX_RAY_RECURSION_DEPTH, 8);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 7);
+   // ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH, 14);
+    //ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH, 22);
+    //ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH, 29);
+    ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
+
+    {
+        namespace r = GlobalRootSignature_BidirectionalLight::Slot;
+        CD3DX12_ROOT_PARAMETER rootParameters[r::Count];
+        rootParameters[r::OutputView].InitAsDescriptorTable(1, &ranges[0]);
+        rootParameters[r::LightVertices].InitAsDescriptorTable(1, &ranges[1]);
+     //   rootParameters[r::LightNormals].InitAsDescriptorTable(1, &ranges[2]);
+       // rootParameters[r::LightColours].InitAsDescriptorTable(1, &ranges[3]);
+        //rootParameters[r::LightDirection].InitAsDescriptorTable(1, &ranges[4]);
+        rootParameters[r::StagingTarget].InitAsDescriptorTable(1, &ranges[2]);
+        rootParameters[r::AccelerationStructure].InitAsShaderResourceView(0);
+        rootParameters[r::SceneConstant].InitAsConstantBufferView(0);
+        rootParameters[r::AABBattributeBuffer].InitAsShaderResourceView(3);
+        rootParameters[r::CSGTree].InitAsShaderResourceView(4);
+        rootParameters[r::VertexBuffers].InitAsDescriptorTable(1, &ranges[3]);
+        CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+        SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_bidirectionalLightRootSignature);
+    }
+
+    {
+        namespace RootSignatureSlots = LocalRootSignature::Triangle::Slot;
+        CD3DX12_ROOT_PARAMETER rootParameters[RootSignatureSlots::Count];
+        rootParameters[RootSignatureSlots::MaterialConstant].InitAsConstants(SizeOfInUint32(PrimitiveConstantBuffer), 1);
+
+        CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+        localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+        SerializeAndCreateRaytracingRootSignature(localRootSignatureDesc, &m_birdirectionalLightLocalRoot[LocalRootSignature::Type::Triangle]);
+    }
+
+    // AABB geometry
+    {
+        namespace RootSignatureSlots = LocalRootSignature::AABB::Slot;
+        CD3DX12_ROOT_PARAMETER rootParameters[RootSignatureSlots::Count];
+        rootParameters[RootSignatureSlots::MaterialConstant].InitAsConstants(SizeOfInUint32(PrimitiveConstantBuffer), 1);
+        rootParameters[RootSignatureSlots::GeometryIndex].InitAsConstants(SizeOfInUint32(PrimitiveInstanceConstantBuffer), 2);
+
+        CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+        localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
+        SerializeAndCreateRaytracingRootSignature(localRootSignatureDesc, &m_birdirectionalLightLocalRoot[LocalRootSignature::Type::AABB]);
+    }
+
+}
 
 void Application::CreateForwardBidirectionalRootSignatures() {
     auto device = m_deviceResources->GetD3DDevice();
-    CD3DX12_DESCRIPTOR_RANGE ranges[2];
+    CD3DX12_DESCRIPTOR_RANGE ranges[4];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
+    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4*MAX_RAY_RECURSION_DEPTH, 8);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 7);
+    ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
 
     {
 
         namespace rootSig = GlobalRootSignature_Bidirectional::Slot;
         CD3DX12_ROOT_PARAMETER rootParameters[rootSig::Count];
         rootParameters[rootSig::OutputView].InitAsDescriptorTable(1, &ranges[0]);
+        rootParameters[rootSig::LightVertices].InitAsDescriptorTable(1, &ranges[1]);
+        rootParameters[rootSig::StagingTarget].InitAsDescriptorTable(1, &ranges[2]);
+
         rootParameters[rootSig::AccelerationStructure].InitAsShaderResourceView(0);
         rootParameters[rootSig::SceneConstant].InitAsConstantBufferView(0);
         rootParameters[rootSig::AABBattributeBuffer].InitAsShaderResourceView(3);
         rootParameters[rootSig::CSGTree].InitAsShaderResourceView(4);
-        rootParameters[rootSig::VertexBuffers].InitAsDescriptorTable(1, &ranges[1]);
+        rootParameters[rootSig::VertexBuffers].InitAsDescriptorTable(1, &ranges[3]);
         CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
         SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_bidirectionalForwardRootSignature);
 
@@ -703,6 +772,41 @@ void Application::CreateHitGroupSubobjectsPathTracing(CD3DX12_STATE_OBJECT_DESC*
             }
     }
 }
+
+void Application::CreateHitGroupSubobjectsLightTracing(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline) {
+    {
+        for (UINT rayType = 0; rayType < RayType::Count; rayType++)
+        {
+            auto hitGroup = raytracingPipeline->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+            if (rayType == RayType::Radiance)
+            {
+                hitGroup->SetClosestHitShaderImport(c_lightPathTracingClosestHit[GeometryType::Triangle]);
+                // hitGroup->SetAnyHitShaderImport(c_anyHitShaderNames[GeometryType::Triangle]);
+            }
+            hitGroup->SetHitGroupExport(c_hitGroupNames_TriangleGeometry[rayType]);
+            hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+        }
+    }
+
+    // AABB geometry hit groups
+    {
+        // Create hit groups for each intersection shader.
+        for (UINT t = 0; t < IntersectionShaderType::Count; t++)
+            for (UINT rayType = 0; rayType < RayType::Count; rayType++)
+            {
+                auto hitGroup = raytracingPipeline->CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+                hitGroup->SetIntersectionShaderImport(c_intersectionShaderNames[t]);
+                if (rayType == RayType::Radiance)
+                {
+                    // hitGroup->SetAnyHitShaderImport(c_anyHitShaderNames[GeometryType::AABB]);
+                    //NEED TO CHECK IF WE ARE CREATING A FORWARD PATH TRACER OR BACKWARD
+                    hitGroup->SetClosestHitShaderImport(c_lightPathTracingClosestHit[GeometryType::AABB]);
+                }
+                hitGroup->SetHitGroupExport(c_hitGroupNames_AABBGeometry[t][rayType]);
+                hitGroup->SetHitGroupType(D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE);
+            }
+    }
+}
 void Application::CreateHitGroupSubobjectsPhotonPass(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline)
 {
     // Triangle geometry hit groups
@@ -1035,9 +1139,10 @@ void Application::CreatePhotonMappingFirstPassStateObject() {
 }
 
 
-void Application::CreateBiDirectionalPathTracingStateObjects() {
+void Application::CreateBiDirectionalPathTracingStateObjects(bool bidirectional) {
     ///create Forward pass state object
-    CD3DX12_STATE_OBJECT_DESC forwardPass{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+    {
+        CD3DX12_STATE_OBJECT_DESC forwardPass{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
 
     // DXIL library
     auto lib = forwardPass.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
@@ -1071,6 +1176,45 @@ void Application::CreateBiDirectionalPathTracingStateObjects() {
 
     // Create the state object.y
     ThrowIfFailed(m_dxrDevice->CreateStateObject(forwardPass, IID_PPV_ARGS(&m_forwardPathState)), L"Couldn't create DirectX Raytracing state object.\n");
+    }
+
+    if (bidirectional) {
+        {
+            CD3DX12_STATE_OBJECT_DESC lightPass{ D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE };
+
+            // DXIL library
+            auto lib = lightPass.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+            D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)g_pRaytracing, ARRAYSIZE(g_pRaytracing));
+            lib->SetDXILLibrary(&libdxil);
+
+            {
+                lib->DefineExport(c_lightPathTracingRayGen);
+
+                lib->DefineExports(c_lightPathTracingClosestHit);
+                lib->DefineExports(c_intersectionShaderNames);
+                lib->DefineExports(c_missPathShaders);
+            }
+
+            CreateHitGroupSubobjectsLightTracing(&lightPass);
+
+            auto shaderConfig = lightPass.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+            UINT payloadSize = max(sizeof(PathTracingPayload), sizeof(ShadowRayPayload));
+            UINT attributeSize = sizeof(struct ProceduralPrimitiveAttributes);
+            shaderConfig->Config(payloadSize, attributeSize);
+            CreateLocalRootSignatureSubobjects(&lightPass, m_birdirectionalLightLocalRoot);
+
+            auto globalRootSignature = lightPass.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+            globalRootSignature->SetRootSignature(m_bidirectionalLightRootSignature.Get());
+
+            auto pipelineConfig = lightPass.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+            UINT maxRecursionDepth = MAX_RAY_RECURSION_DEPTH;
+            pipelineConfig->Config(maxRecursionDepth);
+
+            PrintStateObjectDesc(lightPass);
+
+            // Create the state object.y
+            ThrowIfFailed(m_dxrDevice->CreateStateObject(lightPass, IID_PPV_ARGS(&m_lightPathState)), L"Couldn't create DirectX Raytracing state object.\n");    }
+    }
 }
 
 // Create a raytracing pipeline state object (RTPSO).
@@ -1317,6 +1461,150 @@ void Application::CreateDeferredGBuffer() {
 }
 
 
+void Application::CreateStagingResource() {
+    auto device = m_deviceResources->GetD3DDevice();
+    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
+
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(backbufferFormat, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+    ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&stagingResource)));
+    NAME_D3D12_OBJECT(stagingResource);
+    stagingCounterDescriptorHeapIndex = UINT_MAX;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+    stagingCounterDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, stagingCounterDescriptorHeapIndex);
+
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uva = {};
+    uva.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    device->CreateUnorderedAccessView(stagingResource.Get(), nullptr, &uva, uavDescriptorHandle);
+    stagingGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), stagingCounterDescriptorHeapIndex, m_descriptorSize);
+}
+void Application::CreateLightBuffers() {
+
+
+    
+/*    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_gBufferWidth, m_gBufferHeight, m_gBufferDepth, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+    m_gBuffers.clear();
+
+    for (int i = 0; i < NumGBuffers; ++i)
+    {
+        GBuffer gBuffer = {};
+
+        ThrowIfFailed(device->CreateCommittedResource(
+            &defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gBuffer.textureResource)));
+        NAME_D3D12_OBJECT(gBuffer.textureResource);
+
+        gBuffer.uavDescriptorHeapIndex = UINT_MAX;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        gBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, gBuffer.uavDescriptorHeapIndex);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+        UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+        UAVDesc.Texture2DArray.ArraySize = m_gBufferDepth;
+        device->CreateUnorderedAccessView(gBuffer.textureResource.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+        gBuffer.uavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), gBuffer.uavDescriptorHeapIndex, m_descriptorSize);
+
+        m_gBuffers.push_back(gBuffer);
+    }*/
+    auto device = m_deviceResources->GetD3DDevice();
+    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
+    // DXGI_FORMAT_R32G32B32A32_FLOAT
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    LightBuffers.clear();
+    LightNormals.clear();
+    LightColours.clear();
+    LightDirections.clear();
+    //auto firstUav = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UINT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+    for (int i = 0; i < 4*MAX_RAY_RECURSION_DEPTH; i++) {
+        IBuffer lightBuffer = {};
+
+        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&lightBuffer.textureResource)));
+        std::wstring name;
+     
+        NAME_D3D12_OBJECT(lightBuffer.textureResource);
+        lightBuffer.uavDescriptorHeapIndex = UINT_MAX;
+
+
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        lightBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, lightBuffer.uavDescriptorHeapIndex);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+      //  uavDesc.Texture2DArray.ArraySize = MAX_RAY_RECURSION_DEPTH;
+        device->CreateUnorderedAccessView(lightBuffer.textureResource.Get(), nullptr, &uavDesc, uavDescriptorHandle);
+        lightBuffer.uavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), lightBuffer.uavDescriptorHeapIndex, m_descriptorSize);
+
+        LightBuffers.push_back(lightBuffer);
+    }
+
+   /* for (int i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
+        IBuffer normalBuffer = {};
+
+        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&normalBuffer.textureResource)));
+        std::wstring name;
+      
+
+        NAME_D3D12_OBJECT(normalBuffer.textureResource);
+        normalBuffer.uavDescriptorHeapIndex = UINT_MAX;
+
+
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        normalBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, normalBuffer.uavDescriptorHeapIndex);
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        device->CreateUnorderedAccessView(normalBuffer.textureResource.Get(), nullptr, &uavDesc, uavDescriptorHandle);
+        normalBuffer.uavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), normalBuffer.uavDescriptorHeapIndex, m_descriptorSize);
+
+        LightNormals.push_back(normalBuffer);
+    }
+
+        for (int i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
+            IBuffer colourBuffer = {};
+
+            ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&colourBuffer.textureResource)));
+            std::wstring name;
+
+
+            NAME_D3D12_OBJECT(colourBuffer.textureResource);
+            colourBuffer.uavDescriptorHeapIndex = UINT_MAX;
+
+
+            D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+            colourBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, colourBuffer.uavDescriptorHeapIndex);
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+            device->CreateUnorderedAccessView(colourBuffer.textureResource.Get(), nullptr, &uavDesc, uavDescriptorHandle);
+            colourBuffer.uavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), colourBuffer.uavDescriptorHeapIndex, m_descriptorSize);
+
+            LightColours.push_back(colourBuffer);
+        }
+
+        for (int i = 0; i < MAX_RAY_RECURSION_DEPTH; i++) {
+            IBuffer directionBuffer = {};
+
+            ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&directionBuffer.textureResource)));
+            std::wstring name;
+
+
+            NAME_D3D12_OBJECT(directionBuffer.textureResource);
+            directionBuffer.uavDescriptorHeapIndex = UINT_MAX;
+
+
+            D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+            directionBuffer.uavDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, directionBuffer.uavDescriptorHeapIndex);
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+            device->CreateUnorderedAccessView(directionBuffer.textureResource.Get(), nullptr, &uavDesc, uavDescriptorHandle);
+            directionBuffer.uavGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), directionBuffer.uavDescriptorHeapIndex, m_descriptorSize);
+
+            LightColours.push_back(directionBuffer);
+        }*/
+}
+
 
 // Create a 2D output texture for raytracing.
 
@@ -1355,6 +1643,9 @@ void Application::CreateDescriptorHeap()
     UINT additionalCount = 0;
     if(photonMapping){
         additionalCount = 3 * MAX_RAY_RECURSION_DEPTH + 1 + 1 + 3 + 1 + 20;
+    }
+    else {
+        additionalCount = 4*MAX_RAY_RECURSION_DEPTH + 16;
     }
     descriptorHeapDesc.NumDescriptors = 6 + additionalCount;
     descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -1924,6 +2215,126 @@ void Application::BuildForwardPathShaderTables()
     }
 }
 
+
+void Application::BuildLightPathShaderTable()
+{
+    auto device = m_deviceResources->GetD3DDevice();
+
+    void* rayGenShaderID;
+    void* missShaderIDs[RayType::Count];
+    void* hitGroupShaderIDs_TriangleGeometry[RayType::Count];
+    void* hitGroupShaderIDs_AABBGeometry[IntersectionShaderType::Count][RayType::Count];
+
+    // A shader name look-up table for shader table debug print out.
+    unordered_map<void*, wstring> shaderIdToStringMap;
+
+    auto GetShaderIDs = [&](auto* stateObjectProperties)
+    {
+        rayGenShaderID = stateObjectProperties->GetShaderIdentifier(c_lightPathTracingRayGen);
+        shaderIdToStringMap[rayGenShaderID] = c_forwardPathTracingRayGen;
+
+        for (UINT i = 0; i < RayType::Count; i++)
+        {
+            missShaderIDs[i] = stateObjectProperties->GetShaderIdentifier(c_missPathShaders[i]);
+            shaderIdToStringMap[missShaderIDs[i]] = c_missPathShaders[i];
+        }
+        for (UINT i = 0; i < RayType::Count; i++)
+        {
+            hitGroupShaderIDs_TriangleGeometry[i] = stateObjectProperties->GetShaderIdentifier(c_hitGroupNames_TriangleGeometry[i]);
+            shaderIdToStringMap[hitGroupShaderIDs_TriangleGeometry[i]] = c_hitGroupNames_TriangleGeometry[i];
+        }
+        for (UINT r = 0; r < IntersectionShaderType::Count; r++)
+            for (UINT c = 0; c < RayType::Count; c++)
+            {
+                hitGroupShaderIDs_AABBGeometry[r][c] = stateObjectProperties->GetShaderIdentifier(c_hitGroupNames_AABBGeometry[r][c]);
+                shaderIdToStringMap[hitGroupShaderIDs_AABBGeometry[r][c]] = c_hitGroupNames_AABBGeometry[r][c];
+            }
+    };
+
+    // Get shader identifiers.
+    UINT shaderIDSize;
+    {
+        ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+        ThrowIfFailed(m_lightPathState.As(&stateObjectProperties));
+        GetShaderIDs(stateObjectProperties.Get());
+        shaderIDSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    }
+
+    // RayGen shader table.
+    {
+        UINT numShaderRecords = 1;
+        UINT shaderRecordSize = shaderIDSize; // No root arguments
+
+        ShaderTable rayGenShaderTable(device, numShaderRecords, shaderRecordSize, L"RayGenShaderTable");
+        rayGenShaderTable.push_back(ShaderRecord(rayGenShaderID, shaderRecordSize, nullptr, 0));
+        rayGenShaderTable.DebugPrint(shaderIdToStringMap);
+        m_lightPathRayGenShaderTable = rayGenShaderTable.GetResource();
+    }
+
+    // Miss shader table.
+    {
+        UINT numShaderRecords = RayType::Count;
+        UINT shaderRecordSize = shaderIDSize; // No root arguments
+
+        ShaderTable missShaderTable(device, numShaderRecords, shaderRecordSize, L"MissShaderTable");
+        for (UINT i = 0; i < RayType::Count; i++)
+        {
+            missShaderTable.push_back(ShaderRecord(missShaderIDs[i], shaderIDSize, nullptr, 0));
+        }
+        missShaderTable.DebugPrint(shaderIdToStringMap);
+        m_lightPathRayMissShaderTableStrideInBytes = missShaderTable.GetShaderRecordSize();
+        m_lightPathMissShaderTable = missShaderTable.GetResource();
+    }
+
+    // Hit group shader table.
+    {
+        UINT numShaderRecords = RayType::Count + IntersectionShaderType::TotalPrimitiveCount * RayType::Count;
+        UINT shaderRecordSize = shaderIDSize + LocalRootSignature::MaxRootArgumentsSize();
+        ShaderTable hitGroupShaderTable(device, numShaderRecords, shaderRecordSize, L"HitGroupShaderTable");
+
+        // Triangle geometry hit groups.
+        {
+            LocalRootSignature::Triangle::RootArguments rootArgs;
+            rootArgs.materialCb = scene->m_planeMaterialCB;
+
+            for (auto& hitGroupShaderID : hitGroupShaderIDs_TriangleGeometry)
+            {
+                hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderID, shaderIDSize, &rootArgs, sizeof(rootArgs)));
+            }
+        }
+
+        // AABB geometry hit groups.
+        {
+            LocalRootSignature::AABB::RootArguments rootArgs;
+            UINT instanceIndex = 0;
+
+            // Create a shader record for each primitive.
+            for (UINT iShader = 0, instanceIndex = 0; iShader < IntersectionShaderType::Count; iShader++)
+            {
+                UINT numPrimitiveTypes = IntersectionShaderType::PerPrimitiveTypeCount(static_cast<IntersectionShaderType::Enum>(iShader));
+
+                // Primitives for each intersection shader.
+                for (UINT primitiveIndex = 0; primitiveIndex < numPrimitiveTypes; primitiveIndex++, instanceIndex++)
+                {
+                    //    rootArgs.materialCb = m_aabbMaterialCB[instanceIndex];
+                    rootArgs.materialCb = scene->m_aabbMaterialCB[instanceIndex];
+                    rootArgs.aabbCB.instanceIndex = instanceIndex;
+                    rootArgs.aabbCB.primitiveType = primitiveIndex;
+
+                    // Ray types.
+                    for (UINT r = 0; r < RayType::Count; r++)
+                    {
+                        auto& hitGroupShaderID = hitGroupShaderIDs_AABBGeometry[iShader][r];
+                        hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderID, shaderIDSize, &rootArgs, sizeof(rootArgs)));
+                    }
+                }
+            }
+        }
+        hitGroupShaderTable.DebugPrint(shaderIdToStringMap);
+        m_lightPathHitGroupShaderTableStrideInBytes = hitGroupShaderTable.GetShaderRecordSize();
+        m_lightPathHitGroupShaderTable = hitGroupShaderTable.GetResource();
+    }
+}
 void Application::OnKeyDown(UINT8 key)
 {
     scene->keyPress(key);
@@ -2246,6 +2657,10 @@ void Application::DoForwardPathTracing()
         descriptorSetCommandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::VertexBuffers, scene->m_indexBuffer.gpuDescriptorHandle);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::LightVertices, LightBuffers[0].uavGPUDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::StagingTarget, stagingGPUDescriptor);
+      //  commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::GBuffer, geometryBuffers[0].uavGPUDescriptor);
+
     };
 
     commandList->SetComputeRootSignature(m_bidirectionalForwardRootSignature.Get());
@@ -2273,6 +2688,70 @@ void Application::DoForwardPathTracing()
     m_deviceResources->WaitForGpu();
     commandList->Reset(commandAllocator, nullptr);
 }
+
+void Application::DoLightPathTracing()
+{
+    auto commandList = m_deviceResources->GetCommandList();
+    auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
+    auto commandAllocator = m_deviceResources->GetCommandAllocator();
+    auto DispatchRays = [&](auto* raytracingCommandList, auto* stateObject, auto* dispatchDesc)
+    {
+        dispatchDesc->HitGroupTable.StartAddress = m_lightPathHitGroupShaderTable->GetGPUVirtualAddress();
+        dispatchDesc->HitGroupTable.SizeInBytes = m_lightPathHitGroupShaderTable->GetDesc().Width;
+        dispatchDesc->HitGroupTable.StrideInBytes = m_lightPathHitGroupShaderTableStrideInBytes;
+        dispatchDesc->MissShaderTable.StartAddress = m_lightPathMissShaderTable->GetGPUVirtualAddress();
+        dispatchDesc->MissShaderTable.SizeInBytes = m_lightPathMissShaderTable->GetDesc().Width;
+        dispatchDesc->MissShaderTable.StrideInBytes = m_lightPathRayMissShaderTableStrideInBytes;
+        dispatchDesc->RayGenerationShaderRecord.StartAddress = m_lightPathRayGenShaderTable->GetGPUVirtualAddress();
+        dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_lightPathRayGenShaderTable->GetDesc().Width;
+        dispatchDesc->Width = m_width;
+        dispatchDesc->Height = m_height;
+        dispatchDesc->Depth = 1;
+        raytracingCommandList->SetPipelineState1(stateObject);
+
+        m_gpuTimers[GpuTimers::Raytracing].Start(commandList);
+        raytracingCommandList->DispatchRays(dispatchDesc);
+        m_gpuTimers[GpuTimers::Raytracing].Stop(commandList);
+    };
+
+    auto SetCommonPipelineState = [&](auto* descriptorSetCommandList) {
+        descriptorSetCommandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::VertexBuffers, scene->m_indexBuffer.gpuDescriptorHandle);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightVertices, LightBuffers[0].uavGPUDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::StagingTarget, stagingGPUDescriptor);
+        //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightNormals, LightNormals[0].uavGPUDescriptor);
+        //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightColours, LightColours[0].uavGPUDescriptor);
+        //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightDirection, LightDirections[0].uavGPUDescriptor);
+
+    };
+
+    commandList->SetComputeRootSignature(m_bidirectionalLightRootSignature.Get());
+
+    scene->getSceneBuffer()->CopyStagingToGpu(frameIndex);
+    commandList->SetComputeRootConstantBufferView(GlobalRootSignature_BidirectionalLight::Slot::SceneConstant, scene->getSceneBuffer()->GpuVirtualAddress(frameIndex));
+    scene->getPrimitiveAttributes()->CopyStagingToGpu(frameIndex);
+    commandList->SetComputeRootShaderResourceView(GlobalRootSignature_BidirectionalLight::Slot::AABBattributeBuffer, scene->getPrimitiveAttributes()->GpuVirtualAddress(frameIndex));
+
+    if (scene->CSG) {
+        scene->getCSGTree()->CopyStagingToGpu(frameIndex);
+        commandList->SetComputeRootShaderResourceView(GlobalRootSignature_BidirectionalLight::Slot::CSGTree, scene->getCSGTree()->GpuVirtualAddress(frameIndex));
+    }
+
+    D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+    SetCommonPipelineState(commandList);
+
+
+    commandList->SetComputeRootShaderResourceView(GlobalRootSignature_BidirectionalLight::Slot::AccelerationStructure, acclerationStruct->getTopLevel()->GetGPUVirtualAddress());
+
+
+    DispatchRays(m_dxrCommandList.Get(), m_lightPathState.Get(), &dispatchDesc);
+    m_deviceResources->ExecuteCommandList();
+
+    m_deviceResources->WaitForGpu();
+    commandList->Reset(commandAllocator, nullptr);
+}
+
 
 void Application::DoRaytracing()
 {
@@ -2471,6 +2950,12 @@ void Application::CreateWindowSizeDependentResources()
 
         CreateDeferredGBuffer();
     }
+    else {
+        //create big light photon buffer
+        CreateStagingResource();
+
+        CreateLightBuffers();
+    }
 
     if (tiling) {
        /// CreateTiledPhotonMap();
@@ -2621,8 +3106,10 @@ void Application::OnRender()
 
        //  DoTiling(1024, 720, 1);
         //deferred rendering + direct lighting
-       DoRaytracing();
-       // CopyGBufferToBackBuffer();
+         DoRaytracing();
+       //DoForwardPathTracing();
+
+      // CopyGBufferToBackBuffer();
         //rasterise photon volumes - indirect lighting
         //  CopyRaytracingOutputToBackbuffer();
 
@@ -2633,7 +3120,9 @@ void Application::OnRender()
        CopyRaytracingOutputToBackbuffer();
    }
    else {
-       DoForwardPathTracing();
+      DoLightPathTracing();
+      DoForwardPathTracing();
+
        CopyRaytracingOutputToBackbuffer();
    }
 

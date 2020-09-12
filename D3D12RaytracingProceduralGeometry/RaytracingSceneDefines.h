@@ -36,6 +36,25 @@ namespace GlobalRootSignature_Bidirectional {
     namespace Slot {
         enum Enum {
             OutputView = 0,
+            StagingTarget,
+
+            LightVertices,
+            AccelerationStructure,
+            SceneConstant,
+            AABBattributeBuffer,
+            VertexBuffers,
+            CSGTree,
+            Count
+        };
+    }
+}
+namespace GlobalRootSignature_BidirectionalLight {
+    namespace Slot {
+        enum Enum {
+            OutputView = 0,
+            StagingTarget,
+
+            LightVertices,
             AccelerationStructure,
             SceneConstant,
             AABBattributeBuffer,

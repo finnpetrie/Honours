@@ -50,7 +50,7 @@ void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene, ConstantBuffer<R
     scene->view = view;
     scene->viewInverse = viewInverse;
     scene->projectionInverse = projectionInverse;
-    scene->projection = proj;
+    scene->projection = viewProj;
 
 
 }

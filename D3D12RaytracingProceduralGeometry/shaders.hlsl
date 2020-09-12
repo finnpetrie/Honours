@@ -44,8 +44,8 @@ RWTexture2D<float4> rasterTarget : register(u8);
 PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, float4 color : COLOR)
 {
         float lMax = 100;
-        float maxMajorKernelRadius = 40;
-        float minMajKernelRadius = 0.1;
+        float maxMajorKernelRadius = 20;
+        float minMajKernelRadius = 0.01;
         float pi = 3.1415926535897932384626422832795028841971f;
 
         PSInput result;
@@ -67,9 +67,9 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
        //float kSquash = 1 - minMajKerne
        float pathDensity = k - 1.0;
         
-       //float r = minMajKernelRadius + (maxMajorKernelRadius - minMajKernelRadius) * sqrt(1 - pathDensity);
+       float r = minMajKernelRadius + (maxMajorKernelRadius - minMajKernelRadius) * sqrt(1 - pathDensity);
        float majKernelRadius = lerp(maxMajorKernelRadius, minMajKernelRadius, pathDensity);
-      // float majKernelRadius = r;
+       majKernelRadius = r;
        float kSquash = 1 - length(photon.normal) / majKernelRadius;
         kSquash = 1;
 
@@ -89,8 +89,8 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
 
         float oversize = 1.1;
         //multiplied by 1.1 to avoid undersampling
-        float4 p = sP * majKernelRadius*oversize;
-        float4 p_i = p + photon.position + float4(scaled_u, 0) + float4(toT, 0);
+        float4 p = sP * majKernelRadius;
+        float4 p_i = p + photon.position;//float4(scaled_u, 0) + float4(toT, 0);
         //float4 p_i = float4(p.xyz * majKernelRadius, 1);
         float4  c = mul(proj, float4(p_i.xyz, 1));
         //loat ellipse_area = pi*
@@ -116,7 +116,7 @@ PSInput VSMain(float4 position : POSITION, uint instanceID : SV_InstanceID, floa
         result.kernelMinor = radius;
         //colour, i.e., power, is divided by kernel radius * pi to normalize
         //UNSURE ABOUT THIS - HOW DO WE COMPUTE THE COLOUR -
-        result.color = photon.colour*=inv;
+        result.color = photon.colour;
         result.direction = photon.direction;
         result.originalPosition = photon.position;
         result.normal = photon.normal;
@@ -150,7 +150,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      float r_3 = input.t_radius;
      float r_2 = 1;
 
-     float r = 1/probability;
+     float r = 0.12;
      // float r = input.kernelMinor + (sqrt(input.majKernelRadius) - )
      //float r = input.majKernelRadiusSquared;
 
@@ -200,7 +200,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // rasterTarget[input.position.xy] += color;
     // return  input.color;
      // return  float4(distance2, distance2, distance2, 0);
-     return 10*color;
+     return color;
      // return 22*float4(n_o, n_o, n_o, n_o);//float4(gauss, gauss, gauss, gauss);//float4(gauss, gauss, gauss, gauss);
       //return float4(color.xyz, weighted_direction.x)
     // return input.position;*/

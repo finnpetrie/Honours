@@ -70,6 +70,7 @@ public:
     // Messages
     virtual void OnInit();
     void BuildForwardPathShaderTables();
+    void BuildLightPathShaderTable();
     virtual void OnKeyDown(UINT8 key);
     virtual void OnUpdate();
     virtual void OnRender();
@@ -130,6 +131,10 @@ private:
     ComPtr<ID3D12RootSignature> m_bidirectionalForwardRootSignature;
     ComPtr<ID3D12RootSignature> m_bidirectionalForwardLocalRoot[LocalRootSignature::Type::Count];
 
+    ComPtr<ID3D12RootSignature> m_bidirectionalLightRootSignature;
+    ComPtr<ID3D12RootSignature> m_birdirectionalLightLocalRoot[LocalRootSignature::Type::Count];
+
+
     ComPtr<ID3D12Resource> m_missPhotonTable;
     UINT m_missPhotonTableStrideInBytes;
     ComPtr<ID3D12Resource> m_hitgroupPhotonTable;
@@ -148,7 +153,7 @@ private:
 
 
     bool screenSpaceMap = false;
-    IBuffer stagingResource;
+   // IBuffer stagingResource;
     // Descriptors
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
     UINT m_descriptorsAllocated;
@@ -174,9 +179,17 @@ private:
     D3D12_GPU_DESCRIPTOR_HANDLE photonCounterGpuDescriptor;
     UINT photonCounterDescriptorHeapIndex;
     
+    ComPtr<ID3D12Resource> stagingResource;
+    D3D12_GPU_DESCRIPTOR_HANDLE stagingGPUDescriptor;
+    UINT stagingCounterDescriptorHeapIndex;
 
     std::vector<IBuffer> intersectionBuffers;
     std::vector<IBuffer> geometryBuffers;
+    std::vector<IBuffer> LightBuffers;
+    std::vector<IBuffer> LightNormals;
+    std::vector<IBuffer> LightColours;
+    std::vector<IBuffer> LightDirections;
+
 
     //raster resources
     ComPtr<ID3D12Resource> intersectionBuffer;
@@ -219,7 +232,8 @@ private:
     static const wchar_t* c_forwardPathTracingRayGen;
     static const wchar_t* c_forwardPathTracingClosestHit[GeometryType::Count];
     static const wchar_t* c_missPathShaders[RayType::Count];
-
+    static const wchar_t* c_lightPathTracingRayGen;
+    static const wchar_t* c_lightPathTracingClosestHit[GeometryType::Count];
 
     static const wchar_t* c_intersectionShaderNames[IntersectionShaderType::Count];
     static const wchar_t* c_closestHitShaderNames[GeometryType::Count];
@@ -242,6 +256,12 @@ private:
     UINT m_forwardPathRayMissShaderTableStrideInBytes;
     ComPtr<ID3D12Resource> m_forwardPathHitGroupShaderTable;
     UINT m_forwardPathHitGroupShaderTableStrideInBytes;
+
+    ComPtr<ID3D12Resource> m_lightPathRayGenShaderTable;
+    ComPtr<ID3D12Resource> m_lightPathMissShaderTable;
+    UINT m_lightPathRayMissShaderTableStrideInBytes;
+    ComPtr<ID3D12Resource> m_lightPathHitGroupShaderTable;
+    UINT m_lightPathHitGroupShaderTableStrideInBytes;
 
     
     ComPtr<ID3D12Resource> m_compositeRayGenShaderTable;
@@ -270,9 +290,13 @@ private:
     void DoRaytracing();
     void DoForwardPathTracing();
 
+    void DoLightPathTracing();
+
     void CreatePhotonBuffer_2();
 
     void CreatePhotonBuffer();
+
+    void CreateLightBidirectionalRootSignatures();
     void CreateDeviceDependentResources();
     void CreateWindowSizeDependentResources();
 	void CreateTiledPhotonMap();
@@ -290,6 +314,7 @@ private:
     void CreateDxilLibrarySubobject(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjectsPathTracing(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
+    void CreateHitGroupSubobjectsLightTracing(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjectsPhotonPass(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
 	void CreateComputePhotonTilingRootSignature();
 	void CreateRasterRootSignatures();
@@ -300,10 +325,12 @@ private:
     void CreatePhotonTilingComptuePassStateObject();
     void CreateCompositeRayPipelineStateObject();
     void CreatePhotonMappingFirstPassStateObject();
-    void CreateBiDirectionalPathTracingStateObjects();
+    void CreateBiDirectionalPathTracingStateObjects(bool bidirectional);
     void CreateRaytracingPipelineStateObject();
     void CreateIntersectionVertexBuffer();
     void CreateDeferredGBuffer();
+    void CreateStagingResource();
+    void CreateLightBuffers();
     void CreateIntersectionBuffers();
     void CreateAuxilaryDeviceResources();
     void CreateDescriptorHeap();
@@ -325,7 +352,6 @@ private:
 
     void BuildShaderTables();
     void UpdateForSizeChange(UINT clientWidth, UINT clientHeight);
-	void CreateStagingRenderTargetResource();
 	void CopyIntersectionBufferToBackBuffer(UINT intersectionIndex);
     void CopyGBufferToBackBuffer();
 	void CopyRaytracingOutputToBackbuffer();
