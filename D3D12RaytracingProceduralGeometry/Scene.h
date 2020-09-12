@@ -35,9 +35,9 @@ public:
 
 	std::vector<Primitive> analyticalObjects;
 	bool instancing = false;
-	bool CSG = false;
+	bool CSG = true;
 	bool triangleInstancing = false;
-	bool quatJulia = false;
+	bool quatJulia = true;
 	bool plane = true;
 	const float c_aabbWidth = 2;      // AABB width.
 	const float c_aabbDistance = 2;   // Distance between AABBs.

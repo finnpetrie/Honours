@@ -100,7 +100,7 @@ void Scene::Init(float m_aspectRatio)
     {
         if (quatJulia) {
             using namespace SignedDistancePrimitive;
-            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.0, 0.1, 0.1, 0),1, 2, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.0, 0.9, 0.9, 0),1, 2, 1.0f, 0.7f, 50, 1.0f);
 
         }
         offset += SignedDistancePrimitive::Count;
@@ -112,7 +112,7 @@ void Scene::Init(float m_aspectRatio)
 
         if (CSG) {
             using namespace CSGPrimitive;
-            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0.1, 0.1, 0.1, 0), 1, 2.4, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0.9, 0.9, 0.9, 0), 1, 2.4, 1.0f, 0.7f, 50, 1.0f);
         }
     }
 
@@ -146,16 +146,16 @@ void Scene::Init(float m_aspectRatio)
         XMFLOAT4 lightDiffuseColor;
         XMFLOAT4 lightSphere;
         //2.0f, -0.36, 0
-        lightSphere = XMFLOAT4(3.0, 5.0, 0, 0.5);
+        lightSphere = XMFLOAT4(10, 18, 3, 0.5);
         lightPosition = XMFLOAT4(10, 10, -10, 0.0f);
         m_sceneCB->lightPosition = XMLoadFloat4(&lightPosition);
         m_sceneCB->lightSphere = XMLoadFloat4(&lightSphere);
-        m_sceneCB->lightPower = 200;
+        m_sceneCB->lightPower = 20000;
         lightAmbientColor = XMFLOAT4(1, 1, 1, 1.0f);
         m_sceneCB->lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
 
-        float d = 1;
-        lightDiffuseColor = XMFLOAT4(d, d, d, 1.0f);
+        float d = 1*2000;
+        lightDiffuseColor = XMFLOAT4(d, d, d, d);
         m_sceneCB->lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
     }
 }
@@ -506,11 +506,11 @@ void Scene::CreateGeometry() {
 
     PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.9, 0.1, 0.1, 0), 1, 2, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
-    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.1, 0.5, 0.8, 0), 1, 2, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.01, 0.01, 0.2, 0), 1, 2, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.5, 0.7, 0), 1.7, 0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.9, 0.4, 0.9, 0), 0, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.5, 0.1, 0.5, 0), 1, 2, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.8, 0.64, 0.12, 0), 1, 0, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.4, 0.01, 0.1, 0), 0, 2.417f, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.4, 0.01, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.5, 0.2, 0, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 2, 0, 1, 0.4f, 50, 1 };
 
@@ -519,7 +519,7 @@ void Scene::CreateGeometry() {
     Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 0), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(3, -0.4, 5), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(-2, -0.4f, 2.0f ), XMFLOAT3(6, 6, 6));
-    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, -0.4, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0f, -0.4f, 0.0f), XMFLOAT3(6, 6, 6));
 
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(1.0f, 0.5f, 0.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
@@ -531,7 +531,7 @@ void Scene::CreateGeometry() {
     Primitive plane(AnalyticPrimitive::Plane, parab_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive plane2(AnalyticPrimitive::Plane, AABB_b, XMFLOAT3(1, 3.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive cornellInner(AnalyticPrimitive::CornellBack, cone_b, XMFLOAT3(0, 0, 0.0f), XMFLOAT3(3, 3, 3));
-    analyticalObjects = {ellipsoid, AABB, sphere, hyperboloid, Cylinder};
+    analyticalObjects = {ellipsoid, AABB, hyperboloid, Sphere, Cylinder};
 
 }
 
