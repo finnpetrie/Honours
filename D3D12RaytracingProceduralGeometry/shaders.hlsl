@@ -150,7 +150,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      float r_3 = input.t_radius;
      float r_2 = 1;
 
-     float r = 1 / probability;
+     float r = 0.8;
      // float r = input.kernelMinor + (sqrt(input.majKernelRadius) - )
      //float r = input.majKernelRadiusSquared;
 
@@ -180,7 +180,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      }
 
      //cone filter
-     float k = 1.1;
+     float k = 0.8;
      //falloff
      float wp = 1 - sqrt(distance2) / (k * r);
      //wp = min(1 / 5, wp);
@@ -191,7 +191,7 @@ float4 PSMain(PSInput input) : SV_TARGET
      // float4 color = BRDF * kernel
      float n_o = wp / nor;
          //float4 color = (float4(BRDF.x * input.color.x, BRDF.y * input.color.y, BRDF.z * input.color.z, 1));// *maxima * wp) / (1 - 2 / 3 * k) * pi * r * r * r * r;//divided by distance?
-     float4 color = (BRDF*input.color) * max(0, k_L)* symmetricGauss;
+     float4 color = (BRDF*input.color) * max(0, k_L)* n_o;
      float totalPower = dot(color.xyz, float3(1.0f, 1.0f, 1.0f));
      float3 weighted_direction = totalPower * input.direction.xyz;
     
@@ -200,7 +200,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // rasterTarget[input.position.xy] += color;
     // return  input.color;
      // return  float4(distance2, distance2, distance2, 0);
-     return 200*color;
+     return 1.5*color;
      // return 22*float4(n_o, n_o, n_o, n_o);//float4(gauss, gauss, gauss, gauss);//float4(gauss, gauss, gauss, gauss);
       //return float4(color.xyz, weighted_direction.x)
     // return input.position;*/
