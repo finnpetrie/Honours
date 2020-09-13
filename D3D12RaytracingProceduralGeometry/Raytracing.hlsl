@@ -26,7 +26,9 @@ RWTexture2D<float4> GBufferBRDF : register(u4);
 RWTexture2D<float4> GBufferPosition : register(u5);
 RWTexture2D<float4> GBufferNormal : register(u6);
 RWTexture2D<float4> staging : register(u7);
-RWTexture2D<float4> lightTracingPhotons [MAX_RAY_RECURSION_DEPTH*4]: register(u8);
+RWTexture2D<float4> accumulationLight : register(u8);
+RWTexture2D<float4> accumulationForward : register(u9);
+RWTexture2D<float4> lightTracingPhotons [MAX_RAY_RECURSION_DEPTH*4]: register(u10);
 
 
 
@@ -65,6 +67,14 @@ float2 hash2(inout float seed) {
 
 
 
+float rand_xorshift()
+{
+    // Xorshift algorithm from George Marsaglia's paper
+    rng_state ^= uint(rng_state << 13);
+    rng_state ^= uint(rng_state >> 17);
+    rng_state ^= uint(rng_state << 5);
+    return rng_state * prng_01_convert;
+}
 
 
 float3 lambertian(float3 normal, float3 pos, float3 materialColour) {
@@ -129,9 +139,9 @@ float3x3 GetTangentSpace(float3 normal)
 float3 SampleHemisphere(float3 normal, inout float seed)
 {
     // Uniformly sample hemisphere direction
-    float cosTheta = rand_ik(seed);
+    float cosTheta = rand_xorshift();
     float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
-    float phi = 2 * PI * rand_ik(seed);
+    float phi = 2 * PI * rand_xorshift();
     float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
     // Transform direction to world space
     return mul(tangentSpaceDir, GetTangentSpace(normal));
@@ -459,7 +469,7 @@ uint wang_hash(uint seed, int x , int y)
 float chessBoard(float3 pos) {
 
     float chess = floor(sqrt(pos.x * pos.x + pos.z * pos.z)) + floor(atan(pos.z / pos.x));
-    chess = floor(pos.x + 0.1); //+ floor(pos.z);
+    //chess = floor(pos.x + 0.1); //+ floor(pos.z);
     chess = frac(chess * 0.5);
     chess *= 2;
     if (chess == 0.0) {
@@ -1001,6 +1011,7 @@ float3 RandomUnitVector(inout uint state)
 }
 
 
+
 // Generate a random unsigned int in [0, 2^24) given the previous RNG state
 // using the Numerical Recipes linear congruential generator
 uint lcg(inout uint prev)
@@ -1060,16 +1071,50 @@ float3 TraceForwardPaths(Ray r, PathTracingPayload p) {
     return totalColour;
 }
 
-float rand_xorshift()
+float seed_xorshift(inout uint seed)
 {
     // Xorshift algorithm from George Marsaglia's paper
-    rng_state ^= uint(rng_state << 13);
-    rng_state ^= uint(rng_state >> 17);
-    rng_state ^= uint(rng_state << 5);
-    return rng_state * prng_01_convert;
+    seed ^= uint(seed << 13);
+    seed ^= uint(seed >> 17);
+    seed ^= uint(seed << 5);
+    return seed * prng_01_convert;
+}
+float3 calculateRandomDirectionInHemisphereSeedShift(in float3 normal, inout uint seed) {
+
+    float up = sqrt(seed_xorshift(seed)); // cos(theta)
+    float over = sqrt(1 - up * up); // sin(theta)
+    float around = seed_xorshift(seed) * TWO_PI;
+
+    // Find a direction that is not the normal based off of whether or not the
+    // normal's components are all equal to sqrt(1/3) or whether or not at
+    // least one component is less than sqrt(1/3). Learned this trick from
+    // Peter Kutz.
+
+    float3 directionNotNormal;
+    if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
+        directionNotNormal = float3(1, 0, 0);
+    }
+    else if (abs(normal.y) < SQRT_OF_ONE_THIRD) {
+        directionNotNormal = float3(0, 1, 0);
+    }
+    else {
+        directionNotNormal = float3(0, 0, 1);
+    }
+
+    // Use not-normal direction to generate two perpendicular directions
+    float3 perpendicularDirection1 =
+        normalize(cross(normal, directionNotNormal));
+    float3 perpendicularDirection2 =
+        normalize(cross(normal, perpendicularDirection1));
+
+    return up * normal
+        + cos(around) * over * perpendicularDirection1
+        + sin(around) * over * perpendicularDirection2;
 }
 
-inline float3 calculateRandomDirectionInHemisphere(in float3 normal) {
+
+
+float3 calculateRandomDirectionInHemisphere(in float3 normal) {
 
     float up = sqrt(rand_xorshift()); // cos(theta)
     float over = sqrt(1 - up * up); // sin(theta)
@@ -1101,6 +1146,21 @@ inline float3 calculateRandomDirectionInHemisphere(in float3 normal) {
         + cos(around) * over * perpendicularDirection1
         + sin(around) * over * perpendicularDirection2;
 }
+float3 SampleHemisphereSeedShift(float3 normal, inout float seed)
+{
+    // Uniformly sample hemisphere direction
+
+    float cosTheta = seed_xorshift(seed);
+    float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+    float phi = 2 * PI * seed_xorshift(seed);
+    float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+    // Transform direction to world space
+    return mul(tangentSpaceDir, GetTangentSpace(normal));
+}
+
+
+
+
 inline float3 SquareToSphereUniform(float2 samplePoint)
 {
     float radius = 1.f;
@@ -1192,6 +1252,7 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
 
 }
 
+
 [shader("raygeneration")]
 void ForwardPathTracingRayGen() {
     float2 samplePoint = DispatchRaysIndex().xy;
@@ -1205,18 +1266,19 @@ void ForwardPathTracingRayGen() {
   
 
     uint accumulatedFrames = g_sceneCB.accumulatedFrames;
-    rng_state = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y) + accumulatedFrames);
-
+    //rng_state = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y  + 2000 * accumulatedFrames));
+    uint seed = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y + 2000 * accumulatedFrames));
     for (int i = 0; i < 1; i++) {
 
-        float2 rand = float2(rand_xorshift(), rand_xorshift());
-        float2 screen_coord = DispatchRaysIndex().xy + rand;
+       // float2 rand = float2(rand_xorshift(), rand_xorshift());
+        float2 screen_coord = DispatchRaysIndex().xy;
         //float3 r_4 = RandomUnitVector(ran);
         Ray r = GenerateCameraPath(screen_coord, g_sceneCB.cameraPosition.xyz, g_sceneCB.projectionToWorld);
-
+        //float3 rando = float3(rand_xorshift(), rand_xorshift(), rand_xorshift());
         //set seed.
-        PathTracingPayload payload = { float4(0,0,0,0), float3(1.0f, 1.0f, 1.0f), r.origin, r.direction, 1, 0,  0, 0 };
+        PathTracingPayload payload = { float4(0,0,0,0), float3(1.0f, 1.0f, 1.0f), r.origin, r.direction, 1, 0,  0, seed };
          //radiance += TraceForwardPaths(r, payload);
+      //  float3 ran = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
         radiance +=  TraceForwardPath(r, payload).colour;
          //radiance = float3(0, 0, 0);
         //float3 otherrad = radiance * g_renderTarget[DispatchRaysIndex().xy].xyz;
@@ -1231,29 +1293,29 @@ void ForwardPathTracingRayGen() {
   //  radiance *= 1.0f / float(1);
     float4 stagingColour = staging[DispatchRaysIndex().xy];
     float3 averageRadiance = stagingColour;
-    float3 previousRadiance = g_renderTarget[DispatchRaysIndex().xy];
+    float3 previousRadiance = accumulationLight[DispatchRaysIndex().xy];
     if (accumulatedFrames == 0) {
          averageRadiance = stagingColour.xyz;
     }
     else {
-       float4 previousRadiance = g_renderTarget[DispatchRaysIndex().xy];
+      // float4 previousRadiance = g_renderTarget[DispatchRaysIndex().xy];
         averageRadiance = lerp(previousRadiance, stagingColour, 1.0f / (accumulatedFrames + 1.0f));
     }
     //linearly interpolate light map
-
+    accumulationLight[DispatchRaysIndex().xy] = float4(averageRadiance, 0);
     float3 forwardRadiance = radiance;
     if (accumulatedFrames == 0) {
        
     }
     else {
-        float4 previousRadiance = g_renderTarget[DispatchRaysIndex().xy];
+        float4 previousRadiance = accumulationForward[DispatchRaysIndex().xy];
         forwardRadiance = lerp(previousRadiance, forwardRadiance, 1.0f / (accumulatedFrames + 1.0f));
 
     }
 
+    accumulationForward[DispatchRaysIndex().xy] = float4(forwardRadiance, 0);
 
-
-    g_renderTarget[DispatchRaysIndex().xy] = float4(averageRadiance, 0);
+    g_renderTarget[DispatchRaysIndex().xy] = float4( forwardRadiance + averageRadiance, 0);
 
     
    // averageRadiance = radiance;
@@ -1324,34 +1386,6 @@ float SmoothnessToPhongAlpha(float s)
     return pow(1000.0f, s * s);
 }
 
-float getWeightForPath(int e, int l) {
-    return float(e + l + 2);
-}
-
-
-float3 bidirectionalSummation(float3 origin, uint recursionDepth, float3 pointNormal, float3 energy, uint jdiff) {
-    float2 threadID = DispatchRaysIndex().xy;
-
-    float3 totalColour = float3(0, 0, 0);
-    for (int i = 0; i < MAX_RAY_RECURSION_DEPTH; ++i) {
-        //float3 direction = (lightTracingPhotons[i][threadID].xyz - origin);
-       // float3 nDir = normalize(direction);
-        //float3 normal = lightTracingNormals[i][threadID].xyz;
-        //float4 colour = lightTracingColours[i][threadID];
-
-       // Ray shadowRay = { origin, nDir };
-        //bool checkLightVisible = ShadowRay(shadowRay, recursionDepth);
-       // if (!checkLightVisible) {
-
-            //float weight = saturate(dot(nDir, pointNormal)) * saturate(dot(-nDir, normal)) * saturate(1.0f / dot(direction, direction));
-           // totalColour += colour.xyz * energy*weight;// weight/getWeightForPath(jdiff, i);
-        //}
-    }
-   // totalColour = lightTracingPhotons[2+3][threadID].xyz;
-
-    return totalColour;
-}
-
 
 
 
@@ -1404,7 +1438,7 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
 
     float3 pos = HitWorldPosition();
     float3 normal = float3(0, 1, 0);
-    float3 light_direction = (g_sceneCB.lightPosition - pos);
+    float3 light_direction = (g_sceneCB.lightSphere.xyz - pos);
    // uint brdfType = labelBRDF();
     //sample lights
     Ray sr = { pos, light_direction };
@@ -1415,18 +1449,23 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     float s = chessBoard(pos);
     //float3 c = float3(0.3, 0.3, 0.3);
     //float3 c = float3(1, 1, 1);
-    float3 c = float3(0.6, 0.6, 0.6);
+    float3 c = float3(0.6, 0.6, 0.6)*s;
     //float3 c = float3(0.1, 0.01, 0.3)*s;
     //lambertf is the light value here
     float3 lambert = lambertian(normal, pos, c);
 
  
     //brdf already multiplied by L_i
-   float3 dir =  calculateRandomDirectionInHemisphere(normal);
-    rayPayload.colour = float4(lambert.xyz, 0);
+    //float3 dir =  calculateRandomDirectionInHemisphere(normal);
+    //rayPayload.colour = float4(lambert.xyz, 0);
     float3 r_sample = float3(0, 0, 0);
     //sample the light
-   // float3 r_dir = SampleHemisphere(normal, seed);
+    uint seed = rayPayload.randomSeed;
+   // float3 random = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
+    float3 dir = calculateRandomDirectionInHemisphereSeedShift(normal, seed);
+   //float3 dir = SampleHemisphereSeedShift(normal, seed);
+    rayPayload.randomSeed = seed;
+
    // rayPayload.randomSeed = seed;
     //float3 dir = normalize(normal + RandomUnitVector(seed));
     Ray r = { pos, dir };
@@ -1438,7 +1477,7 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     }
 
 
-    rayPayload.colour =  float4(rayPayload.energy*r_sample, 0);
+    rayPayload.colour = float4(rayPayload.energy*r_sample + lambert, 0);
     //rayPayload.colour +=float4(rayPayload.energy*lambert, 0);
     //sammple the hemisphere of the BRDF and connect it to the light
     //we have hit a triangle
@@ -1469,7 +1508,11 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
     if (brdf == 0) {
         //sample light source
         lambert = lambertian(normal, pos, l_materialCB.albedo);
-        float3 dir = calculateRandomDirectionInHemisphere(attr.normal);
+        uint seed = rayPayload.randomSeed;
+        // float3 random = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
+        float3 dir = calculateRandomDirectionInHemisphereSeedShift(normal, seed);
+        //float3 dir = SampleHemisphereSeedShift(normal, seed);
+        rayPayload.randomSeed = seed;
         //setup random ray, and trace
         //uint seed = rayPayload.randomSeed;
 
@@ -1493,7 +1536,7 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
         specChance /= sum;
         diffChance /= sum;
         uint seed = rayPayload.randomSeed;
-        float roulette = rand_ik(seed);
+        float roulette = seed_xorshift(seed);
         rayPayload.randomSeed = seed;
         if (roulette < specChance) {
             float3 direction = reflect(WorldRayDirection(), normal);
@@ -1545,13 +1588,13 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
             Ray r = { pos, reflected };
             reflectionColour = TraceForwardPath(r, rayPayload).colour;
 
-            hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel) + l_materialCB.albedo;
+            hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel);
 
             //hitColour += l_materialCB.albedo;
 
     }
     
-    rayPayload.colour = float4(float4(rayPayload.energy, 0)* (reflectiveColour.xyz + hitColour.xyz  + monte_sample) , 0);
+    rayPayload.colour = float4(float4(rayPayload.energy, 0)*l_materialCB.albedo + (reflectiveColour.xyz + hitColour.xyz  + monte_sample) , 0);
 }
 
 [shader("miss")]
@@ -1559,8 +1602,9 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
 void MissPathTracing(inout PathTracingPayload rayPayload) {
     float3 ndir = normalize(WorldRayDirection());
     rayPayload.energy = 0.0f; 
-    rayPayload.recursionDepth = MAX_RAY_RECURSION_DEPTH;
     rayPayload.colour = float4(getColour(ndir), 0);
+    rayPayload.recursionDepth = MAX_RAY_RECURSION_DEPTH;
+
 }
 
 
@@ -1671,7 +1715,7 @@ void LightTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in Buil
     uint c = rayPayload.recursionDepth * 4;
 
    // colour /= lambertPdf;
-    if (rayPayload.recursionDepth > 1) {
+    if (true) {
         lightTracingPhotons[c][index] = float4(pos, float(brdfType));
         lightTracingPhotons[c + 1][index] = rayPayload.colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);

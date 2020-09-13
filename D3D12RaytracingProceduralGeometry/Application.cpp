@@ -238,7 +238,7 @@ void Application::CreateLightBidirectionalRootSignatures()
     auto device = m_deviceResources->GetD3DDevice();
     CD3DX12_DESCRIPTOR_RANGE ranges[4];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4*MAX_RAY_RECURSION_DEPTH, 8);
+    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4*MAX_RAY_RECURSION_DEPTH, 10);
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 7);
    // ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH, 14);
     //ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH, 22);
@@ -289,11 +289,14 @@ void Application::CreateLightBidirectionalRootSignatures()
 
 void Application::CreateForwardBidirectionalRootSignatures() {
     auto device = m_deviceResources->GetD3DDevice();
-    CD3DX12_DESCRIPTOR_RANGE ranges[4];
+    CD3DX12_DESCRIPTOR_RANGE ranges[6];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4*MAX_RAY_RECURSION_DEPTH, 8);
+    ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4*MAX_RAY_RECURSION_DEPTH, 10);
     ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 7);
-    ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
+    ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 8);
+    ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 9);
+
+    ranges[5].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
 
     {
 
@@ -302,12 +305,13 @@ void Application::CreateForwardBidirectionalRootSignatures() {
         rootParameters[rootSig::OutputView].InitAsDescriptorTable(1, &ranges[0]);
         rootParameters[rootSig::LightVertices].InitAsDescriptorTable(1, &ranges[1]);
         rootParameters[rootSig::StagingTarget].InitAsDescriptorTable(1, &ranges[2]);
-
+        rootParameters[rootSig::LightAccumulationBuffer].InitAsDescriptorTable(1, &ranges[3]);
+        rootParameters[rootSig::ForwardAccumulationBuffer].InitAsDescriptorTable(1, &ranges[4]);
         rootParameters[rootSig::AccelerationStructure].InitAsShaderResourceView(0);
         rootParameters[rootSig::SceneConstant].InitAsConstantBufferView(0);
         rootParameters[rootSig::AABBattributeBuffer].InitAsShaderResourceView(3);
         rootParameters[rootSig::CSGTree].InitAsShaderResourceView(4);
-        rootParameters[rootSig::VertexBuffers].InitAsDescriptorTable(1, &ranges[3]);
+        rootParameters[rootSig::VertexBuffers].InitAsDescriptorTable(1, &ranges[5]);
         CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
         SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_bidirectionalForwardRootSignature);
 
@@ -1621,7 +1625,44 @@ void Application::CreateAuxilaryDeviceResources()
 }
 
 
+void Application::CreateAccumulationBuffers() {
+    auto device = m_deviceResources->GetD3DDevice();
+    auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
+    // DXGI_FORMAT_R32G32B32A32_FLOAT
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+    auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
+    //light accumulation
+
+    {
+
+        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&lightAccumulationResource)));
+        NAME_D3D12_OBJECT(lightAccumulationResource);
+        lightAccumulationDescriptorHeapIndex = UINT_MAX;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        lightAccumulationDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, lightAccumulationDescriptorHeapIndex);
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uva = {};
+        uva.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        device->CreateUnorderedAccessView(lightAccumulationResource.Get(), nullptr, &uva, uavDescriptorHandle);
+        lightAccumulationGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), lightAccumulationDescriptorHeapIndex, m_descriptorSize);
+    }
+
+    //forward accumulation
+    {
+        ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&forwardAccumulationResource)));
+        NAME_D3D12_OBJECT(forwardAccumulationResource);
+        forwardAccumulationDescriptorHeapIndex = UINT_MAX;
+
+        D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+        forwardAccumulationDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, forwardAccumulationDescriptorHeapIndex);
+
+        D3D12_UNORDERED_ACCESS_VIEW_DESC uva = {};
+        uva.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        device->CreateUnorderedAccessView(forwardAccumulationResource.Get(), nullptr, &uva, uavDescriptorHandle);
+        forwardAccumulationGPUDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), forwardAccumulationDescriptorHeapIndex, m_descriptorSize); }
+}
 
 void Application::CreateDescriptorHeap()
 {
@@ -1645,7 +1686,8 @@ void Application::CreateDescriptorHeap()
         additionalCount = 3 * MAX_RAY_RECURSION_DEPTH + 1 + 1 + 3 + 1 + 20;
     }
     else {
-        additionalCount = 4*MAX_RAY_RECURSION_DEPTH + 16;
+        //3 accumulation buffers
+        additionalCount = 4*MAX_RAY_RECURSION_DEPTH + 15 + 4;
     }
     descriptorHeapDesc.NumDescriptors = 6 + additionalCount;
     descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -2659,7 +2701,9 @@ void Application::DoForwardPathTracing()
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::LightVertices, LightBuffers[0].uavGPUDescriptor);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::StagingTarget, stagingGPUDescriptor);
-      //  commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::GBuffer, geometryBuffers[0].uavGPUDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::LightAccumulationBuffer, lightAccumulationGPUDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::ForwardAccumulationBuffer, forwardAccumulationGPUDescriptor);
+        //  commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::GBuffer, geometryBuffers[0].uavGPUDescriptor);
 
     };
 
@@ -2953,7 +2997,7 @@ void Application::CreateWindowSizeDependentResources()
     else {
         //create big light photon buffer
         CreateStagingResource();
-
+        CreateAccumulationBuffers();
         CreateLightBuffers();
     }
 
@@ -3122,8 +3166,7 @@ void Application::OnRender()
    else {
       DoLightPathTracing();
       DoForwardPathTracing();
-
-       CopyRaytracingOutputToBackbuffer();
+      CopyRaytracingOutputToBackbuffer();
    }
 
     //DoCompositing();

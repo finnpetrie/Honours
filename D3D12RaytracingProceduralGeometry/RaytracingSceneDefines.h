@@ -37,7 +37,8 @@ namespace GlobalRootSignature_Bidirectional {
         enum Enum {
             OutputView = 0,
             StagingTarget,
-
+            LightAccumulationBuffer,
+            ForwardAccumulationBuffer,
             LightVertices,
             AccelerationStructure,
             SceneConstant,

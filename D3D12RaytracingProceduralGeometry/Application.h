@@ -183,6 +183,14 @@ private:
     D3D12_GPU_DESCRIPTOR_HANDLE stagingGPUDescriptor;
     UINT stagingCounterDescriptorHeapIndex;
 
+    ComPtr<ID3D12Resource> lightAccumulationResource;
+    D3D12_GPU_DESCRIPTOR_HANDLE lightAccumulationGPUDescriptor;
+    UINT lightAccumulationDescriptorHeapIndex;
+
+    ComPtr<ID3D12Resource> forwardAccumulationResource;
+    D3D12_GPU_DESCRIPTOR_HANDLE forwardAccumulationGPUDescriptor;
+    UINT forwardAccumulationDescriptorHeapIndex;
+
     std::vector<IBuffer> intersectionBuffers;
     std::vector<IBuffer> geometryBuffers;
     std::vector<IBuffer> LightBuffers;
@@ -333,7 +341,8 @@ private:
     void CreateLightBuffers();
     void CreateIntersectionBuffers();
     void CreateAuxilaryDeviceResources();
-    void CreateDescriptorHeap();
+	void CreateAccumulationBuffers();
+	void CreateDescriptorHeap();
 	void CreateBufferForIntersectionData();
 	void CreateRasterisationBuffers();
     void CreateRasterConstantBuffer();
