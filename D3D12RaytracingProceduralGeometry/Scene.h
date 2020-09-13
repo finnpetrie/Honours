@@ -37,7 +37,7 @@ public:
 	bool instancing = false;
 	bool CSG = false;
 	bool triangleInstancing = false;
-	bool quatJulia = true;
+	bool quatJulia = false;
 	bool plane = true;
 	const float c_aabbWidth = 2;      // AABB width.
 	const float c_aabbDistance = 2;   // Distance between AABBs.

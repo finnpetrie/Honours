@@ -76,6 +76,145 @@ float rand_xorshift()
     return rng_state * prng_01_convert;
 }
 
+uint wang_hash_original(uint seed)
+{
+    seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
+    seed *= uint(9);
+    seed = seed ^ (seed >> 4);
+    seed *= uint(0x27d4eb2d);
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
+
+float seed_xorshift(inout uint seed)
+{
+    // Xorshift algorithm from George Marsaglia's paper
+    seed ^= uint(seed << 13);
+    seed ^= uint(seed >> 17);
+    seed ^= uint(seed << 5);
+    return seed * prng_01_convert;
+}
+
+float3x3 GetTangentSpace(float3 normal)
+{
+    // Choose a helper vector for the cross product
+    float3 helper = float3(1, 0, 0);
+    if (abs(normal.x) > 0.99f)
+        helper = float3(0, 0, 1);
+    // Generate vectors
+    float3 tangent = normalize(cross(normal, helper));
+    float3 binormal = normalize(cross(normal, tangent));
+    return float3x3(tangent, binormal, normal);
+}
+
+
+
+float3 SampleHemisphere(float3 normal, inout float seed)
+{
+    // Uniformly sample hemisphere direction
+    float cosTheta = rand_xorshift();
+    float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+    float phi = 2 * PI * rand_xorshift();
+    float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+    // Transform direction to world space
+    return mul(tangentSpaceDir, GetTangentSpace(normal));
+}
+
+float3 calculateRandomDirectionInHemisphereSeedShift(in float3 normal, inout uint seed) {
+
+    float up = sqrt(seed_xorshift(seed)); // cos(theta)
+    float over = sqrt(1 - up * up); // sin(theta)
+    float around = seed_xorshift(seed) * TWO_PI;
+
+    // Find a direction that is not the normal based off of whether or not the
+    // normal's components are all equal to sqrt(1/3) or whether or not at
+    // least one component is less than sqrt(1/3). Learned this trick from
+    // Peter Kutz.
+
+    float3 directionNotNormal;
+    if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
+        directionNotNormal = float3(1, 0, 0);
+    }
+    else if (abs(normal.y) < SQRT_OF_ONE_THIRD) {
+        directionNotNormal = float3(0, 1, 0);
+    }
+    else {
+        directionNotNormal = float3(0, 0, 1);
+    }
+
+    // Use not-normal direction to generate two perpendicular directions
+    float3 perpendicularDirection1 =
+        normalize(cross(normal, directionNotNormal));
+    float3 perpendicularDirection2 =
+        normalize(cross(normal, perpendicularDirection1));
+
+    return up * normal
+        + cos(around) * over * perpendicularDirection1
+        + sin(around) * over * perpendicularDirection2;
+}
+
+
+
+float3 calculateRandomDirectionInHemisphere(in float3 normal) {
+
+    float up = sqrt(rand_xorshift()); // cos(theta)
+    float over = sqrt(1 - up * up); // sin(theta)
+    float around = rand_xorshift() * TWO_PI;
+
+    // Find a direction that is not the normal based off of whether or not the
+    // normal's components are all equal to sqrt(1/3) or whether or not at
+    // least one component is less than sqrt(1/3). Learned this trick from
+    // Peter Kutz.
+
+    float3 directionNotNormal;
+    if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
+        directionNotNormal = float3(1, 0, 0);
+    }
+    else if (abs(normal.y) < SQRT_OF_ONE_THIRD) {
+        directionNotNormal = float3(0, 1, 0);
+    }
+    else {
+        directionNotNormal = float3(0, 0, 1);
+    }
+
+    // Use not-normal direction to generate two perpendicular directions
+    float3 perpendicularDirection1 =
+        normalize(cross(normal, directionNotNormal));
+    float3 perpendicularDirection2 =
+        normalize(cross(normal, perpendicularDirection1));
+
+    return up * normal
+        + cos(around) * over * perpendicularDirection1
+        + sin(around) * over * perpendicularDirection2;
+}
+float3 SampleHemisphereSeedShift(float3 normal, inout float seed)
+{
+    // Uniformly sample hemisphere direction
+
+    float cosTheta = seed_xorshift(seed);
+    float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+    float phi = 2 * PI * seed_xorshift(seed);
+    float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+    // Transform direction to world space
+    return mul(tangentSpaceDir, GetTangentSpace(normal));
+}
+
+
+
+
+inline float3 SquareToSphereUniform(float2 samplePoint)
+{
+    float radius = 1.f;
+
+    float phi = samplePoint.y * PI;
+    float theta = samplePoint.x * TWO_PI;
+
+    float3 result;
+    result.x = radius * cos(theta) * sin(phi);
+    result.y = radius * cos(phi);
+    result.z = radius * sin(theta) * sin(phi);
+    return result;
+}
 
 float3 lambertian(float3 normal, float3 pos, float3 materialColour) {
     //float3 lightDir =  normalize(g_sceneCB.lightPosition.xyz - pos);
@@ -122,30 +261,6 @@ float3 sampleLight(const in float3 ro, inout float seed) {
 
 
 
-float3x3 GetTangentSpace(float3 normal)
-{
-    // Choose a helper vector for the cross product
-    float3 helper = float3(1, 0, 0);
-    if (abs(normal.x) > 0.99f)
-        helper = float3(0, 0, 1);
-    // Generate vectors
-    float3 tangent = normalize(cross(normal, helper));
-    float3 binormal = normalize(cross(normal, tangent));
-    return float3x3(tangent, binormal, normal);
-}
-
-
-
-float3 SampleHemisphere(float3 normal, inout float seed)
-{
-    // Uniformly sample hemisphere direction
-    float cosTheta = rand_xorshift();
-    float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
-    float phi = 2 * PI * rand_xorshift();
-    float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
-    // Transform direction to world space
-    return mul(tangentSpaceDir, GetTangentSpace(normal));
-}
 
 
 
@@ -309,7 +424,7 @@ float FresnelAmount(float n1, float n2, float3 normal, float3 incident) {
 
 float PhongLighting(float3 normal, bool shadowHit) {
     float3 position = HitWorldPosition();
-    float3 lightDir = normalize(g_sceneCB.lightPosition.xyz - position);
+    float3 lightDir = normalize(g_sceneCB.lightSphere.xyz - position);
     float3 viewDir = normalize(-WorldRayDirection());
     float3 refl = normalize(reflect(normal, lightDir));
     float illum;
@@ -469,7 +584,7 @@ uint wang_hash(uint seed, int x , int y)
 float chessBoard(float3 pos) {
 
     float chess = floor(sqrt(pos.x * pos.x + pos.z * pos.z)) + floor(atan(pos.z / pos.x));
-    //chess = floor(pos.x + 0.1); //+ floor(pos.z);
+    chess = floor(pos.x) +  floor(pos.z);
     chess = frac(chess * 0.5);
     chess *= 2;
     if (chess == 0.0) {
@@ -665,19 +780,22 @@ void Photon_Ray_Gen() {
     for (int i = 0; i < 1; i++) {
        // float3 direction = randomDirection(DispatchRaysIndex().xy + i);
         // = uint(wang_hash_original(samplePoint.x + i + DispatchRaysDimensions().x * samplePoint.y));
+        rng_state = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y) );
 
-        rng_state = g_sceneCB.rand1 + accumulatedFrames;
-        float2 rany = float2(rand_ik(rng_state), rand_ik(rng_state));
+    //    float2 rany = float2(rand_ik(rng_state), rand_ik(rng_state));
+        payload.seed = rng_state;
+        float2 random = float2(rand_xorshift(), rand_xorshift());
+        float3 dir = SquareToSphereUniform(random);
+       // float3 ro = randomSphereDirection(seed);
+        //float3 ro = randomSphereDirection(rng_state);
+        //float3 rd = cosWeightedRandomHemisphereDirection(ro, rng_state);
 
-        float3 ro = randomSphereDirection(seed);
-        float3 rd = cosWeightedRandomHemisphereDirection(ro, seed);
-
-        ro = g_sceneCB.lightSphere.xyz - ro * g_sceneCB.lightSphere.w;       // float2 r = rand_xor(ran);
+        float3 ro = g_sceneCB.lightSphere.xyz;    // float2 r = rand_xor(ran);
 //        float2 randi = float2(wang_hash_original(ran), wang_hash_original(ran));
         float3 origin = ro;
         //float3 dir = normalize(SquareToSphereUniform(rany));
 
-        Ray ray = { ro,rd };
+        Ray ray = { ro,dir };
        // float3 origin = g_sceneCB.lightPosition;
         //float3 dir = normalize(SquareToSphereUniform(rany));
       //  float2 rand = float2(rand_xorshift(), rand_xorshift());
@@ -773,8 +891,8 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
 
     //compute path probability
     
-    //if diffuse surface, store photon
-    if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth > 1) {
+    //if diffuse surface, store photon//(l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0 && payload.recursionDepth > 1
+    if (l_materialCB.reflectanceCoef <= 0.0f && l_materialCB.refractiveCoef <= 0.0f && payload.recursionDepth > 1) {
 
     
         uint dstIndex = photonBuffer.IncrementCounter();
@@ -833,8 +951,16 @@ void ClosestHit_Photon_Triangle(inout PhotonPayload payload, in BuiltInTriangleI
         reflectPos = TracePhotonRay(r, payload).position;
     }
     else {
-        float3 randDir = SampleHemisphere(normal, rng_state);
-        Ray r = { pos, randDir };
+        uint seed = payload.seed;
+        float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
+        payload.seed = seed;
+        //uint seed = rayPayload.randomSeed;
+        float3 dir = SquareToHemisphereCosine(randomSample);
+
+
+
+       // float3 randDir = SampleHemisphere(normal, rng_state);
+        Ray r = { pos, dir };
         TracePhotonRay(r, payload);
     }
 }
@@ -916,9 +1042,17 @@ void ClosestHit_Photon_Procedural(inout PhotonPayload payload, in ProceduralPrim
         //hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel);
     }
     else {
-        float3 randDir = SampleHemisphere(attr.normal, rng_state);
+
+        uint seed = payload.seed;
+        float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
+        payload.seed = seed;
+        //uint seed = rayPayload.randomSeed;
+        float3 dir = SquareToHemisphereCosine(randomSample);
+
+        //uint seed = payload.seed;
+        //float3 randDir = SampleHemisphere(attr.normal, seed);
         payload.probability = INV_PI;
-        Ray r = { pos, randDir };
+        Ray r = { pos, dir };
         TracePhotonRay(r, payload);
     }
 }
@@ -986,15 +1120,7 @@ uint tea(uint val0, uint val1)
 }
 
 
-uint wang_hash_original(uint seed)
-{
-    seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
-    seed *= uint(9);
-    seed = seed ^ (seed >> 4);
-    seed *= uint(0x27d4eb2d);
-    seed = seed ^ (seed >> 15);
-    return seed;
-}
+
 float RandomFloat01(inout uint state)
 {
     return float(wang_hash_original(state)) / 4294967296.0;
@@ -1071,109 +1197,6 @@ float3 TraceForwardPaths(Ray r, PathTracingPayload p) {
     return totalColour;
 }
 
-float seed_xorshift(inout uint seed)
-{
-    // Xorshift algorithm from George Marsaglia's paper
-    seed ^= uint(seed << 13);
-    seed ^= uint(seed >> 17);
-    seed ^= uint(seed << 5);
-    return seed * prng_01_convert;
-}
-float3 calculateRandomDirectionInHemisphereSeedShift(in float3 normal, inout uint seed) {
-
-    float up = sqrt(seed_xorshift(seed)); // cos(theta)
-    float over = sqrt(1 - up * up); // sin(theta)
-    float around = seed_xorshift(seed) * TWO_PI;
-
-    // Find a direction that is not the normal based off of whether or not the
-    // normal's components are all equal to sqrt(1/3) or whether or not at
-    // least one component is less than sqrt(1/3). Learned this trick from
-    // Peter Kutz.
-
-    float3 directionNotNormal;
-    if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
-        directionNotNormal = float3(1, 0, 0);
-    }
-    else if (abs(normal.y) < SQRT_OF_ONE_THIRD) {
-        directionNotNormal = float3(0, 1, 0);
-    }
-    else {
-        directionNotNormal = float3(0, 0, 1);
-    }
-
-    // Use not-normal direction to generate two perpendicular directions
-    float3 perpendicularDirection1 =
-        normalize(cross(normal, directionNotNormal));
-    float3 perpendicularDirection2 =
-        normalize(cross(normal, perpendicularDirection1));
-
-    return up * normal
-        + cos(around) * over * perpendicularDirection1
-        + sin(around) * over * perpendicularDirection2;
-}
-
-
-
-float3 calculateRandomDirectionInHemisphere(in float3 normal) {
-
-    float up = sqrt(rand_xorshift()); // cos(theta)
-    float over = sqrt(1 - up * up); // sin(theta)
-    float around = rand_xorshift() * TWO_PI;
-
-    // Find a direction that is not the normal based off of whether or not the
-    // normal's components are all equal to sqrt(1/3) or whether or not at
-    // least one component is less than sqrt(1/3). Learned this trick from
-    // Peter Kutz.
-
-    float3 directionNotNormal;
-    if (abs(normal.x) < SQRT_OF_ONE_THIRD) {
-        directionNotNormal = float3(1, 0, 0);
-    }
-    else if (abs(normal.y) < SQRT_OF_ONE_THIRD) {
-        directionNotNormal = float3(0, 1, 0);
-    }
-    else {
-        directionNotNormal = float3(0, 0, 1);
-    }
-
-    // Use not-normal direction to generate two perpendicular directions
-    float3 perpendicularDirection1 =
-        normalize(cross(normal, directionNotNormal));
-    float3 perpendicularDirection2 =
-        normalize(cross(normal, perpendicularDirection1));
-
-    return up * normal
-        + cos(around) * over * perpendicularDirection1
-        + sin(around) * over * perpendicularDirection2;
-}
-float3 SampleHemisphereSeedShift(float3 normal, inout float seed)
-{
-    // Uniformly sample hemisphere direction
-
-    float cosTheta = seed_xorshift(seed);
-    float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
-    float phi = 2 * PI * seed_xorshift(seed);
-    float3 tangentSpaceDir = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
-    // Transform direction to world space
-    return mul(tangentSpaceDir, GetTangentSpace(normal));
-}
-
-
-
-
-inline float3 SquareToSphereUniform(float2 samplePoint)
-{
-    float radius = 1.f;
-
-    float phi = samplePoint.y * PI;
-    float theta = samplePoint.x * TWO_PI;
-
-    float3 result;
-    result.x = radius * cos(theta) * sin(phi);
-    result.y = radius * cos(phi);
-    result.z = radius * sin(theta) * sin(phi);
-    return result;
-}
 
 inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float4 normal, float2 screenDims, float accumulatedFrames)
 {
@@ -1226,7 +1249,6 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
         float lambertian = 0.0f;
 
         //we give all photons initial flux, so we don't need to normalize (essentially cancels out)
-       // float conv = 1 / (4 * tan(90 / 2) * tan(45 / 2));
         //convert to radiance
         float4 radiance = colour * invSqrLength * cos_alpha;
 
@@ -1240,7 +1262,7 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
         }
 
         staging[pixelPos] += radiance;
-        AllMemoryBarrierWithGroupSync();
+       // AllMemoryBarrierWithGroupSync();
         // g_renderTarget[pixelPos] += radiance;//
         // lightTracingPhotons[8][pixelPos] += colour;
 
@@ -1277,8 +1299,7 @@ void ForwardPathTracingRayGen() {
         //float3 rando = float3(rand_xorshift(), rand_xorshift(), rand_xorshift());
         //set seed.
         PathTracingPayload payload = { float4(0,0,0,0), float3(1.0f, 1.0f, 1.0f), r.origin, r.direction, 1, 0,  0, seed };
-         //radiance += TraceForwardPaths(r, payload);
-      //  float3 ran = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
+    
         radiance +=  TraceForwardPath(r, payload).colour;
          //radiance = float3(0, 0, 0);
         //float3 otherrad = radiance * g_renderTarget[DispatchRaysIndex().xy].xyz;
@@ -1315,7 +1336,7 @@ void ForwardPathTracingRayGen() {
 
     accumulationForward[DispatchRaysIndex().xy] = float4(forwardRadiance, 0);
 
-    g_renderTarget[DispatchRaysIndex().xy] = float4( forwardRadiance + averageRadiance, 0);
+    g_renderTarget[DispatchRaysIndex().xy] = float4( averageRadiance, 0);
 
     
    // averageRadiance = radiance;
@@ -1343,24 +1364,7 @@ uint labelBRDF() {
     }
     return 0;
 }
-/**
-float3 sampleLights(float3 hitPos, float3 normal, uint brdfType) {
-    uint numberOfLights = 1;
-    float3 l_dir = normalize(g_sceneCB.lightPosition - hitPos);
-    float3 light = 0.0f;
-    //evaluate BRDF for surface * lightPower;
-    float brdfValue = 0.0f;
-    switch (brdfType) {
-        case 0:
-            brdfValue = lambertian(normal, hitPos);
-            break;
-        case 1:
-            break;
-        case 2:
-            break;
-    light = g_sceneCB.lightAmbientColor*brdfValue;
-    return light;
-}*/
+
 
 float energy(float3 color)
 {
@@ -1449,7 +1453,7 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     float s = chessBoard(pos);
     //float3 c = float3(0.3, 0.3, 0.3);
     //float3 c = float3(1, 1, 1);
-    float3 c = float3(0.6, 0.6, 0.6)*s;
+    float3 c = float3(0.8, 0.8, 0.8);
     //float3 c = float3(0.1, 0.01, 0.3)*s;
     //lambertf is the light value here
     float3 lambert = lambertian(normal, pos, c);
@@ -1552,6 +1556,7 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
             rayPayload.energy *= (1.0f / diffChance) * s * sdot(normal, dir);
             Ray r = { pos, dir };
             reflectiveColour = TraceForwardPath(r, rayPayload).colour;
+            reflectiveColour += l_materialCB.albedo;
         }
      
     }else if(brdf == 2){
@@ -1588,13 +1593,15 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
             Ray r = { pos, reflected };
             reflectionColour = TraceForwardPath(r, rayPayload).colour;
 
-            hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel);
-
+            hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel) ;
+            hitColour *= l_materialCB.albedo;
             //hitColour += l_materialCB.albedo;
 
     }
+
+   
     
-    rayPayload.colour = float4(float4(rayPayload.energy, 0)*l_materialCB.albedo + (reflectiveColour.xyz + hitColour.xyz  + monte_sample) , 0);
+    rayPayload.colour = float4(float4(rayPayload.energy, 0)*(reflectiveColour.xyz + hitColour.xyz  + monte_sample) , 0);
 }
 
 [shader("miss")]
@@ -1616,13 +1623,13 @@ void lightPath(inout float seed) {
     //float2 rany = float2(rand_ik(seed), rand_ik(seed));
     float2 random = float2(rand_xorshift(), rand_xorshift());
     float3 dir = SquareToSphereUniform(random);
-    float3 ro = randomSphereDirection(seed);
+  //  float3 ro = randomSphereDirection(seed);
    // float3 rd = cosWeightedRandomHemisphereDirection(ro, seed);
-
-    ro = g_sceneCB.lightSphere.xyz + ro * g_sceneCB.lightSphere.w;
+   float3  ro = g_sceneCB.lightSphere.xyz;
+   // ro = g_sceneCB.lightSphere.xyz + ro * g_sceneCB.lightSphere.w;
    // float3 origin = g_sceneCB.lightPosition;
    // float3 dir = normalize(SquareToSphereUniform(rany));
-    PathTracingPayload p = { g_sceneCB.lightDiffuseColor*2000, float3(0,0,0), ro, dir, 1, 0, 0, seed };
+    PathTracingPayload p = { g_sceneCB.lightDiffuseColor*20000, float3(0,0,0), ro, dir, 1, 0, 0, seed };
    while(p.recursionDepth <= MAX_RAY_RECURSION_DEPTH){
         float3 normal;
         //ntersect scene
@@ -1667,9 +1674,10 @@ void LightTracingRayGen() {
 
     uint accumulatedFrames = g_sceneCB.accumulatedFrames;
         rng_state = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y) + accumulatedFrames*2000);
+        uint seed = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y ) + 2000 * accumulatedFrames);
 
         //seed = DispatchRaysIndex().x + DispatchRaysIndex().y * 3.43121412313 + frac(1.12345314312 * accumulatedFrames)*g_sceneCB.rand1;
-        lightPath(rng_state);
+        lightPath(seed);
 
         float3 totalRadiance = 0.0f;
         for (int j = 0; j < MAX_RAY_RECURSION_DEPTH; j++) {
@@ -1724,8 +1732,10 @@ void LightTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in Buil
         colour *= float4(0.8, 0.8, 0.8, 0);
         float lambertPdf = abs(dot(-WorldRayDirection(), normal)) * INV_PI;
 
-    
-        float2 randomSample = float2(rand_xorshift(), rand_xorshift());
+        uint seed = rayPayload.randomSeed;
+        float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
+       // randomSample = float2(rand_xorshift(), rand_xorshift());
+        rayPayload.randomSeed = seed;
 
         //uint seed = rayPayload.randomSeed;
         float3 dir = SquareToHemisphereCosine(randomSample);
@@ -1766,7 +1776,7 @@ void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in Pr
     uint2 index = DispatchRaysIndex().xy;
 
     //then meant to the divide throughput or flux by the probability distribution for sampling the BRDF
-    if (rayPayload.recursionDepth > 1) {
+    if (true) {
         lightTracingPhotons[c][index] = float4(pos, brdf);
         lightTracingPhotons[c + 1][index] = rayPayload.colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);
@@ -1776,8 +1786,9 @@ void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in Pr
 
         if (brdf == 0) {
 
-            float2 randomSample = float2(rand_xorshift(), rand_xorshift());
-
+            uint seed = rayPayload.randomSeed;
+            float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
+            rayPayload.randomSeed = seed;
             //uint seed = rayPayload.randomSeed;
             float3 dir = SquareToHemisphereCosine(randomSample);
            // float3 dir = normalize(normal + RandomUnitVector(seed));
@@ -1925,9 +1936,9 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float4 ambient = l_materialCB.albedo;
     float3 hitPos = HitWorldPosition();
     float3 pos = HitWorldPosition();
-    float3 dir = normalize(g_sceneCB.lightPosition.xyz - pos);
+    float3 dir = normalize(g_sceneCB.lightSphere.xyz - pos);
     float3 r_dir = randomDirection(HitWorldPosition().xy);
-    float3 l_dir = g_sceneCB.lightPosition.xyz - hitPos;
+    float3 l_dir = g_sceneCB.lightSphere.xyz - hitPos;
     float3 pos_n =normalize(HitWorldPosition());
 
     uint depth = rayPayload.recursionDepth;
@@ -2001,7 +2012,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     //intersectionBuffer[rayPayload.recursionDepth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
    
     //g_buffer[1080*y + x] = float4(pos, 1);
-    float3 l_dir = normalize(g_sceneCB.lightPosition.xyz - pos);
+    float3 l_dir = normalize(g_sceneCB.lightSphere.xyz - pos);
     float4 reflectionColour = float4(0,0,0,1);
     Ray shadowRay = { pos, l_dir };
     float3 currentDir = RayTCurrent() * WorldRayDirection();
@@ -2094,7 +2105,7 @@ void MyMissShader(inout RayPayload rayPayload)
 //
     float3 ndir = normalize(WorldRayDirection());
    
-    rayPayload.color = float4(getColour(ndir), 1);
+    rayPayload.color += float4(getColour(ndir), 1);
    // float4 backgroundColor = float4(BackgroundColor);
     uint depth = rayPayload.recursionDepth;
     //float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor);

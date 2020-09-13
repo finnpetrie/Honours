@@ -70,7 +70,7 @@ struct PathTracingPayload {
 struct PhotonPayload {
     XMFLOAT4 position;
     XMFLOAT4 colour;
-    float intensity;
+    UINT seed;
     float probability;
     UINT recursionDepth;
 };
