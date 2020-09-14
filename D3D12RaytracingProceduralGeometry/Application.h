@@ -71,6 +71,7 @@ public:
     virtual void OnInit();
     void BuildForwardPathShaderTables();
     void BuildLightPathShaderTable();
+    void BuildSecondPassLightShaderTables();
     virtual void OnKeyDown(UINT8 key);
     virtual void OnUpdate();
     virtual void OnRender();
@@ -93,7 +94,7 @@ private:
     std::vector<float> fpsAverages;
     bool testing = false;
     bool drawRays = false;
-    bool photonMapping = true;
+    bool photonMapping = false;
     bool recordIntersections = true;
     bool biPathTracing = true;
     // Constants.
@@ -112,6 +113,7 @@ private:
     //Bi-Directional Path Tracing State Objects
     ComPtr<ID3D12StateObject> m_forwardPathState;
     ComPtr<ID3D12StateObject> m_lightPathState;
+    ComPtr<ID3D12StateObject> m_lightPathSecondPassState;
 
     ComPtr<ID3D12PipelineState> m_computeStateObject;
     //Raster Pipeline
@@ -128,10 +130,17 @@ private:
     ComPtr<ID3D12RootSignature> m_photonLocalRootSignature[LocalRootSignature::Type::Count];
     ComPtr<ID3D12RootSignature> m_photonGlobalRootSignature;;
 
+
+    ComPtr<ID3D12Resource> m_bidirectionalLightSecondPassRootSignature;
     ComPtr<ID3D12RootSignature> m_bidirectionalForwardRootSignature;
     ComPtr<ID3D12RootSignature> m_bidirectionalForwardLocalRoot[LocalRootSignature::Type::Count];
 
+    //ComPtr<ID3D12RootSignature> 
+    //ComPtr<ID3D12RootSignature> m_bidirectionalLightLocalRootSecondPass[LocalRootSignature::Type::Count];
+
+
     ComPtr<ID3D12RootSignature> m_bidirectionalLightRootSignature;
+
     ComPtr<ID3D12RootSignature> m_birdirectionalLightLocalRoot[LocalRootSignature::Type::Count];
 
 
@@ -158,6 +167,8 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
     UINT m_descriptorsAllocated;
     UINT m_descriptorSize;
+
+
     
     IDxcBlob* m_rayGenLibrary;
     //std::vector<TiledBuffer> photonTiles;
@@ -193,6 +204,7 @@ private:
 
     std::vector<IBuffer> intersectionBuffers;
     std::vector<IBuffer> geometryBuffers;
+    std::vector<IBuffer> stages;
     std::vector<IBuffer> LightBuffers;
     std::vector<IBuffer> LightNormals;
     std::vector<IBuffer> LightColours;
@@ -242,7 +254,9 @@ private:
     static const wchar_t* c_missPathShaders[RayType::Count];
     static const wchar_t* c_lightPathTracingRayGen;
     static const wchar_t* c_lightPathTracingClosestHit[GeometryType::Count];
-
+    static const wchar_t* c_lightTracingSecondPassRayGen;
+    static const wchar_t* c_lightTracingSecondPassMiss;
+    static const wchar_t* c_lightTracingSecondPassClosestHit;
     static const wchar_t* c_intersectionShaderNames[IntersectionShaderType::Count];
     static const wchar_t* c_closestHitShaderNames[GeometryType::Count];
     static const wchar_t* c_anyHitShaderNames[GeometryType::Count];
@@ -270,6 +284,12 @@ private:
     UINT m_lightPathRayMissShaderTableStrideInBytes;
     ComPtr<ID3D12Resource> m_lightPathHitGroupShaderTable;
     UINT m_lightPathHitGroupShaderTableStrideInBytes;
+
+    ComPtr<ID3D12Resource> m_lightPathSecondPassRayGenShaderTable;
+    ComPtr<ID3D12Resource> m_lightPathSecondPassMissShaderTable;
+    UINT m_lightPathSecondPassRayMissShaderTableStrideInBytes;
+    ComPtr<ID3D12Resource> m_lightPathSecondPassHitGroupShaderTable;
+    UINT m_lightPathSecondPassHitGroupShaderTableStrideInBytes;
 
     
     ComPtr<ID3D12Resource> m_compositeRayGenShaderTable;
@@ -300,9 +320,13 @@ private:
 
     void DoLightPathTracing();
 
+    void DoLightPathTracingSecondPass();
+
     void CreatePhotonBuffer_2();
 
     void CreatePhotonBuffer();
+
+    void CreateSecondPassLightSignatures();
 
     void CreateLightBidirectionalRootSignatures();
     void CreateDeviceDependentResources();
@@ -322,6 +346,7 @@ private:
     void CreateDxilLibrarySubobject(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjectsPathTracing(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
+    void CreateHitGrourpSubobjectLightTracingSecondPass(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjectsLightTracing(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateHitGroupSubobjectsPhotonPass(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
 	void CreateComputePhotonTilingRootSignature();
@@ -337,6 +362,7 @@ private:
     void CreateRaytracingPipelineStateObject();
     void CreateIntersectionVertexBuffer();
     void CreateDeferredGBuffer();
+    void CreateDiscreteStagingTargetBuffers();
     void CreateStagingResource();
     void CreateLightBuffers();
     void CreateIntersectionBuffers();

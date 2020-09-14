@@ -509,7 +509,7 @@ void Scene::CreateGeometry() {
     PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.9, 0.1, 0.1, 0), 1, 2, 1, 0.4f, 50, 1 };
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.01, 0.2, 0.2, 0), 1, 2, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.5, 0.7, 0), 1.7, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.5, 0.7, 0), 1.7, 2.4, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.8, 0.8, 0.8, 0), 0, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.8, 0.64, 0.12, 0), 1, 0, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.2, 0.01, 0.1, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
@@ -518,7 +518,7 @@ void Scene::CreateGeometry() {
 
     PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
-    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 0), XMFLOAT3(9, 9, 9));
+    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 3.0f), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(3, -0.4, 5), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(-2, -0.4f, 2.0f ), XMFLOAT3(6, 6, 6));
     Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(-1, -0.4f, 2.0f), XMFLOAT3(6, 6, 6));
@@ -533,7 +533,9 @@ void Scene::CreateGeometry() {
     Primitive plane(AnalyticPrimitive::Plane, parab_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive plane2(AnalyticPrimitive::Plane, AABB_b, XMFLOAT3(1, 3.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive cornellInner(AnalyticPrimitive::CornellBack, cone_b, XMFLOAT3(0, 0, 0.0f), XMFLOAT3(3, 3, 3));
-    analyticalObjects = { Sphere, AABB, hyperboloid };
+    Primitive otherBox(AnalyticPrimitive::AABB, ellipse_b, XMFLOAT3(2.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
+
+    analyticalObjects = { Sphere, AABB, hyperboloid, otherBox };
 
 }
 

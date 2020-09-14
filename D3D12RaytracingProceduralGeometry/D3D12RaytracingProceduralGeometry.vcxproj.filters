@@ -200,6 +200,9 @@
     <FxCompile Include="shaders.hlsl">
       <Filter>Assets\Shaders\Rasterisation</Filter>
     </FxCompile>
+    <FxCompile Include="StageLightVertices.hlsl">
+      <Filter>Assets\Shaders\Util</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="PathTracing.hlsl">

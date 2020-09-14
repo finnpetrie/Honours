@@ -26,9 +26,13 @@ RWTexture2D<float4> GBufferBRDF : register(u4);
 RWTexture2D<float4> GBufferPosition : register(u5);
 RWTexture2D<float4> GBufferNormal : register(u6);
 RWTexture2D<float4> staging : register(u7);
-RWTexture2D<float4> accumulationLight : register(u8);
-RWTexture2D<float4> accumulationForward : register(u9);
-RWTexture2D<float4> lightTracingPhotons [MAX_RAY_RECURSION_DEPTH*4]: register(u10);
+RWTexture2D<uint> stagingTarget_R : register(u8);
+RWTexture2D<uint> stagingTarget_G : register(u9);
+RWTexture2D<uint> stagingTarget_B : register(u10);
+
+RWTexture2D<float4> accumulationLight : register(u11);
+RWTexture2D<float4> accumulationForward : register(u12);
+RWTexture2D<float4> lightTracingPhotons [MAX_RAY_RECURSION_DEPTH*4]: register(u13);
 
 
 
@@ -1261,10 +1265,20 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
             radiance = 0.0f;
         }
 
-        staging[pixelPos] += radiance;
+
+        uint3 scaledColor = radiance.xyz * 1024.f;
+        uint3 newColorValue = float3(scaledColor);
+        uint original;
+        InterlockedAdd(stagingTarget_R[pixelPos], newColorValue[0], original);
+        InterlockedAdd(stagingTarget_G[pixelPos], newColorValue[1], original);
+        InterlockedAdd(stagingTarget_B[pixelPos], newColorValue[2], original);
+       // staging[pixelPos] += radiance;
        // AllMemoryBarrierWithGroupSync();
         // g_renderTarget[pixelPos] += radiance;//
         // lightTracingPhotons[8][pixelPos] += colour;
+      //  InterlockedAdd(stagingTarget_R[pixelPos], 128, original);
+       // InterlockedAdd(stagingTarget_G[pixelPos], 128, original);
+        //InterlockedAdd(stagingTarget_B[pixelPos], 128, original);
 
          // else {
            //   g_renderTarget[pixelPos] = lerp(g_renderTarget[pixelPos], colour*conv, 1.0f / (accumulatedFrames + 1.0f));
@@ -1281,7 +1295,7 @@ void ForwardPathTracingRayGen() {
     uint spp = g_sceneCB.spp;
 
     float2 screenDims = DispatchRaysDimensions().xy;
-
+  
    
     UINT currentRecursionDepth = 0;
     float3 radiance = 0.0f;
@@ -1312,18 +1326,35 @@ void ForwardPathTracingRayGen() {
 
    // float4 stagingColour = D
   //  radiance *= 1.0f / float(1);
-    float4 stagingColour = staging[DispatchRaysIndex().xy];
-    float3 averageRadiance = stagingColour;
+   // float4 stagingColour = staging[DispatchRaysIndex().xy];
+   // float3 averageRadiance = stagingColour;
     float3 previousRadiance = accumulationLight[DispatchRaysIndex().xy];
+    uint2 index = uint2(DispatchRaysIndex().xy);
+
+    float channel_r = stagingTarget_R[index];
+    float channel_g = stagingTarget_G[index];
+    float channel_b = stagingTarget_B[index];
+
+
+   float3 lightStaging = float3(channel_r, channel_g, channel_b) / ( 1024.f);
+   float3 lightAverageRadiance;
     if (accumulatedFrames == 0) {
+        lightAverageRadiance = lightStaging;
+    }
+    else {
+        lightAverageRadiance = lerp(previousRadiance, lightStaging, 1.0f / (accumulatedFrames + 1.0f));
+    }
+    accumulationLight[DispatchRaysIndex().xy] = float4(lightAverageRadiance, 0);
+ 
+   /* if (accumulatedFrames == 0) {
          averageRadiance = stagingColour.xyz;
     }
     else {
       // float4 previousRadiance = g_renderTarget[DispatchRaysIndex().xy];
         averageRadiance = lerp(previousRadiance, stagingColour, 1.0f / (accumulatedFrames + 1.0f));
-    }
+    }*/
     //linearly interpolate light map
-    accumulationLight[DispatchRaysIndex().xy] = float4(averageRadiance, 0);
+   // accumulationLight[DispatchRaysIndex().xy] = float4(averageRadiance, 0);
     float3 forwardRadiance = radiance;
     if (accumulatedFrames == 0) {
        
@@ -1336,7 +1367,7 @@ void ForwardPathTracingRayGen() {
 
     accumulationForward[DispatchRaysIndex().xy] = float4(forwardRadiance, 0);
 
-    g_renderTarget[DispatchRaysIndex().xy] = float4( averageRadiance, 0);
+    g_renderTarget[DispatchRaysIndex().xy] = float4(lightAverageRadiance, 0);
 
     
    // averageRadiance = radiance;
@@ -1621,6 +1652,8 @@ void MissPathTracing(inout PathTracingPayload rayPayload) {
 void lightPath(inout float seed) {
     // float2 r = rand_xor(ran);
     //float2 rany = float2(rand_ik(seed), rand_ik(seed));
+    float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
+    // randomSample = float2(rand_xorshift(), rand_xorshift());
     float2 random = float2(rand_xorshift(), rand_xorshift());
     float3 dir = SquareToSphereUniform(random);
   //  float3 ro = randomSphereDirection(seed);
@@ -1629,7 +1662,7 @@ void lightPath(inout float seed) {
    // ro = g_sceneCB.lightSphere.xyz + ro * g_sceneCB.lightSphere.w;
    // float3 origin = g_sceneCB.lightPosition;
    // float3 dir = normalize(SquareToSphereUniform(rany));
-    PathTracingPayload p = { g_sceneCB.lightDiffuseColor*20000, float3(0,0,0), ro, dir, 1, 0, 0, seed };
+    PathTracingPayload p = { g_sceneCB.lightDiffuseColor*2000, float3(0,0,0), ro, dir, 1, 0, 0, seed };
    while(p.recursionDepth <= MAX_RAY_RECURSION_DEPTH){
         float3 normal;
         //ntersect scene
@@ -1663,16 +1696,19 @@ void lightPath(inout float seed) {
 
 [shader("raygeneration")]
 void LightTracingRayGen() {
-    staging[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
- 
+   // staging[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
+    uint2 index = DispatchRaysIndex().xy;
+    stagingTarget_R[index] = 0;
+    stagingTarget_G[index] = 0;
+    stagingTarget_B[index] = 0;
     float2 screenDims = float2(DispatchRaysDimensions().x, DispatchRaysDimensions().y); 
    
     for (int j = 0; j < 4*MAX_RAY_RECURSION_DEPTH; j++) {
         
         lightTracingPhotons[j][DispatchRaysIndex().xy] = 0.0f;
     }
-
     uint accumulatedFrames = g_sceneCB.accumulatedFrames;
+
         rng_state = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y) + accumulatedFrames*2000);
         uint seed = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y ) + 2000 * accumulatedFrames);
 
@@ -1680,17 +1716,7 @@ void LightTracingRayGen() {
         lightPath(seed);
 
         float3 totalRadiance = 0.0f;
-        for (int j = 0; j < MAX_RAY_RECURSION_DEPTH; j++) {
-            uint c = j * 4;
-            float4 pos = lightTracingPhotons[c][DispatchRaysIndex().xy];
-            float4 colour = lightTracingPhotons[c + 1][DispatchRaysIndex().xy];
-            float4 normal = lightTracingPhotons[c + 2][DispatchRaysIndex().xy];
-            float4 dir = lightTracingPhotons[c + 3][DispatchRaysIndex().xy];
-
-            // g_renderTarget[DispatchRaysIndex().xy] += float4(pos);
-            VisualiseLightVertex(pos, colour, dir, normal, screenDims, g_sceneCB.accumulatedFrames);
-            //g_renderTarget[DispatchRaysIndex().xy] = float4(1, 1, 0, 0);
-        }
+      
        // g_renderTarget[DispatchRaysIndex().xy] = float4(rand_xorshift(), rand_xorshift(), rand_xorshift(), rand_xorshift());
 
    
@@ -1706,6 +1732,34 @@ void LightTracingRayGen() {
 
 }
 
+
+[shader("raygeneration")]
+void lightTracingRayGenSecondPass() {
+    uint accumulatedFrames = g_sceneCB.accumulatedFrames;
+    uint2 screenDims = DispatchRaysDimensions().xy;
+    for (int j = 0; j < MAX_RAY_RECURSION_DEPTH; j++) {
+        uint c = j * 4;
+        float4 pos = lightTracingPhotons[c][DispatchRaysIndex().xy];
+        float4 colour = lightTracingPhotons[c + 1][DispatchRaysIndex().xy];
+        float4 normal = lightTracingPhotons[c + 2][DispatchRaysIndex().xy];
+        float4 dir = lightTracingPhotons[c + 3][DispatchRaysIndex().xy];
+
+        // g_renderTarget[DispatchRaysIndex().xy] += float4(pos);
+        VisualiseLightVertex(pos, colour, dir, normal, screenDims, g_sceneCB.accumulatedFrames);
+
+        //g_renderTarget[DispatchRaysIndex().xy] = float4(1, 1, 0, 0);
+    }
+}
+
+[shader("closesthit")]
+void lightTracingClosestHitSecondPass(inout PathTracingPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
+
+}
+
+[shader("miss")]
+void lightTracingSecondPassMiss(inout PathTracingPayload payload) {
+
+}
 
 //SORT_FORCEINLINE float CosHemispherePdf(const Vector& v) {
   //  return absCosTheta(v) * INV_PI;
@@ -1780,7 +1834,7 @@ void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in Pr
         lightTracingPhotons[c][index] = float4(pos, brdf);
         lightTracingPhotons[c + 1][index] = rayPayload.colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);
-        lightTracingPhotons[c + 3][index] = float4(-WorldRayDirection(), 0);
+        lightTracingPhotons[c + 3][index] = float4(-WorldRayDirection(), 1);
     }
 
 
