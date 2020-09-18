@@ -106,6 +106,8 @@ struct SceneConstantBuffer
     UINT accumulatedFrames;
     UINT spp;
     UINT frameNumber;
+    UINT csgNodes;
+    bool renderFull;
     float lightPower;
     float rand1;
     float rand2;

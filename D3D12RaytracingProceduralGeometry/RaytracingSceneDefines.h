@@ -54,7 +54,6 @@ namespace GlobalRootSignature_BidirectionalLight {
         enum Enum {
             OutputView = 0,
             StagingTarget,
-
             LightVertices,
             AccelerationStructure,
             SceneConstant,

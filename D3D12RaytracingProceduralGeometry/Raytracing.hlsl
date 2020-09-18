@@ -493,7 +493,7 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
 {
     if (payload.recursionDepth >= MAX_RAY_RECURSION_DEPTH)
     {
-       payload.color = float4(1,1,1, 1);
+       payload.color = float4(0,0,0,0);
        return payload;
     }
 
@@ -503,7 +503,7 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.01;
+    rayDesc.TMin = 0.001;
     rayDesc.TMax = 10000;
   
     payload.recursionDepth += 1;
@@ -531,15 +531,13 @@ bool ShadowRay(in Ray ray, in UINT currentRayRecursionDepth) {
     RayDesc rayDesc;
     rayDesc.Origin = ray.origin;
     rayDesc.Direction = ray.direction;
-    rayDesc.TMin = 0.1;
+    rayDesc.TMin = 0.0001;
     rayDesc.TMax = 10000;
 
     ShadowRayPayload shadow = { true };
 
     TraceRay(g_scene,
-        RAY_FLAG_CULL_BACK_FACING_TRIANGLES
-                   // ~skip any hit shaders
-        | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // ~skip closest hit shaders,  
+         RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // ~skip closest hit shaders,  
         TraceRayParameters::InstanceMask,
         TraceRayParameters::HitGroup::Offset[RayType::Shadow],
         TraceRayParameters::HitGroup::GeometryStride,
@@ -1077,7 +1075,7 @@ PathTracingPayload TraceForwardPath(in Ray ray, in PathTracingPayload payload)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.01;
+    rayDesc.TMin = 0.001;
     rayDesc.TMax = 10000;
 
     payload.recursionDepth += 1;
@@ -1183,7 +1181,7 @@ float3 TraceForwardPaths(Ray r, PathTracingPayload p) {
         RayDesc ray;
         ray.Origin = origin;
         ray.Direction = direction;
-        ray.TMin = 0.01;
+        ray.TMin = 0.001;
         ray.TMax = 10000;
 
         p.weight = jdff;
@@ -1221,14 +1219,14 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
     ray.Origin = hitPosition;
     //ray.Direction = normalize(g_sceneCB.cameraPosition.xyz - hitPosition);
     ray.Direction = g_sceneCB.cameraPosition.xyz - hitPosition;
-    ray.TMin = 0.001;
+    ray.TMin = 0.0001;
     ray.TMax = 1.001;
 
-    Ray r = { hitPosition, g_sceneCB.cameraPosition.xyz - hitPosition };
-    ShadowRayPayload shadow = { true };
+    Ray r = { hitPosition, normalize(g_sceneCB.cameraPosition.xyz - hitPosition) };
+    //ShadowRayPayload shadow = { true };
+    bool shadow = ShadowRay(r, 0);
 
-
-    TraceRay(g_scene,
+    /*TraceRay(g_scene,
         RAY_FLAG_CULL_BACK_FACING_TRIANGLES
         // ~skip any hit shaders
         | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER, // ~skip closest hit shaders,  
@@ -1236,9 +1234,9 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
         TraceRayParameters::HitGroup::Offset[RayType::Shadow],
         TraceRayParameters::HitGroup::GeometryStride,
         TraceRayParameters::MissShader::Offset[RayType::Shadow],
-        ray, shadow);
+        ray, shadow);*/
 
-    if (!shadow.hit) {
+    if (!shadow || !g_sceneCB.renderFull) {
         float2 tempPixel = pixelPos;
         tempPixel /= screenDims;
 
@@ -1266,13 +1264,13 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
         }
 
 
-        uint3 scaledColor = radiance.xyz * 1024.f;
+        /*uint3 scaledColor = radiance.xyz * 262144.f;
         uint3 newColorValue = float3(scaledColor);
         uint original;
         InterlockedAdd(stagingTarget_R[pixelPos], newColorValue[0], original);
         InterlockedAdd(stagingTarget_G[pixelPos], newColorValue[1], original);
-        InterlockedAdd(stagingTarget_B[pixelPos], newColorValue[2], original);
-       // staging[pixelPos] += radiance;
+        InterlockedAdd(stagingTarget_B[pixelPos], newColorValue[2], original);*/
+        staging[pixelPos] += radiance;
        // AllMemoryBarrierWithGroupSync();
         // g_renderTarget[pixelPos] += radiance;//
         // lightTracingPhotons[8][pixelPos] += colour;
@@ -1326,25 +1324,25 @@ void ForwardPathTracingRayGen() {
 
    // float4 stagingColour = D
   //  radiance *= 1.0f / float(1);
-   // float4 stagingColour = staging[DispatchRaysIndex().xy];
+ 
    // float3 averageRadiance = stagingColour;
     float3 previousRadiance = accumulationLight[DispatchRaysIndex().xy];
     uint2 index = uint2(DispatchRaysIndex().xy);
 
-    float channel_r = stagingTarget_R[index];
-    float channel_g = stagingTarget_G[index];
-    float channel_b = stagingTarget_B[index];
+   // float channel_r = stagingTarget_R[index];
+    //float channel_g = stagingTarget_G[index];
+    //float channel_b = stagingTarget_B[index];
 
-
-   float3 lightStaging = float3(channel_r, channel_g, channel_b) / ( 1024.f);
+    float4 lightStaging = staging[DispatchRaysIndex().xy];
+  // float3 lightStaging = float3(channel_r, channel_g, channel_b) / (262144.f);
    float3 lightAverageRadiance;
     if (accumulatedFrames == 0) {
         lightAverageRadiance = lightStaging;
     }
     else {
-        lightAverageRadiance = lerp(previousRadiance, lightStaging, 1.0f / (accumulatedFrames + 1.0f));
+        lightAverageRadiance = lerp(previousRadiance.xyz, lightStaging.xyz, 1.0f / (accumulatedFrames + 1.0f));
     }
-    accumulationLight[DispatchRaysIndex().xy] = float4(lightAverageRadiance, 0);
+    accumulationLight[DispatchRaysIndex().xy] = float4(lightAverageRadiance , 0);
  
    /* if (accumulatedFrames == 0) {
          averageRadiance = stagingColour.xyz;
@@ -1366,8 +1364,14 @@ void ForwardPathTracingRayGen() {
     }
 
     accumulationForward[DispatchRaysIndex().xy] = float4(forwardRadiance, 0);
-
-    g_renderTarget[DispatchRaysIndex().xy] = float4(lightAverageRadiance, 0);
+    float3 totalRadiance;
+    if (g_sceneCB.renderFull) {
+        totalRadiance = forwardRadiance + lightAverageRadiance;
+    }
+    else {
+        totalRadiance = lightAverageRadiance;
+    }
+    g_renderTarget[DispatchRaysIndex().xy] = float4((totalRadiance), 0);
 
     
    // averageRadiance = radiance;
@@ -1484,7 +1488,7 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     float s = chessBoard(pos);
     //float3 c = float3(0.3, 0.3, 0.3);
     //float3 c = float3(1, 1, 1);
-    float3 c = float3(0.8, 0.8, 0.8);
+    float3 c = float3(0.8, 0.8, 0.8)*s;
     //float3 c = float3(0.1, 0.01, 0.3)*s;
     //lambertf is the light value here
     float3 lambert = lambertian(normal, pos, c);
@@ -1536,7 +1540,18 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
     float4 hitColour = float4(0, 0, 0, 0);
     float3 lambert = float3(0, 0, 0);
     float3 monte_sample = float3(0, 0, 0);
+    float3 lightDir = g_sceneCB.lightSphere.xyz - pos;
+    Ray sr = { pos, lightDir };
+    bool shadowHit = ShadowRay(sr, rayPayload.recursionDepth);
 
+
+
+    ///float s = chessBoard(pos);
+    //float3 c = float3(0.3, 0.3, 0.3);
+    //float3 c = float3(1, 1, 1);
+    //float3 c = float3(0.1, 0.01, 0.3)*s;
+    //lambertf is the light value here
+    lambert = lambertian(normal, pos, l_materialCB.albedo);
     
     //uint seed = rayPayload.seed
     //float3 n_direction = SampleHemisphere()
@@ -1561,7 +1576,26 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
     }
     else if (brdf == 1) {
        
-        float alpha = 300;
+        uint seed = rayPayload.randomSeed;
+        float roulette = seed_xorshift(seed);
+        rayPayload.randomSeed = seed;
+        float doSpecular = (roulette < l_materialCB.specularCoef) ? 1.0f : 0.0f;
+        seed = rayPayload.randomSeed;
+        // float3 random = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
+        float3 dir = calculateRandomDirectionInHemisphereSeedShift(normal, seed);
+        //float3 dir = SampleHemisphereSeedShift(normal, seed);
+        rayPayload.randomSeed = seed;
+
+        float3 specularDirection = reflect(WorldRayDirection(), attr.normal);
+        specularDirection = normalize(lerp(specularDirection, dir, l_materialCB.diffuseCoef * l_materialCB.diffuseCoef));
+
+        rayPayload.energy *= l_materialCB.albedo;
+        Ray r = { pos, specularDirection };
+        reflectiveColour = TraceForwardPath(r, rayPayload).colour;
+
+       
+        
+       /* float alpha = 300;
         float3 specular = 0.4f;
         float3 s = min(1.0f - specular, l_materialCB.albedo);
         float specChance = energy(specular);
@@ -1587,8 +1621,8 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
             rayPayload.energy *= (1.0f / diffChance) * s * sdot(normal, dir);
             Ray r = { pos, dir };
             reflectiveColour = TraceForwardPath(r, rayPayload).colour;
-            reflectiveColour += l_materialCB.albedo;
-        }
+            reflectiveColour *= l_materialCB.albedo;
+        }*/
      
     }else if(brdf == 2){
             float3 dir = WorldRayDirection();
@@ -1632,7 +1666,7 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
 
    
     
-    rayPayload.colour = float4(float4(rayPayload.energy, 0)*(reflectiveColour.xyz + hitColour.xyz  + monte_sample) , 0);
+    rayPayload.colour = float4(float4(rayPayload.energy, 0)*(reflectiveColour.xyz + hitColour.xyz  + monte_sample + lambert) , 0);
 }
 
 [shader("miss")]
@@ -1650,6 +1684,7 @@ void MissPathTracing(inout PathTracingPayload rayPayload) {
 
 
 void lightPath(inout float seed) {
+   
     // float2 r = rand_xor(ran);
     //float2 rany = float2(rand_ik(seed), rand_ik(seed));
     float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
@@ -1669,7 +1704,7 @@ void lightPath(inout float seed) {
         RayDesc rayDesc;
         rayDesc.Origin = ro;
         rayDesc.Direction = dir;
-        rayDesc.TMin = 0.1;
+        rayDesc.TMin = 0.0001;
         rayDesc.TMax = 10000;
 
         TraceRay(g_scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
@@ -1696,11 +1731,11 @@ void lightPath(inout float seed) {
 
 [shader("raygeneration")]
 void LightTracingRayGen() {
-   // staging[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
-    uint2 index = DispatchRaysIndex().xy;
-    stagingTarget_R[index] = 0;
-    stagingTarget_G[index] = 0;
-    stagingTarget_B[index] = 0;
+    staging[DispatchRaysIndex().xy] = float4(0, 0, 0, 0);
+   // uint2 index = DispatchRaysIndex().xy;
+  //  stagingTarget_R[index] = 0;
+    //stagingTarget_G[index] = 0;
+    //stagingTarget_B[index] = 0;
     float2 screenDims = float2(DispatchRaysDimensions().x, DispatchRaysDimensions().y); 
    
     for (int j = 0; j < 4*MAX_RAY_RECURSION_DEPTH; j++) {
@@ -1735,6 +1770,8 @@ void LightTracingRayGen() {
 
 [shader("raygeneration")]
 void lightTracingRayGenSecondPass() {
+
+
     uint accumulatedFrames = g_sceneCB.accumulatedFrames;
     uint2 screenDims = DispatchRaysDimensions().xy;
     for (int j = 0; j < MAX_RAY_RECURSION_DEPTH; j++) {
@@ -1777,7 +1814,7 @@ void LightTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in Buil
     uint c = rayPayload.recursionDepth * 4;
 
    // colour /= lambertPdf;
-    if (true) {
+    if (dot(normalize(WorldRayDirection()), normal) < 0) {
         lightTracingPhotons[c][index] = float4(pos, float(brdfType));
         lightTracingPhotons[c + 1][index] = rayPayload.colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);
@@ -1821,18 +1858,18 @@ void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in Pr
     uint brdf = labelBRDF();
     float fresnel = Fresnel(WorldRayDirection(), attr.normal, l_materialCB.refractiveCoef);
     if (brdf == 1) {
-        colour *= fresnel;
+       // colour *= fresnel;
     }
-    else {
-        colour *= (1 - fresnel);
+    else if(brdf == 2) {
+       // colour *= (1 - fresnel);
     }
     colour *= l_materialCB.albedo;
     uint2 index = DispatchRaysIndex().xy;
 
     //then meant to the divide throughput or flux by the probability distribution for sampling the BRDF
-    if (true) {
+    if (dot(normalize(WorldRayDirection()), attr.normal) < 0) {
         lightTracingPhotons[c][index] = float4(pos, brdf);
-        lightTracingPhotons[c + 1][index] = rayPayload.colour;
+        lightTracingPhotons[c + 1][index] = colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);
         lightTracingPhotons[c + 3][index] = float4(-WorldRayDirection(), 1);
     }
@@ -1851,7 +1888,7 @@ void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in Pr
 
 
           
-              colour *= l_materialCB.albedo * INV_PI;
+              colour *=  INV_PI;
               colour *= abs(dot(attr.normal, dir))/abs(dot(attr.normal, -WorldRayDirection()))*INV_PI;
                 //lambertian brdf
             
@@ -1860,14 +1897,31 @@ void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in Pr
             rayPayload.dir = dir;
             rayPayload.pos = pos;
             rayPayload.colour = colour;
-
-           
-
         }
         else {
             float3 dir;
             if (l_materialCB.reflectanceCoef >= 0.0f && l_materialCB.refractiveCoef <= 0.0f) {
-                dir = reflect(WorldRayDirection(), attr.normal);
+                uint seed = rayPayload.randomSeed;
+                float roulette = seed_xorshift(seed);
+                rayPayload.randomSeed = seed;
+                float doSpecular = (roulette < l_materialCB.specularCoef) ? 1.0f : 0.0f;
+                seed = rayPayload.randomSeed;
+                // float3 random = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
+                float3 dir = calculateRandomDirectionInHemisphereSeedShift(normal, seed);
+                //float3 dir = SampleHemisphereSeedShift(normal, seed);
+                rayPayload.randomSeed = seed;
+
+                float3 specularDirection = reflect(WorldRayDirection(), attr.normal);
+                specularDirection = normalize(lerp(specularDirection, dir, l_materialCB.diffuseCoef * l_materialCB.diffuseCoef));
+
+                rayPayload.colour *= l_materialCB.albedo;
+                rayPayload.pos = pos;
+                rayPayload.dir = specularDirection;
+               // Ray r = { pos, specularDirection };
+                //reflectiveColour = TraceForwardPath(r, rayPayload).colour;
+              /*  dir = reflect(WorldRayDirection(), attr.normal);
+                rayPayload.pos = pos;
+                rayPayload.dir = dir;*/
             }
             else {
                 float fresnel = Fresnel(WorldRayDirection(), normal, l_materialCB.refractiveCoef);
@@ -1885,20 +1939,22 @@ void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in Pr
                     outwardNormal = normal;
                     index = n1 / n2;
                 }
-                refractTest(dir, outwardNormal, index, refracted);
+               bool refract =  refractTest(dir, outwardNormal, index, refracted);
+               if (refract) {
+                   dir = refracted;
+                   rayPayload.pos = pos;
+                   rayPayload.dir = dir;
+                   // rayPayload.randomSeed = seed;
+                   rayPayload.colour = colour;
+               }
+               else {
+                   rayPayload.pos = pos;
+                   rayPayload.dir = reflect(WorldRayDirection(), attr.normal);
+                   rayPayload.colour = colour;
 
-                dir = refracted;
-            }
-
-          //  uint seed = rayPayload.randomSeed;
-            //float3 dir = directionFromBRDF(normal, seed);
-            rayPayload.pos = pos;
-            rayPayload.dir = dir;
-           // rayPayload.randomSeed = seed;
-            rayPayload.colour = colour;
-           
-
-        }
+                    }
+               }
+          }
 
 }
 
@@ -2123,19 +2179,23 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
         float3 reflected = normalize(reflect(dir, attr.normal));
         Ray r = { pos, reflected };
         reflectionColour = TraceRadianceRay(r, rayPayload).color;
-
-        hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel);
+        hitColour = refractColour;
+       // hitColour += (reflectionColour * fresnel + refractColour * (1 - fresnel));
     }
     else {
-        hitColour = l_materialCB.albedo * orenNayar(normalize(WorldRayDirection()), attr.normal, normalize(l_dir), 1);
+        
+        hitColour += lambertian(attr.normal, pos, l_materialCB.albedo);//orenNayar(normalize(WorldRayDirection()), attr.normal, normalize(l_dir), 1);
        // hitColour =   lambertian(attr.normal, pos, l_materialCB.albedo);
+         if (shadowHit) {
+        hitColour *= 0.5;
+        }
     }
     float re = reflectionBRDF(dir, attr.normal);
-
+   
 //0.1f is a good coefficient for reflectioncolour.
  // rayPayload.color += refractionColour + 0.1*reflectionColour;
 //  rayPayload.color = refractionColour;
-float4 colour =  l_materialCB.albedo + float4(hitColour.xyz, 0);
+float4 colour =   float4(l_materialCB.albedo + re*hitColour.xyz, 0);
 
 //ray
 //float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor.xyz);
@@ -2259,13 +2319,20 @@ void MyIntersectionShader_SignedDistancePrimitive()
     float thit;
     ProceduralPrimitiveAttributes attr;
 
+    /*if (RaySignedDistanceQuatTest(localRay, thit, attr)) {
+        PrimitiveInstancePerFrameBuffer aabbAttribute = g_AABBPrimitiveAttributes[l_aabbCB.instanceIndex];
+        attr.normal = mul(attr.normal, (float3x3) aabbAttribute.localSpaceToBottomLevelAS);
+        attr.normal = normalize(mul((float3x3) ObjectToWorld3x4(), attr.normal));
+
+        ReportHit(thit, 0, attr);
+    }*/
     if (RaySignedDistancePrimitiveTest(localRay, primitiveType, thit, attr, l_materialCB.stepScale))
     {
         PrimitiveInstancePerFrameBuffer aabbAttribute = g_AABBPrimitiveAttributes[l_aabbCB.instanceIndex];
         attr.normal = mul(attr.normal, (float3x3) aabbAttribute.localSpaceToBottomLevelAS);
         attr.normal = normalize(mul((float3x3) ObjectToWorld3x4(), attr.normal));
 
-        ReportHit(thit, /*hitKind*/ 0, attr);
+        ReportHit(thit,  0, attr);
     }
  
 }
@@ -2436,15 +2503,16 @@ void CSGCombine(in int operation, in intersectionInterval left, in intersectionI
 }
 bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes attr) {
     //tree is in post-order, just need to iterate the tree.
-
+    uint2 p = DispatchRaysIndex().xy;
     intersectionInterval intersections[10];
+    //g_renderTarget[p] = float4(1,0.2, 3, 0);
     CSGNode current = csgTree[0];
     int i = 0;
     int depth = 1;
     uint num;
     uint stride;
     csgTree.GetDimensions(num, stride);
-    while(i < 7) {
+    while(i < g_sceneCB.csgNodes) {
         //need to record depth
         if (current.boolValue == -1) {
 
@@ -2455,7 +2523,9 @@ bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttribute
             r.origin = ray.origin + current.translation;
             r.direction = ray.direction + current.translation;
             //r.direction = ray.direction + current.translation;
-            bool hit = RayCSGGeometryIntervals(r, (AnalyticPrimitive::Enum)current.geometry, tmin, tmax, normal);
+            float4 interval;
+            uint count;
+            bool hit = RayCSGGeometryIntervals(r, (AnalyticPrimitive::Enum)current.geometry, tmin, tmax, interval, normal, count);
             intersectionInterval inter = { tmin, tmax, hit, normal };
             //store this interval in the intersections array at   our node's index.
             intersections[i] = inter;
@@ -2476,13 +2546,13 @@ bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttribute
         }
         i += 1;
         current = csgTree[i];
-        if (i % 6 == 0) {
+        if ((i % 6) == 0) {
             depth += 1;
         }
     }
  
 
-    intersectionInterval final = intersections[i-1];
+    intersectionInterval final = intersections[i -1];//intersections[i-1];
 
     if (final.hit) {
         if (final.tmin > RayTMin()) {
@@ -2545,10 +2615,11 @@ bool RayCSGIntersectionTest(in Ray ray, in CSGPrimitive::Enum csgPrimitive, out 
             //works - or at least runs.
             if (root.boolValue == -1) {
                 //primitive node
-
+                float4 intersectionValues;
                 float  tmin, tmax;
                 float3 normal;
-                bool hit = RayCSGGeometryIntervals(ray, (AnalyticPrimitive::Enum)root.geometry, tmin, tmax, normal);
+                uint count;
+                bool hit = RayCSGGeometryIntervals(ray, (AnalyticPrimitive::Enum)root.geometry, tmin, tmax, intersectionValues, normal, count);
                 //  float3 normal = attr.normal;
                       //intersect geometry
                 intersectionInterval i = { tmin, tmax, hit, normal };

@@ -94,7 +94,9 @@ private:
     std::vector<float> fpsAverages;
     bool testing = false;
     bool drawRays = false;
-    bool photonMapping = false;
+    bool mappingAndPathing = true;
+    bool photonMapping = true;
+    bool biDirectional = true;
     bool recordIntersections = true;
     bool biPathTracing = true;
     // Constants.

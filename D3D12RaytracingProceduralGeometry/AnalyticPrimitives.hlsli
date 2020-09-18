@@ -175,23 +175,45 @@ bool cornellBoxUnColoured(in Ray r, inout float tmin, inout float tmax, out floa
     //figure out which hit point was closest
 }
 
-bool rayPlane(in Ray r, inout float tmin, inout float tmax, out float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float3 translation) {
-    float epsilon = 0.001;
-    float denominator = dot(r.direction, normal);
-    if (abs(denominator) < epsilon) {
+bool rayPlane(in Ray r,  inout float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float3 translation) {
+    float epsilon = 0.00001;
+    
+ //   float translation = 0;
+   
+    double z0 = translation + r.origin.x;
+    double dz = r.direction.x;
+
+    double t =  -z0 / dz;
+
+    if (abs(dz) < epsilon) {
         return false;
     }
 
+
+    float3 intersectionPoint = r.origin + t * r.direction;
    
+    if ((abs(intersectionPoint.z <= 3)) && (abs(intersectionPoint.y) <= 3)) {
+        if (abs(dot(intersectionPoint.zy, intersectionPoint.zy)) <= radius) {
+            attr.normal = float3(0, 0, 1);
+
+            thit = t;
+            if (dot(attr.normal, r.direction) > 0) {
+                attr.normal = -attr.normal;
+            }
+            return true;
+        }
+    }
+    
+    return false;
     //float t2 = 1 - r.origin.x / r.direction.x;
   
-    float3 p_2 = -(r.origin - translation);
+   /* float3 p_2 = -(r.origin - translation);
     float t1 = dot(p_2, normal) / denominator;
     float3 intersectionPoint;
     if (t1 > epsilon) {
         intersectionPoint = r.origin + t1 * r.direction;
-        if ((abs(intersectionPoint.x < 1)) && (abs(intersectionPoint.z) < 1)) {
-         
+        if ((abs(intersectionPoint.x < 1)) && (abs(intersectionPoint.y) < 1)) {
+            if (sqrt(dot(intersectionPoint.xy, intersectionPoint.xy)) <= 1) {
                 thit = t1;
                 tmin = tmax = t1;
                 attr.normal = normal;
@@ -200,10 +222,11 @@ bool rayPlane(in Ray r, inout float tmin, inout float tmax, out float thit, out 
                 }
                 return true;
             }
+        }
         
 
     }
-    return false;
+    return false;*/
 }
 bool QuadricRayIntersectionTest(in Ray r, inout float tmin, inout float tmax, out float thit, out ProceduralPrimitiveAttributes attr, in AnalyticPrimitive::Enum analyticPrimitive = AnalyticPrimitive::Enum::Hyperboloid, in float4x4 Q = float4x4(-1.0f, 0.0f, 0.0f, 0.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
@@ -379,7 +402,35 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
 
 }
 
-bool CSGRayTest(in Ray ray, out float tmin, out float tmax, out float3 normal, in AnalyticPrimitive::Enum type) {
+/**
+void insertSort(inout float4 a, int length)
+{
+    int i, j, value;
+    for (i = 1; i < length; i++)
+    {
+        value = a[i];
+        for (j = i - 1; j >= 0 && a[j] > value; j--)
+            a[j + 1] = a[j];
+        a[j + 1] = value;
+    }
+}*/
+
+
+void insertionSort(inout float4 intersections) {
+
+    int j;
+    float key;
+    for (int i = 1; i < 4; i++) {
+        key = intersections[i];
+        j = i - 1;
+        while (j >= 0 && intersections[j] > key) {
+            intersections[j + 1] = intersections[j];
+            j--;
+        }
+        intersections[j + 1] = key;
+    }
+}
+bool CSGRayTest(in Ray ray, out float tmin, out float tmax, inout float4 intervals, out float3 normal, in AnalyticPrimitive::Enum type) {
 
     //thit = RayTCurrent();
 
@@ -422,37 +473,55 @@ bool CSGRayTest(in Ray ray, out float tmin, out float tmax, out float3 normal, i
     float _thit;
     ProceduralPrimitiveAttributes _attr;
 
-    if (QuadricRayIntersectionTest(ray, tmin, tmax, _thit, _attr, type, Q))
+    float tquadMin = -1;
+    float tquadMax = -1;
+    bool quadricHit = false;
+    if (QuadricRayIntersectionTest(ray, tquadMin, tquadMax, _thit, _attr, type, Q))
     {
-
+        quadricHit = true;
        // thit = _thit;
         normal = _attr.normal;
         hitFound = true;
 
     }
 
-    float left_tmin, left_tmax, left_thit, right_tmin, right_tmax, right_thit;
+    float left_thit = -1;
+    float right_thit = -1;
+   bool rightPlaneI = false;
+   bool leftPlaneI = false;
     ProceduralPrimitiveAttributes leftPlane, rightPlane;
-    if (type == AnalyticPrimitive::Cylinder) {
+    if (type == AnalyticPrimitive::Hyperboloid) {
         //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
-        if (rayPlane(ray, left_tmin, left_tmax, left_thit, leftPlane, float3(1, 0, 0), 1, float3(-2, 0, 0))) {
+        if (rayPlane(ray, left_thit, leftPlane, float3(1, 0, 0), 5, float3(-2, 0, 0))) {
             if ((_thit > left_thit) || (!hitFound)) {
                 tmin = left_thit;
                 _thit = left_thit;
                 normal = leftPlane.normal;
                 hitFound = true;
+                leftPlaneI = true;
             }
         }
-        if (rayPlane(ray, right_tmin, right_tmax, right_thit, rightPlane, float3(1, 0, 0), 1, float3(2, 0, 0))) {
+        if (rayPlane(ray, right_thit, rightPlane, float3(1, 0, 0), 5, float3(2, 0, 0))) {
             if ((_thit > right_thit) || (!hitFound)) {
                 tmin = right_thit;
                 normal =  rightPlane.normal;
                 hitFound = true;
+                rightPlaneI = true;
             }
         }
     }
 
+    
+    float4 intersections = float4(tquadMin, tquadMax, left_thit, right_thit);
+    insertionSort(intersections);
 
+    int count = 0;
+    for (int i = 0; i < 4; i++) {
+        if (intersections[i] > 0) {
+            intervals[count] = intersections[i];
+        }
+    }
+    //need to return float4 in sorted order
     return hitFound;
 
 }
@@ -530,20 +599,7 @@ bool Intersection(float4 intersections, in float thit, in ProceduralPrimitiveAtt
     }
     return true;
 }
-void insertionSort(inout float4 intersections) {
 
-    int j;
-    float key;
-    for (int i = 1; i < 4; i++) {
-        key = intersections[i];
-        j = i - 1;
-        while (j >= 0 && intersections[j] > key) {
-            intersections[j + 1] = intersections[j];
-            j--;
-        }
-        intersections[j + 1] = key;
-    }
-}
 bool Union(float s_min, float b_min, out float thit, out ProceduralPrimitiveAttributes attr) {
     thit = min(s_min, b_min);
   
@@ -647,7 +703,7 @@ bool ConstructiveSolidGeometry_I(in Ray ray, out float thit, out ProceduralPrimi
     return false;
 
 
-    //turn true;
+//turn true;
 }
 
 
@@ -661,7 +717,7 @@ bool ConstructiveSolidGeometry_D(in Ray ray, out float thit, out ProceduralPrimi
 
     ProceduralPrimitiveAttributes s_attr;
     ProceduralPrimitiveAttributes b_attr;
-    float4x4 Q =  float4x4 (-1.0f, 0.0f, 0.0f, 0.0f,
+    float4x4 Q = float4x4 (-1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, -1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 0.0f);
@@ -671,7 +727,7 @@ bool ConstructiveSolidGeometry_D(in Ray ray, out float thit, out ProceduralPrimi
 
     if (sphere_hit && hyp_hit) {
         intersections = float4(b_tmin, b_tmax, s_tmin, s_tmax);
-        if(intersections.x < intersections.z){
+        if (intersections.x < intersections.z) {
             thit = intersections.x;
             attr = b_attr;
         }
@@ -723,19 +779,145 @@ bool RaySpheresIntersectionTest(in Ray ray, out float thit, out ProceduralPrimit
     float _thit;
     float _tmax;
     ProceduralPrimitiveAttributes _attr;
-   // for (int i = 0; i < N; i++) {
-        if (RaySphereIntersectionTest(ray, _thit, _tmax, _attr, centers[0], radii[0]))
+    // for (int i = 0; i < N; i++) {
+    if (RaySphereIntersectionTest(ray, _thit, _tmax, _attr, centers[0], radii[0]))
+    {
+        if (_thit < thit)
         {
-            if (_thit < thit)
-            {
-                thit = _thit;
-                attr = _attr;
-                hitFound = true;
-            }
+            thit = _thit;
+            attr = _attr;
+            hitFound = true;
         }
-  //  }
+    }
+    //  }
     return hitFound;
 
+}
+
+
+bool cubeIntersection(Ray r, inout float thit, out ProceduralPrimitiveAttributes attr) {
+
+
+    float eps = 0.000001;
+
+    //this conditional makes sure we will not divide by zero in any of the cases, or get rounding errors.
+    if (abs(r.direction.x) < eps || abs(r.direction.y) < eps || abs(r.direction.z) < eps) {
+        return false;
+    }
+    //r.direction = normalize(r.direction)
+    float hits[6];
+    float3 normals[6];
+    float t1;
+    float t2;
+    float t3;
+    float t4;
+    float t5;
+    float t6;
+
+    int counter = 0;
+    //tests for the plane where z components = 1
+    t1 = (1 - r.origin.z) / r.direction.z;
+    //if the intersection is greater than zero (in front of the camera) and if x, y components are in range [-1, 1] we have a hit.
+    if (t1 > 0) {
+
+        float3 hit = r.origin + t1 * r.direction;
+
+        if ((abs(hit.x) <= 1) && (abs(hit.y) <= 1)) {
+            hits[counter] = t1;
+            normals[counter] = float3(0, 0, 1);
+
+            counter++;
+        }
+    }
+    //tests for the plane where z components = -1
+    t2 = (-1 - r.origin.z) / r.direction.z;
+    //if the intersection is greater than zero (in front of the camera) and if x, y components are in range [-1, 1] we have a hit.
+    if (t2 > 0) {
+        float3 hit = r.origin + t2 * r.direction;
+        if ((abs(hit.x) <= 1) && (abs(hit.y) <= 1)) {
+            hits[counter] = t2;
+            normals[counter] = float3(0, 0, -1);
+            counter++;
+        }
+    }
+    //tests for the plane where y components = 1
+    t3 = (1 - r.origin.y) / r.direction.y;
+    if (t3 > 0) {
+        //if the intersection is greater than zero (in front of the camera) and if x, z components are in range [-1, 1] we have a hit.
+        float3 hit = r.origin + t3 * r.direction;
+        if ((abs(hit.x) <= 1) && (abs(hit.z) <= 1)) {
+            hits[counter] = t3;
+            normals[counter] = float3(0, 1, 0);
+            counter++;
+        }
+    }
+
+    //tests for the plane where y components = -1
+    t4 = (-1 - r.origin.y) / r.direction.y;
+    if (t4 > 0) {
+        //if the intersection is greater than zero (in front of the camera) and if x, z components are in range [-1, 1] we have a hit.
+        float3 hit = r.origin + t4 * r.direction;
+        if ((abs(hit.x) <= 1) && (abs(hit.z) <= 1)) {
+            hits[counter] = t4;
+            normals[counter] = float3(0, 1, 0);
+            counter++;
+        }
+    }
+    //tests for the plane where x components = 1
+    t5 = (1 - r.origin.x) / r.direction.x;
+    if (t5 > 0) {
+        //if the intersection is greater than zero (in front of the camera) and if y, z components are in range [-1, 1] we have a hit.
+        float3 hit = r.origin + t5 * r.direction;
+
+        if ((abs(hit.y) <= 1) && (abs(hit.z) <= 1)) {
+            hits[counter] = t5;
+            normals[counter] = float3(1, 0, 0);
+            counter++;
+        }
+    }
+
+    //tests for the plane where x components = -1
+    t6 = (-1 - r.origin.x) / r.direction.x;
+    if (t6 > 0) {
+        //if the intersection is greater than zero (in front of the camera) and if y, z components are in range [-1, 1] we have a hit.
+        float3 hit = r.origin + t6 * r.direction;
+        if ((abs(hit.y) <= 1) && (abs(hit.z) <= 1)) {
+            hits[counter] = t6;
+            normals[counter] = float3(1, 0, 0);
+            counter++;
+        }
+    }
+
+    if (counter == 0) {
+        return false;
+    }
+    float tmin = 100000;
+    float tmax = -1;
+    float3 minNormal;
+    float3 maxNormal;
+
+    for (int i = 0; i < counter; i++) {
+        if (hits[i] < tmin) {
+            tmin = hits[i];
+            minNormal = normals[i];
+        }
+        if (hits[i] > tmax) {
+            tmax = hits[i];
+            maxNormal = normals[i];
+        }
+    }
+
+    thit = tmin;
+         if (tmin < RayTMin() || tmin > RayTCurrent() )
+            return false;
+   // float3 hit = ray.origin + thit * r.direction;
+    if (dot(minNormal, r.direction) > 0) {
+        minNormal = -minNormal;
+    }
+    
+    attr.normal = minNormal;
+    return true;
+    // return result;
 }
 
 // Test if a ray segment <RayTMin(), RayTCurrent()> intersects an AABB.

@@ -4,8 +4,9 @@ using namespace DirectX;
 
 
 Camera::Camera(float aspectRatio) : aspectRatio(aspectRatio) {
-    m_pos = { 0.0f, 10.0f, 1.0f, 0.0f };
-    //m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
+   // m_pos = { 12,6, 3, 0 };
+    m_pos = { 2, 10, 3, 0 };
+   //m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
     m_front = { 0.0f, 0.0f, -1.0f, 0.0f };
 
     m_at = XMVectorAdd(m_pos, m_front);
@@ -34,7 +35,7 @@ void Camera::Update(ConstantBuffer<SceneConstantBuffer> &scene, ConstantBuffer<R
     m_at = XMVectorAdd(m_front, m_pos);
     m_direction = XMVector3Normalize(m_at - m_pos);
     scene->cameraPosition = m_pos;
-
+    XMVECTOR lookAt = { 2.0f, -0.14, 2.0f , 0.0f };
     float fovAngleY = 45.0f;
     XMMATRIX view = XMMatrixLookAtRH(m_pos, m_at, m_up);
     XMMATRIX proj = XMMatrixPerspectiveFovRH(XMConvertToRadians(fovAngleY), aspectRatio, 0.01f, 1000.0f);

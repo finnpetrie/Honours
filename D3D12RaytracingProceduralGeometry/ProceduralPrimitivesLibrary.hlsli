@@ -28,11 +28,11 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     float t_min;
     float t_max;
     
-    
+    //cubeIntersection(ray, thit, attr);
                    
     switch (analyticPrimitive)
     {
-    case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);
+    case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);//cubeIntersection(ray, thit, attr);
     //case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
     case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
     case AnalyticPrimitive::Sphere: return RayQuadric(ray, thit, attr, analyticPrimitive);
@@ -44,14 +44,14 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     case AnalyticPrimitive::Paraboloid: return RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::Cylinder: return RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::Cone: return  RayQuadric(ray, thit, attr, analyticPrimitive);
-    case AnalyticPrimitive::Plane: return rayPlane(ray, t_min, t_max, thit, attr, float3(1, 0, 0), 20, float3(0, 0, 0));
-    case AnalyticPrimitive::CornellBack: return rayPlane(ray, t_min, t_max, thit, attr, float3(0, 0, -1), 0, float3(0, 0, 0));
+    case AnalyticPrimitive::Plane: return rayPlane(ray, thit, attr, float3(1, 0, 0), 20, float3(0, 0, 0));
+    //case AnalyticPrimitive::CornellBack: return rayPlane(ray, t_min, t_max, thit, attr, float3(0, 0, -1), 0, float3(0, 0, 0));
     default: return false;
     }
 }
 
-bool RayCSGGeometryIntervals(in Ray ray, in AnalyticPrimitive::Enum analyticPrimitive, out float tMin, out float tMax, out float3 normal) {
-    return CSGRayTest(ray, tMin, tMax, normal, analyticPrimitive);
+bool RayCSGGeometryIntervals(in Ray ray, in AnalyticPrimitive::Enum analyticPrimitive, out float tMin, out float tMax, inout float4 intervals, out float3 normal, inout uint count) {
+    return CSGRayTest(ray, tMin, tMax, intervals, normal, analyticPrimitive);
 }
 
 
@@ -102,8 +102,9 @@ float GetDistanceFromSignedDistancePrimitive(in float3 position, in SignedDistan
         float3 trap;
         //return opS(opS(udRoundBox(position, (float3) 0.75, 0.2), sdSphere(position, 1.20)), -sdSphere(position, 1.32));
                // float4 c1 = float4(-0.45, 0.34, -0.09, -0.56)
+       // return  sdTorus(position, float2 t)
 
-      return juliaMap(position.xyz, trap,  float4(0.6, 0.6, 0.6, 0));
+     return juliaMap(position.xyz, trap,  float4(0.6, 0.6, 0.6, 0));
      //  return sdTorus82(position, float2(0.75, 0.15));
         //return sdQuaternionJuliaSet(position + float3(0, 0, 0), float4(0.894, 0.447, 2.0, 0.0), 2.0f);
       // return sdGyroid(position);

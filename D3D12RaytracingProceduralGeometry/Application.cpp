@@ -175,8 +175,14 @@ void Application::CreateDeviceDependentResources()
         CreateCompositeRayPipelineStateObject();
         CreateRasterRootSignatures();
         CreateRasterisationPipeline();
-        CreateForwardBidirectionalRootSignatures();
-        CreateBiDirectionalPathTracingStateObjects(false);
+       // CreateForwardBidirectionalRootSignatures();
+        //CreateBiDirectionalPathTracingStateObjects(false);
+        if (mappingAndPathing) {
+            CreateLightBidirectionalRootSignatures();
+            //CreatePhotonTilingComptuePassStateObject();
+            CreateForwardBidirectionalRootSignatures();
+            CreateBiDirectionalPathTracingStateObjects(true);
+        }
 
     }
     else {
@@ -215,10 +221,13 @@ void Application::CreateDeviceDependentResources()
 
         BuildCompositeTable();
         BuildPhotonShaderTable();
+        if (mappingAndPathing) {
+            BuildLightPathShaderTable();
+            BuildSecondPassLightShaderTables();
+
+        }
     }
     else {
-        BuildLightPathShaderTable();
-        BuildSecondPassLightShaderTables();
 
     }
 
@@ -244,7 +253,9 @@ void Application::CreateLightBidirectionalRootSignatures()
     CD3DX12_DESCRIPTOR_RANGE ranges[4];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4*MAX_RAY_RECURSION_DEPTH, 13);
-    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 8);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 7);
+
+   // ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 8);
    // ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH, 14);
     //ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH, 22);
     //ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, MAX_RAY_RECURSION_DEPTH, 29);
@@ -297,7 +308,9 @@ void Application::CreateForwardBidirectionalRootSignatures() {
     CD3DX12_DESCRIPTOR_RANGE ranges[6];
     ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
     ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 4*MAX_RAY_RECURSION_DEPTH, 13);
-    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 8);
+    ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 7);
+
+   // ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 8);
     ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 11);
     ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 12);
 
@@ -1810,6 +1823,9 @@ void Application::CreateDescriptorHeap()
     UINT additionalCount = 0;
     if(photonMapping){
         additionalCount = 3 * MAX_RAY_RECURSION_DEPTH + 1 + 1 + 3 + 1 + 20;
+        if (mappingAndPathing) {
+            additionalCount += 4 * MAX_RAY_RECURSION_DEPTH + 15 + 8;
+        }
     }
     else {
         //3 accumulation buffers
@@ -2634,6 +2650,9 @@ void Application::OnKeyDown(UINT8 key)
     case 'L': 
         m_animateLight = !m_animateLight;
         break;
+    case 'B':
+        biDirectional = !biDirectional;
+        break;
     case '0':
         intersectionIndex = 0;
         break;
@@ -2947,7 +2966,7 @@ void Application::DoForwardPathTracing()
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::VertexBuffers, scene->m_indexBuffer.gpuDescriptorHandle);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::LightVertices, LightBuffers[0].uavGPUDescriptor);
-        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::StagingTarget, stages[0].uavGPUDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::StagingTarget, stagingGPUDescriptor);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::LightAccumulationBuffer, lightAccumulationGPUDescriptor);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_Bidirectional::Slot::ForwardAccumulationBuffer, forwardAccumulationGPUDescriptor);
         
@@ -3011,7 +3030,7 @@ void Application::DoLightPathTracing()
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::VertexBuffers, scene->m_indexBuffer.gpuDescriptorHandle);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightVertices, LightBuffers[0].uavGPUDescriptor);
-        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::StagingTarget, stages[0].uavGPUDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::StagingTarget, stagingGPUDescriptor);
         //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightNormals, LightNormals[0].uavGPUDescriptor);
         //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightColours, LightColours[0].uavGPUDescriptor);
         //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightDirection, LightDirections[0].uavGPUDescriptor);
@@ -3075,7 +3094,7 @@ void Application::DoLightPathTracingSecondPass()
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::VertexBuffers, scene->m_indexBuffer.gpuDescriptorHandle);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::OutputView, m_raytracingOutputResourceUAVGpuDescriptor);
         commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightVertices, LightBuffers[0].uavGPUDescriptor);
-        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::StagingTarget, stages[0].uavGPUDescriptor);
+        commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::StagingTarget, stagingGPUDescriptor);
         //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightNormals, LightNormals[0].uavGPUDescriptor);
         //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightColours, LightColours[0].uavGPUDescriptor);
         //commandList->SetComputeRootDescriptorTable(GlobalRootSignature_BidirectionalLight::Slot::LightDirection, LightDirections[0].uavGPUDescriptor);
@@ -3301,17 +3320,23 @@ void Application::CreateWindowSizeDependentResources()
         CreateRasterOutputResource();
 
         CreateCountBuffer();
-
+        if (mappingAndPathing) {
+            CreateStagingResource();
+            CreateAccumulationBuffers();
+            CreateLightBuffers();
+        }
         CreatePhotonStructuredBuffer();
 
         CreateDeferredGBuffer();
+
     }
     else {
         //create big light photon buffer
-        CreateDiscreteStagingTargetBuffers();
-        //CreateStagingResource();
+        //CreateDiscreteStagingTargetBuffers();
+        CreateStagingResource();
         CreateAccumulationBuffers();
         CreateLightBuffers();
+
     }
 
     if (tiling) {
@@ -3459,28 +3484,38 @@ void Application::OnRender()
     }
 
    if (photonMapping) {
-       DoScreenSpacePhotonMapping();
+       if (biDirectional && mappingAndPathing) {
+           DoLightPathTracing();
+           DoLightPathTracingSecondPass();
+           DoForwardPathTracing();
+           CopyRaytracingOutputToBackbuffer();
+       }
+       else {
 
-       //  DoTiling(1024, 720, 1);
-        //deferred rendering + direct lighting
-         DoRaytracing();
-       //DoForwardPathTracing();
 
-      // CopyGBufferToBackBuffer();
-        //rasterise photon volumes - indirect lighting
-        //  CopyRaytracingOutputToBackbuffer();
+           DoScreenSpacePhotonMapping();
 
-       DoRasterisation();
-       CopyBackBufferToRasterBuffer();
-       DoCompositing();
+           //  DoTiling(1024, 720, 1);
+            //deferred rendering + direct lighting
+           DoRaytracing();
+           //DoForwardPathTracing();
 
-       CopyRaytracingOutputToBackbuffer();
+          // CopyGBufferToBackBuffer();
+            //rasterise photon volumes - indirect lighting
+            //  CopyRaytracingOutputToBackbuffer();
+
+           DoRasterisation();
+           CopyBackBufferToRasterBuffer();
+           DoCompositing();
+
+           CopyRaytracingOutputToBackbuffer();
+       }
    }
    else {
-      DoLightPathTracing();
-      DoLightPathTracingSecondPass();
-      DoForwardPathTracing();
-      CopyRaytracingOutputToBackbuffer();
+       DoLightPathTracing();
+       DoLightPathTracingSecondPass();
+       DoForwardPathTracing();
+       CopyRaytracingOutputToBackbuffer();
    }
 
     //DoCompositing();
@@ -3533,7 +3568,7 @@ void Application::CalculateFrameStats()
     //has run for a total of 30 seconds, write the fps to a file, and stop.
 
     if (totalTime >= 30.0f && testing) {
-        std::ofstream output_file("/fps_stats_photon_mapping.txt");
+        std::ofstream output_file("/fps_stats_4k_Photon_mapping_Julia.txt");
         for (const auto& e : fpsAverages) output_file << e << "\n";
       //  double fps = frameCnt / totalTime;
         //output_file << fps << "\n";

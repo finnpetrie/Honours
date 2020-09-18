@@ -119,6 +119,8 @@ float sdTorus(float3 p, float2 t)
     return length(q) - t.y;
 }
 
+
+
 float sdHexPrism(float3 p, float2 h)
 {
     float3 q = abs(p);
@@ -251,25 +253,153 @@ float3 sdCalculateNormal(in float3 pos, in SignedDistancePrimitive::Enum sdPrimi
         e.xxx * GetDistanceFromSignedDistancePrimitive(pos + e.xxx, sdPrimitive));
 }
 
+/*float intersectQuaternionJuliaSet(in Ray ray, out float4 res, in float4 c) {
+    float4 tmp;
+    float resT = -1.0;
+    float maxd = 10.0;
+    float h = 1.0;
+    float t = 0.0;
+    for (uint i = 0; i < 300; i++) {
+        if (h <0.0001 || t >maxd)break;
+        //map quaternion julia set
+        t += h;
+    }
+    
+}*/
+
+float4 qsqr(in float4 a) // square a quaterion
+{
+    return float4(a.x * a.x - a.y * a.y - a.z * a.z - a.w * a.w,
+        2.0 * a.x * a.y,
+        2.0 * a.x * a.z,
+        2.0 * a.x * a.w);
+}
+
+float qlength2(in float4 q)
+{
+    return dot(q, q);
+}
+
+float4 qconj(in float4 a)
+{
+    return float4(a.x, -a.yzw);
+}
+
+float map(in float3 p, out float4 oTrap, in float4 c)
+{
+    float4 z = float4(p, 0.0);
+    float md2 = 1.0;
+    float mz2 = dot(z, z);
+
+    float4 trap = float4(abs(z.xyz), dot(z, z));
+
+    float n = 1.0;
+    int numIterations = 11;
+    for (int i = 0; i < numIterations; i++)
+    {
+        // dz -> 2·z·dz, meaning |dz| -> 2·|z|·|dz|
+        // Now we take the 2.0 out of the loop and do it at the end with an exp2
+        md2 *= 4.0 * mz2;
+        // z  -> z^2 + c
+        z = qsqr(z) + c;
+
+        trap = min(trap, float4(abs(z.xyz), dot(z, z)));
+
+        mz2 = qlength2(z);
+        if (mz2 > 4.0) break;
+        n += 1.0;
+    }
+
+    oTrap = trap;
+
+    return 0.25 * sqrt(mz2 / md2) * log(mz2);  // d = 0.5·|z|·log|z|/|z'|
+}
+float3 calcNormal(in float3 p, in float4 c)
+{
+    float4 z = float4(p, 0.0);
+
+    // identity derivative
+    float4 J0 = float4(1, 0, 0, 0);
+    float4 J1 = float4(0, 1, 0, 0);
+    float4 J2 = float4(0, 0, 1, 0);
+    uint numIterations = 11;
+    for (int i = 0; i < numIterations; i++)
+    {
+        float4 cz = qconj(z);
+
+        // chain rule of jacobians (removed the 2 factor)
+        J0 = float4(dot(J0, cz), dot(J0.xy, z.yx), dot(J0.xz, z.zx), dot(J0.xw, z.wx));
+        J1 = float4(dot(J1, cz), dot(J1.xy, z.yx), dot(J1.xz, z.zx), dot(J1.xw, z.wx));
+        J2 = float4(dot(J2, cz), dot(J2.xy, z.yx), dot(J2.xz, z.zx), dot(J2.xw, z.wx));
+
+        // z -> z2 + c
+        z = qsqr(z) + c;
+
+        if (qlength2(z) > 4.0) break;
+    }
+
+    float3 v = float3(dot(J0, z),
+        dot(J1, z),
+        dot(J2, z));
+
+    return normalize(v);
+}
+
+float intersect(Ray r, out float4 res, in float4 c) {
+    float4 tmp;
+    float resT = -1.0;
+    float maxD = 10.0;
+    float h = 1.0;
+    float t = 0.0;
+    for (int i = 0; i < 300; i++) {
+        if (h < 0.0001 || t > maxD)break;
+        h = map(r.origin + r.direction * t, tmp, c);
+        t += h;
+    }
+    if (t < maxD) {
+        resT = t;
+        res = tmp;
+    }
+}
+
+bool RaySignedDistanceQuatTest(in Ray ray, out float thit, out ProceduralPrimitiveAttributes attr) {
+    float4 tra;
+    float4 c = float4(0.6, 0.6, 0.6, 0);
+    float t = intersect(ray, tra, c);
+    if (t < 0.0) {
+        return false;
+    }
+    else {
+        float3 pos = ray.origin + t * ray.direction;
+        float3 normal = calcNormal(pos, c);
+        thit = t;
+        attr.normal = normal;
+        return true;
+        //calculate surface normal
+        //return true
+    }
+}
 // Test ray against a signed distance primitive.
 // Ref: https://www.scratchapixel.com/lessons/advanced-rendering/rendering-distance-fields/basic-sphere-tracer
 bool RaySignedDistancePrimitiveTest(in Ray ray, in SignedDistancePrimitive::Enum sdPrimitive, out float thit, out ProceduralPrimitiveAttributes attr, in float stepScale = 1.0f)
 {
     const float threshold = 0.0001;
     float t = RayTMin();
-    const UINT MaxSteps = 200;
-
+    const UINT MaxSteps = 300;
+    float4 tmp;
+    float4 c = float4(0.1, 0.7, 0.12, 0.12);
     // Do sphere tracing through the AABB.
     UINT i = 0;
     while (i++ < MaxSteps && t <= RayTCurrent())
     {
         float3 position = ray.origin + t * ray.direction;
-        float distance = GetDistanceFromSignedDistancePrimitive(position, sdPrimitive);
+        float distance = map(position, tmp, c);//GetDistanceFromSignedDistancePrimitive(position, sdPrimitive);
 
         // Has the ray intersected the primitive? 
         if (distance <= threshold * t)
         {
-            float3 hitSurfaceNormal = sdCalculateNormal(position, sdPrimitive);
+            float3 hitSurfaceNormal = calcNormal(position, c);
+           // float3 hitSurfaceNormal = sdCalculateNormal(position, sdPrimitive);
             if (IsAValidHit(ray, t, hitSurfaceNormal))
             {
                 thit = t;
