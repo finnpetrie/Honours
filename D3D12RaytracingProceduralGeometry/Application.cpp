@@ -228,7 +228,8 @@ void Application::CreateDeviceDependentResources()
         }
     }
     else {
-
+        BuildLightPathShaderTable();
+        BuildSecondPassLightShaderTables();
     }
 
     // Create an output 2D texture to store the raytracing result to.

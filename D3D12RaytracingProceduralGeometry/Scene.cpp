@@ -525,11 +525,11 @@ void Scene::CreateGeometry() {
 
 
     PrimitiveConstantBuffer sphere_b = { XMFLOAT4(0.9, 0.1, 0.1, 0), 1, 1.7, 1, 0.4f, 50, 1 };
-    Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(0.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(3.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.01, 0.8, 0.8, 0), 1, 2, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.3, 0.7, 0), 1, 1.5, 0.3f, 1.0f, 50, 1 };
-    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.8, 0.8, 0.8, 0), 1, 1.7, 1, 0.4f, 50, 1 };
-    PrimitiveConstantBuffer cylin_b = {XMFLOAT4(1.0, 0.0, 0.0, 0.0), 1, 0, 0.0f, 1.0f, 50, 1 };
+    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.8, 0.8, 0.8, 0), 0, 0, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.8, 0.64, 0.12, 0), 1, 0, 0.0f, 1.0f, 50, 1 };
     PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.9, 0.3, 0.9, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.1, 0.8, 0.1, 0), 1, 1.5, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 2, 1, 1, 0.4f, 50, 1 };
@@ -539,7 +539,7 @@ void Scene::CreateGeometry() {
     Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 0.0f), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(3.0f, -0.4, 2.0f ), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(4, -0.4f, 0.0f ), XMFLOAT3(6, 6, 6));
-    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(2.0f, -0.4f, 2.0f), XMFLOAT3(6, 6, 6));
+    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(3.5f, -0.4f, 0.0f), XMFLOAT3(6, 6, 6));
 
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(1.0f, 0.0f, 2.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
@@ -552,8 +552,8 @@ void Scene::CreateGeometry() {
     Primitive plane2(AnalyticPrimitive::Plane, AABB_b, XMFLOAT3(1, 3.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive cornellInner(AnalyticPrimitive::CornellBack, cone_b, XMFLOAT3(0, 0, 0.0f), XMFLOAT3(3, 3, 3));
     Primitive otherBox(AnalyticPrimitive::AABB, ellipse_b, XMFLOAT3(2.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
-
-    analyticalObjects = { Cylinder};
+   // analyticalObjects = {};
+   analyticalObjects = {AABB, sphere};
 
 }
 

@@ -586,7 +586,7 @@ uint wang_hash(uint seed, int x , int y)
 float chessBoard(float3 pos) {
 
     float chess = floor(sqrt(pos.x * pos.x + pos.z * pos.z)) + floor(atan(pos.z / pos.x));
-    chess = floor(pos.x) +  floor(pos.z);
+    //chess = floor(pos.x) +  floor(pos.z);
     chess = frac(chess * 0.5);
     chess *= 2;
     if (chess == 0.0) {
@@ -2114,20 +2114,20 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
 
 [shader("closesthit")]
 void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitiveAttributes attr)
-{   
+{
 
     float3 pos = HitWorldPosition();
     float3 pos_n = normalize(HitWorldPosition());
 
     //intersectionBuffer[rayPayload.recursionDepth][DispatchRaysIndex().xy] = normalize(float4(pos, 1));
-   
+
     //g_buffer[1080*y + x] = float4(pos, 1);
     float3 l_dir = normalize(g_sceneCB.lightSphere.xyz - pos);
-    float4 reflectionColour = float4(0,0,0,1);
+    float4 reflectionColour = float4(0, 0, 0, 1);
     Ray shadowRay = { pos, l_dir };
     float3 currentDir = RayTCurrent() * WorldRayDirection();
     currentDir += WorldRayOrigin();
-    
+
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
 
 
@@ -2138,7 +2138,7 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
         GBufferPosition[DispatchRaysIndex().xy] = float4(pos, 0);
         GBufferNormal[DispatchRaysIndex().xy] = float4(attr.normal, 0);
     }
-
+    bool diffuse = false;
     float3 hitColour = float3(0, 0, 0);
     if (!shadowHit) {
         //ambient += 0.1*PhongLighting(float4(attr.normal, 0), shadowHit);
@@ -2173,29 +2173,35 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
             Ray r = { pos, refracted };
             refractColour = TraceRadianceRay(r, rayPayload).color;
             //setup refracted ray
-        
+
         }
 
         float3 reflected = normalize(reflect(dir, attr.normal));
         Ray r = { pos, reflected };
         reflectionColour = TraceRadianceRay(r, rayPayload).color;
-        hitColour = refractColour;
-       // hitColour += (reflectionColour * fresnel + refractColour * (1 - fresnel));
+        // hitColour = refractColour;
+        hitColour += (reflectionColour * fresnel + refractColour * (1 - fresnel));
     }
     else {
-        
+        diffuse = true;
         hitColour += lambertian(attr.normal, pos, l_materialCB.albedo);//orenNayar(normalize(WorldRayDirection()), attr.normal, normalize(l_dir), 1);
        // hitColour =   lambertian(attr.normal, pos, l_materialCB.albedo);
-         if (shadowHit) {
-        hitColour *= 0.5;
+        if (shadowHit) {
+            hitColour *= 0.5;
         }
     }
     float re = reflectionBRDF(dir, attr.normal);
-   
-//0.1f is a good coefficient for reflectioncolour.
- // rayPayload.color += refractionColour + 0.1*reflectionColour;
-//  rayPayload.color = refractionColour;
-float4 colour =   float4(l_materialCB.albedo + re*hitColour.xyz, 0);
+
+    //0.1f is a good coefficient for reflectioncolour.
+     // rayPayload.color += refractionColour + 0.1*reflectionColour;
+    //  rayPayload.color = refractionColour;
+    float4 colour;
+    if (!diffuse) {
+        colour = float4(l_materialCB.albedo * hitColour.xyz, 0);
+    }
+    else {
+        colour = float4(hitColour.xyz + l_materialCB.albedo, 0);
+    }
 
 //ray
 //float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor.xyz);
@@ -2500,6 +2506,22 @@ void CSGCombine(in int operation, in intersectionInterval left, in intersectionI
     }
 
     
+}
+
+bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes attr) {
+    //we assume just an intersection filled tree at the moment
+    float tValues[100]; //corresponding chosen t values @ index i of the post order traversal.
+    CSGNode current = csgTree[0];
+    int i = 0;
+    while (i < g_sceneCB.csgNodes) {
+        if (current.boolValue == -1) {
+            //find nearest intersection 
+            Ray r;
+            r.origin = ray.origin;
+            r.origin = ray.direction;
+        }
+    }
+
 }
 bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes attr) {
     //tree is in post-order, just need to iterate the tree.

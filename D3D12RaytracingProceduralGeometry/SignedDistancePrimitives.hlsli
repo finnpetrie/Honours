@@ -388,13 +388,16 @@ bool RaySignedDistancePrimitiveTest(in Ray ray, in SignedDistancePrimitive::Enum
     const UINT MaxSteps = 300;
     float4 tmp;
     float4 c = float4(0.1, 0.7, 0.12, 0.12);
+    float maxD = 10.0;
     // Do sphere tracing through the AABB.
     UINT i = 0;
     while (i++ < MaxSteps && t <= RayTCurrent())
     {
         float3 position = ray.origin + t * ray.direction;
         float distance = map(position, tmp, c);//GetDistanceFromSignedDistancePrimitive(position, sdPrimitive);
-
+        if (distance < threshold) {
+            break;
+        }
         // Has the ray intersected the primitive? 
         if (distance <= threshold * t)
         {
