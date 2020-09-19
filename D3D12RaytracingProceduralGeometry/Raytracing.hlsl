@@ -1488,7 +1488,7 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     float s = chessBoard(pos);
     //float3 c = float3(0.3, 0.3, 0.3);
     //float3 c = float3(1, 1, 1);
-    float3 c = float3(0.8, 0.8, 0.8)*s;
+    float3 c = float3(0.8, 0.8, 0.8);
     //float3 c = float3(0.1, 0.01, 0.3)*s;
     //lambertf is the light value here
     float3 lambert = lambertian(normal, pos, c);
@@ -1674,7 +1674,8 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
 void MissPathTracing(inout PathTracingPayload rayPayload) {
     float3 ndir = normalize(WorldRayDirection());
     rayPayload.energy = 0.0f; 
-    rayPayload.colour = float4(getColour(ndir), 0);
+    rayPayload.colour = float4(0.8, 0.8, 0.8, 0.0);
+    //rayPayload.colour = float4(getColour(ndir), 0);
     rayPayload.recursionDepth = MAX_RAY_RECURSION_DEPTH;
 
 }
@@ -1697,14 +1698,14 @@ void lightPath(inout float seed) {
    // ro = g_sceneCB.lightSphere.xyz + ro * g_sceneCB.lightSphere.w;
    // float3 origin = g_sceneCB.lightPosition;
    // float3 dir = normalize(SquareToSphereUniform(rany));
-    PathTracingPayload p = { g_sceneCB.lightDiffuseColor*2000, float3(0,0,0), ro, dir, 1, 0, 0, seed };
+    PathTracingPayload p = { g_sceneCB.lightDiffuseColor*200, float3(0,0,0), ro, dir, 1, 0, 0, seed };
    while(p.recursionDepth <= MAX_RAY_RECURSION_DEPTH){
         float3 normal;
         //ntersect scene
         RayDesc rayDesc;
         rayDesc.Origin = ro;
         rayDesc.Direction = dir;
-        rayDesc.TMin = 0.0001;
+        rayDesc.TMin = 0.1;
         rayDesc.TMax = 10000;
 
         TraceRay(g_scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
@@ -2438,32 +2439,6 @@ void CSGCombine(in int operation, in intersectionInterval left, in intersectionI
 
 
     else {
-        /*
-    if (sphere_hit && hyp_hit) {
-        intersections = float4(b_tmin, b_tmax, s_tmin, s_tmax);
-        if(intersections.x < intersections.z){
-            thit = intersections.x;
-            attr = b_attr;
-        }
-        else if (intersections.w < intersections.y) {
-            thit = intersections.w;
-            attr.normal = -s_attr.normal;
-        }
-        else {
-            return false;
-        }
-
-        return true;
-        //return Intersection(intersections, thit, s_attr, b_attr, attr);
-    }
-
-    if (hyp_hit) {
-        thit = t_hit;
-        attr = b_attr;
-        return true;
-    }
-    return false;
-*/
 
     //difference
         if (right.hit && left.hit) {
@@ -2507,22 +2482,450 @@ void CSGCombine(in int operation, in intersectionInterval left, in intersectionI
 
     
 }
+Classify::Enum classifyIntersectionCSGIntersection(classificationInterval left, classificationInterval right) {
+    //entry is based on 
+    switch (left.classification) {
+    case 0:
+        if (right.classification == 0) {
+            //enter both.
+            //return minimum value
+            if (left.tmin < right.tmin) {
+                return Classify::Enum::AdvanceLeftLoop;
+            }
+            else {
+                return Classify::Enum::AdvanceRightLoop;
+            }
+        }
+        else if (right.classification == 1) {
+            if (left.tmin < right.tmin) {
+                return Classify::Enum::Left;
+            }
+            else {
+                return Classify::Enum::AdvanceRightLoop;//Classify::Enum::Left;
+                //return Classify::Enum::AdvanceLeftLoop;
+            }
+        }
+        else if (right.classification == -1) {
+            return Classify::Enum::Miss;
+        }
+        break;
+    case 1:
+        if (right.classification == 0) {
+            if (right.tmin < left.tmin) {
+                return Classify::Enum::Right;
+            }
+            else {
+                return Classify::Enum::AdvanceLeftLoop;//Classify::Enum::Right;
+                // return Classify::Enum::AdvanceRightLoop;
+            }
+        }
+        else if (right.classification == 1) {
+            if (left.tmin < right.tmin) {
+                return Classify::Enum::Left;
+            }
+            else {
+                return Classify::Enum::Right;
+            }
+        }
+        else if (right.classification == -1) {
+            return Classify::Enum::Miss;
+        }
+        break;
+    case -1:
+        if (right.classification == 0 || right.classification == 1 || right.classification == -1) {
+            return Classify::Enum::Miss;
+        }
+     
+        break;
+    }
+    return Classify::Enum::Miss;
+
+}
+
+Classify::Enum classifyDifference(classificationInterval left, classificationInterval right) {
+    //entry is based on 
+    switch (left.classification) {
+    case 0:
+        if (right.classification == 0) {
+            //enter both.
+            //return minimum value
+            if (left.tmin < right.tmin) {
+                return Classify::Enum::Left;
+            }
+            else {
+                return Classify::Enum::AdvanceRightLoop;
+            }
+        }
+        else if (right.classification == 1) {
+            if (right.tmin < left.tmin) {
+                return Classify::Enum::AdvanceRightLoop;
+            }
+            else {
+                return Classify::Enum::AdvanceLeftLoop;
+            }
+        }
+        else if (right.classification == -1) {
+            return Classify::Enum::Left;
+        }
+        break;
+    case 1:
+        if (right.classification == 0) {
+            if (left.tmin < right.tmin) {
+                return Classify::Enum::Left;
+            }
+            else {
+                return Classify::Enum::RightWithNormFlip;
+            }
+            //also need to flip norm
+        }
+
+        else if (right.classification == 1) {
+            if (right.tmin < left.tmin) {
+                return Classify::Enum::RightWithNormFlip;
+            }
+            else {
+                return Classify::Enum::AdvanceLeftLoop;
+            }
+        }
+        else if (right.classification == -1) {
+            return Classify::Enum::Left;
+        }
+        break;
+    case -1:
+        return Classify::Enum::Miss;
+        break;
+    }
+    return Classify::Enum::Miss;
+
+}
+Classify::Enum classifyIntersectionCSG(classificationInterval left, classificationInterval right) {
+    //entry is based on 
+    switch (left.classification) {
+    case 0:
+        if (right.classification == 0) {
+            //enter both.
+            //return minimum value
+            if (left.tmin < right.tmin) {
+                return Classify::Enum::Left;
+            }
+            else {
+                return Classify::Enum::Right;
+            }
+        }
+        else if (right.classification == 1) {
+            if (right.tmin < left.tmin) {
+                return Classify::Enum::Right;
+            }
+            else {
+                return Classify::Enum::AdvanceLeftLoop;
+            }
+        }
+        else if (right.classification == -1) {
+            return Classify::Enum::Left;
+        }
+        break;
+    case 1:
+        if (right.classification == 0) {
+            if (left.tmin < right.tmin) {
+                return Classify::Enum::Left;
+            }
+            else {
+                return Classify::Enum::AdvanceRightLoop;
+            }
+        }
+        else if (right.classification == 1) {
+            if (left.tmin > right.tmin) {
+                return Classify::Enum::AdvanceRightLoop;
+                //return Classify::Enum::Left;
+            }
+            else {
+                return Classify::Enum::AdvanceLeftLoop;
+                //return Classify::Enum::Right;
+            }
+        }
+        else if (right.classification == -1) {
+            return Classify::Enum::Left;
+        }
+        break;
+    case -1:
+        if (right.classification == 0 || right.classification == 1) {
+            return Classify::Enum::Right;
+        }
+        else if (right.classification == -1) {
+            return Classify::Enum::Miss;
+        }
+        break;
+    }
+    return Classify::Enum::Miss;
+    
+}
+/*else {
+          //we have a node;
+          classificationInterval left = intersections[i - 2 * depth];
+          classificationInterval right = intersections[i - 1];
+          //want to classify the hits b
+          bool continueLoop = true;
+          //an action
+          classificationInterval inter = { -1, -1, false, float3(0,0,0) };
+
+          while (continueLoop) {
+              Classify::Enum action = classifyIntersectionCSG(left, right);
+
+              if (action == Classify::Enum::Miss) {
+                  //miss
+                  continueLoop = false;
+                  //return miss
+              }
+              else if (action == Classify::Enum::Left || action == Classify::Enum::LeftIfCloser || action == Classify::Enum::LeftIfFurther) {
+                  inter = left;
+                  continueLoop = false;
+              }
+              else if (action == Classify::Enum::Right || action == Classify::Enum::RightIfCloser || action == Classify::Enum::RightIfFurther) {
+                  inter = right;
+                  continueLoop = false;
+              }
+              else if (action == Classify::Enum::AdvanceLeftLoop) {
+                  //
+                  float tmin = left.tmin + 0.1;
+                  float3 normal;
+                  float thit;
+                  uint classification = -1;
+
+                  bool hit = OtherRayCSGGeometryIntervals(ray, tmin, (AnalyticPrimitive::Enum)current.geometry, thit, normal);
+
+                  if (hit) {
+                      if (dot(ray.direction, normal) < 0) {
+                          //entering
+                          classification = 0;
+                      }
+                      else {
+                          //exiting
+                          classification = 1;
+                      }
+                  }
+                  classificationInterval newLeft = { thit, classification, hit, normal };
+                  left = newLeft;
+                  //intersect with left sub node
+              }
+              else if (action == Classify::Enum::AdvanceRightLoop) {
+                  float tmin = right.tmin + 0.1;
+                  float3 normal;
+                  float thit;
+                  uint classification = -1;
+
+                  bool hit = OtherRayCSGGeometryIntervals(ray, tmin, (AnalyticPrimitive::Enum)current.geometry, thit, normal);
+
+                  if (hit) {
+                      if (dot(ray.direction, normal) < 0) {
+                          //entering
+                          classification = 0;
+                      }
+                      else {
+                          //exiting
+                          classification = 1;
+                      }
+                  }
+                  classificationInterval newRight = { thit, classification, hit, normal };
+                  right = newRight;
+              }
+          }
+          intersections[i] = inter;
+      }*/
+
+
+
+
+bool csgLoop(in Ray ray, inout classificationInterval left, inout classificationInterval right, inout classificationInterval inter, int type, inout bool revertLeft, inout bool revertRight, inout float min) {
+    Classify::Enum action;
+    if (type == 0) {
+       action = classifyIntersectionCSG(left, right);
+    }
+    else if (type == 1) {
+       action = classifyIntersectionCSGIntersection(left, right);
+
+    }
+    else if (type == 2) {
+        action = classifyDifference(left, right);
+    }
+
+
+    bool continueLoop = true;
+    if (action == Classify::Enum::Miss) {
+        //miss
+        continueLoop = false;
+        //return miss
+    }
+    else if (action == Classify::Enum::Left || action == Classify::Enum::LeftIfCloser || action == Classify::Enum::LeftIfFurther) {
+        inter = left;
+        continueLoop = false;
+    }
+    else if (action == Classify::Enum::Right || action == Classify::Enum::RightIfCloser || action == Classify::Enum::RightIfFurther || action == Classify::Enum::RightWithNormFlip) {
+        
+        if (action == Classify::Enum::
+            RightWithNormFlip) {
+            right.normal = -right.normal;
+        }
+        inter = right;
+        continueLoop = false;
+    }
+    else if (action == Classify::Enum::AdvanceLeftLoop) {
+        //
+        if (left.geometry != -1) {
+            float tmin = left.tmin + 0.01;
+            float3 normal = float3(0, 0, 0);
+            float thit = -1;
+            uint classification = -1;
+
+            bool hit = OtherRayCSGGeometryIntervals(ray, tmin, (AnalyticPrimitive::Enum)left.geometry, thit, normal);
+
+            if (hit) {
+                if (dot(ray.direction, normal) < 0) {
+                    //entering
+                    classification = 0;
+                }
+                else {
+                    //exiting
+                    classification = 1;
+                }
+            }
+
+            classificationInterval newLeft = { thit, classification, hit, normal, left.geometry };
+            left = newLeft;
+        }
+        else {
+            revertLeft = true;
+            min = left.tmin + 0.01;
+
+            //set revert to left node equal true, return
+        }
+        //intersect with left sub node
+    }
+    else if (action == Classify::Enum::AdvanceRightLoop) {
+        if (right.geometry != -1) {
+            float tmin = right.tmin + 0.01;
+            float3 normal = float3(0, 0, 0);
+            float thit = -1;
+            uint classification = -1;
+
+            bool hit = OtherRayCSGGeometryIntervals(ray, tmin, (AnalyticPrimitive::Enum)right.geometry, thit, normal);
+
+            if (hit) {
+                if (dot(ray.direction, normal) < 0) {
+                    //entering
+                    classification = 0;
+                }
+                else {
+                    //exiting
+                    classification = 1;
+                }
+            }
+
+            classificationInterval newRight = { thit, classification, hit, normal, right.geometry };
+            right = newRight;
+        }
+        else {
+            revertRight = true;
+            min = right.tmin + 0.01;
+        }
+    }
+    return continueLoop;
+}
+
+
 
 bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes attr) {
     //we assume just an intersection filled tree at the moment
-    float tValues[100]; //corresponding chosen t values @ index i of the post order traversal.
+    //corresponding chosen t values @ index i of the post order traversal.
+    classificationInterval intersections[10];
     CSGNode current = csgTree[0];
+    uint depth = 1;
     int i = 0;
-    while (i < g_sceneCB.csgNodes) {
+    float minimum = RayTMin();
+
+    while (i < g_sceneCB.csgNodes){
         if (current.boolValue == -1) {
             //find nearest intersection 
-            Ray r;
-            r.origin = ray.origin;
-            r.origin = ray.direction;
-        }
+            //Ray r;
+          //  r.origin = ray.origin;
+           // r.origin = ray.direction;
+            float3 normal;
+            float hitter;
+            uint classification = -1;
+            bool hit = OtherRayCSGGeometryIntervals(ray, minimum, (AnalyticPrimitive::Enum)current.geometry, hitter, normal);
+            if (hit) {
+                if (dot(ray.direction, normal) < 0) {
+                    //entering
+                    classification = 0;
+                }
+                else {
+                    //exiting
+                    classification = 1;
+                }
+            }
+            classificationInterval inter = { hitter, classification, hit, normal, (AnalyticPrimitive::Enum)current.geometry };
+
+            intersections[i] = inter;
+            //interset with node, get closest hit
+
+        }else {
+          //we have a node;
+          classificationInterval left = intersections[i - 2 * depth];
+          classificationInterval right = intersections[i - 1];
+          //want to classify the hits b
+          bool continueLoop = true;
+          //an action
+          classificationInterval inter = { -1, -1, false, float3(0,0,0), (AnalyticPrimitive::Enum)current.geometry };
+
+          bool revertLeft = false;
+          bool revertRight = false;
+          while (continueLoop) {
+              continueLoop = csgLoop(ray, left, right, inter, current.boolValue, revertLeft, revertRight, minimum);
+              if (revertLeft == true) {
+                  //left index is then (index) - 2*depth
+                  uint index = i - 2 * depth;
+                  while (intersections[index].geometry == -1) {
+                      index = index - 2 * depth;
+
+                  }
+                  continueLoop = false;
+                  i = index - 1;
+                  //find left most primitive of the current left tree
+              }
+              if (revertRight == true) {
+                  uint index = i - 1;
+                  while (intersections[index].geometry == -1) {
+                      index = index - 1;
+                  }
+                  i = index - 1;
+                  continueLoop = false;
+                  //once we have the correct index we want to set i to this index, and start the loop from this point with the new value of t.
+                  //find right most primitive of the current right tree
+              }
+
+          }
+          if (!revertLeft || !revertRight) {
+              intersections[i] = inter;
+          }
+      }
+
+      
+        i += 1;
+        current = csgTree[i];
+
     }
 
+    classificationInterval final = intersections[i -1];//intersections[i-1];
+
+    if (final.hit) {
+        if (final.tmin > RayTMin()) {
+            thit = final.tmin;
+            attr.normal = final.normal;
+            return true;
+        }
+    }
+    return false;
 }
+
 bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes attr) {
     //tree is in post-order, just need to iterate the tree.
     uint2 p = DispatchRaysIndex().xy;
@@ -2574,7 +2977,7 @@ bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttribute
     }
  
 
-    intersectionInterval final = intersections[i -1];//intersections[i-1];
+    intersectionInterval final = intersections[i-1];//intersections[i-1];
 
     if (final.hit) {
         if (final.tmin > RayTMin()) {
@@ -2722,7 +3125,7 @@ void CSG_Intersection() {
     float thit;
     ProceduralPrimitiveAttributes attr;
    // if (RayCSGIntersectionTest(localRay, primitiveType, thit, attr)) {
-    if (alternativeCSG(localRay, thit, attr)) {
+    if (latestCSG(localRay, thit, attr)) {
     PrimitiveInstancePerFrameBuffer aabbAttribute = g_AABBPrimitiveAttributes[l_aabbCB.instanceIndex];
         attr.normal = mul(attr.normal, (float3x3) aabbAttribute.localSpaceToBottomLevelAS);
         attr.normal = normalize(mul((float3x3) ObjectToWorld3x4(), attr.normal));

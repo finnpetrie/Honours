@@ -162,14 +162,15 @@ void Scene::Init(float m_aspectRatio)
         //10, 18, 5
       //  -1, -0.4f, 2.0f
        // lightSphere = XMFLOAT4(0.0f, 18.0f, -20.0f, 0.5f);
-      lightSphere = XMFLOAT4(10, 18, -0.0f, 0.5);
+     lightSphere = XMFLOAT4(10, 18, -0.0f, 0.5);
+        //lightSphere = XMFLOAT4(4.07625, 5.90386, 1.00545, 0.0f);
         lightPosition = XMFLOAT4(10, 10, -10, 0.0f);
         m_sceneCB->lightPosition = XMLoadFloat4(&lightPosition);
         m_sceneCB->lightSphere = XMLoadFloat4(&lightSphere);
         m_sceneCB->lightPower = 1;
         lightAmbientColor = XMFLOAT4(1, 1, 1, 1.0f);
         m_sceneCB->lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
-
+         
         float d = 1;
         lightDiffuseColor = XMFLOAT4(d, d, d, d);
         m_sceneCB->lightDiffuseColor = XMLoadFloat4(&lightDiffuseColor);
@@ -193,10 +194,13 @@ void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResou
     //SetNodeValues(1, -1, -1, -1, 1, 3, XMFLOAT3(0.5, 0.5, 0));
     //SetNodeValues(2, 0, 1,1, 1, -1, XMFLOAT3(0, 0, 0));
 
-    SetNodeValues(0, -1, -1, -1, 1, 6, XMFLOAT3(0, 0, 0));
-    SetNodeValues(1, -1, -1, -1, 1, 4, XMFLOAT3(0, 0, 0));
+    SetNodeValues(0, -1, -1, -1, 1, 4, XMFLOAT3(0, 0, 0));
+    SetNodeValues(1, -1, -1, -1, 1, 6, XMFLOAT3(0, 0, 0));
     SetNodeValues(2, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
-    m_sceneCB->csgNodes = 3;
+    SetNodeValues(3, -1, -1, -1, -1, 3, XMFLOAT3(0, 0, 0));
+    SetNodeValues(4, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
+
+    m_sceneCB->csgNodes = 5;
    /* SetNodeValues(0, -1, -1, -1, 2, 3, XMFLOAT3(0,0,0));
     SetNodeValues(1, -1, -1, -1, 2, 6, XMFLOAT3(0, 0, 0));
     SetNodeValues(2, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
@@ -539,7 +543,7 @@ void Scene::CreateGeometry() {
     Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 0.0f), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(3.0f, -0.4, 2.0f ), XMFLOAT3(9, 9, 9));
     Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(4, -0.4f, 0.0f ), XMFLOAT3(6, 6, 6));
-    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(3.5f, -0.4f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0, -0.4f, 0.0f), XMFLOAT3(6, 6, 6));
 
     Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(1.0f, 0.0f, 2.0f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
@@ -553,7 +557,7 @@ void Scene::CreateGeometry() {
     Primitive cornellInner(AnalyticPrimitive::CornellBack, cone_b, XMFLOAT3(0, 0, 0.0f), XMFLOAT3(3, 3, 3));
     Primitive otherBox(AnalyticPrimitive::AABB, ellipse_b, XMFLOAT3(2.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
    // analyticalObjects = {};
-   analyticalObjects = {AABB, sphere};
+   analyticalObjects = { Sphere};
 
 }
 

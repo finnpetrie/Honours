@@ -42,6 +42,24 @@ bool SolveQuadraticEqn(float a, float b, float c, out float x0, out float x1)
     return true;
 }
 
+float3 CalculateNormalForARayQuadricHitCSG(in Ray r, in float thit, in float4x4 Q)
+{
+    float n_x, n_y, n_z;
+    float3 intersectionPoint;
+    float3 dir = normalize(r.direction);
+
+    intersectionPoint = r.origin + thit * r.direction;
+
+    float4 Q_X = mul(Q, float4(intersectionPoint, 1));
+    n_x = dot(float4(2, 0, 0, 0), Q_X);
+    n_y = dot(float4(0, 2, 0, 0), Q_X);
+    n_z = dot(float4(0, 0, 2, 0), Q_X);
+    float3 norm = normalize(float3(n_x, n_y, n_z));
+
+  
+
+    return norm;
+}
 // Calculate a normal for a hit point on a sphere.
 float3 CalculateNormalForARaySphereHit(in Ray ray, in float thit, float3 center)
 {
@@ -174,7 +192,113 @@ bool cornellBoxUnColoured(in Ray r, inout float tmin, inout float tmax, out floa
     return false;
     //figure out which hit point was closest
 }
+bool rayPlaneCSG(in Ray r, inout float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float3 translation, in float minimum) {
+    float epsilon = 0.00001;
 
+    //   float translation = 0;
+
+    double z0 = translation + r.origin.x;
+    double dz = r.direction.x;
+
+    double t = -z0 / dz;
+    if (t < minimum) {
+        return false;
+    }
+    if (abs(dz) < epsilon) {
+        return false;
+    }
+
+
+    float3 intersectionPoint = r.origin + t * r.direction;
+
+    if ((abs(intersectionPoint.z <= 3)) && (abs(intersectionPoint.y) <= 3)) {
+        if (abs(dot(intersectionPoint.zy, intersectionPoint.zy)) <= radius) {
+            attr.normal = float3(0, 0, 1);
+
+            thit = t;
+        
+            return true;
+        }
+    }
+
+    return false;
+    //float t2 = 1 - r.origin.x / r.direction.x;
+
+   /* float3 p_2 = -(r.origin - translation);
+    float t1 = dot(p_2, normal) / denominator;
+    float3 intersectionPoint;
+    if (t1 > epsilon) {
+        intersectionPoint = r.origin + t1 * r.direction;
+        if ((abs(intersectionPoint.x < 1)) && (abs(intersectionPoint.y) < 1)) {
+            if (sqrt(dot(intersectionPoint.xy, intersectionPoint.xy)) <= 1) {
+                thit = t1;
+                tmin = tmax = t1;
+                attr.normal = normal;
+                if (dot(attr.normal, r.direction) > 0) {
+                    attr.normal = -attr.normal;
+                }
+                return true;
+            }
+        }
+
+
+    }
+    return false;*/
+}
+
+bool rayPlaneCSGCone(in Ray r, inout float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float3 translation, in float minimum) {
+    float epsilon = 0.00001;
+
+    //   float translation = 0;
+
+    double z0 = translation + r.origin.y;
+    double dz = r.direction.y;
+
+    double t = -z0 / dz;
+    if (t < minimum) {
+        return false;
+    }
+    if (abs(dz) < epsilon) {
+        return false;
+    }
+
+
+    float3 intersectionPoint = r.origin + t * r.direction;
+
+    if ((abs(intersectionPoint.z <= 3)) && (abs(intersectionPoint.x) <= 3)) {
+        if (abs(dot(intersectionPoint.xz, intersectionPoint.xz)) <= radius) {
+            attr.normal = float3(0, 1, 0);
+
+            thit = t;
+
+            return true;
+        }
+    }
+
+    return false;
+    //float t2 = 1 - r.origin.x / r.direction.x;
+
+   /* float3 p_2 = -(r.origin - translation);
+    float t1 = dot(p_2, normal) / denominator;
+    float3 intersectionPoint;
+    if (t1 > epsilon) {
+        intersectionPoint = r.origin + t1 * r.direction;
+        if ((abs(intersectionPoint.x < 1)) && (abs(intersectionPoint.y) < 1)) {
+            if (sqrt(dot(intersectionPoint.xy, intersectionPoint.xy)) <= 1) {
+                thit = t1;
+                tmin = tmax = t1;
+                attr.normal = normal;
+                if (dot(attr.normal, r.direction) > 0) {
+                    attr.normal = -attr.normal;
+                }
+                return true;
+            }
+        }
+
+
+    }
+    return false;*/
+}
 bool rayPlane(in Ray r,  inout float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float3 translation) {
     float epsilon = 0.00001;
     
@@ -198,7 +322,7 @@ bool rayPlane(in Ray r,  inout float thit, out ProceduralPrimitiveAttributes att
 
             thit = t;
             if (dot(attr.normal, r.direction) > 0) {
-                attr.normal = -attr.normal;
+               // attr.normal = -attr.normal;
             }
             return true;
         }
@@ -430,6 +554,219 @@ void insertionSort(inout float4 intersections) {
         intersections[j + 1] = key;
     }
 }
+
+
+
+bool QuadricRayIntersectionTestCSG (in Ray r, in float minimum, inout float tmin, inout float tmax, out float thit, out ProceduralPrimitiveAttributes attr, in AnalyticPrimitive::Enum analyticPrimitive = AnalyticPrimitive::Enum::Hyperboloid, in float4x4 Q = float4x4(-1.0f, 0.0f, 0.0f, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f,
+    0.0f, 0.0f, 0.0f, -1.0f)) {
+
+
+    float n_x, n_y, n_z;
+    bool plane = false;
+
+
+
+    if (!SolveRayQuadricInteresection(r, tmin, tmax, Q)) {
+        return false;
+    }
+
+    //determine whether qudraic or plane intersection is closer
+
+
+
+    if (tmin <minimum ) {
+        if (tmax < minimum) {
+            return false;
+        }
+        thit = tmax;
+    }
+    else {
+        thit = tmin;
+    }
+
+
+    float3 intersectionPoint = r.origin + thit * r.direction;
+
+    if (abs(intersectionPoint.x) > 2) {
+        thit = tmax;
+        tmin = tmax;
+    }
+
+    if (analyticPrimitive == AnalyticPrimitive::Paraboloid || analyticPrimitive == AnalyticPrimitive::Cone) {
+        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2)) {
+            thit = tmax;
+            tmin = tmax;
+        }
+    }
+    if (analyticPrimitive == AnalyticPrimitive::Cylinder) {
+        if ((abs(intersectionPoint.y) > 0.5) || (abs(intersectionPoint.z) > 2)) {
+            thit = tmax;
+            tmin = tmax;
+        }
+    }
+    intersectionPoint = r.origin + thit * r.direction;
+
+
+
+    //bound along x-axis
+    if (abs(intersectionPoint.x) > 2) {
+        return false;
+    }
+
+    //bound y for cylinder
+    if (analyticPrimitive == AnalyticPrimitive::Cylinder) {
+        if ((abs(intersectionPoint.y) > 0.5) || (abs(intersectionPoint.z) > 2)) {
+            return false;
+        }
+    }
+    //todo -- add caps - intersect planes
+
+    /*if(analyticPrimitive == AnalyticPrimitive::Cylinder) {
+        if (intersectionPoint.x == 2) {
+            attr.normal = float3(1, 0, 0);
+
+        }
+        else if (intersectionPoint.x == -2) {
+            attr.normal = float3(-1, 0, 0);
+        }
+    }*/
+
+    //bound paraboloid in all axes
+
+    if (analyticPrimitive == AnalyticPrimitive::Cone) {
+        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.z) > 2)) {
+            return false;
+        }
+    }
+    if (analyticPrimitive == AnalyticPrimitive::Paraboloid) {
+        if ((abs(intersectionPoint.y) > 2) || (abs(intersectionPoint.x) > 2)) {
+            return false;
+        }
+    }
+
+    attr.normal = CalculateNormalForARayQuadricHitCSG(r, thit, Q);
+
+    tmin = thit;
+    return true;
+}
+
+bool OtherCSGRayTest(in Ray ray, in float minimum, out float thit, out float3 normal, in AnalyticPrimitive::Enum type) {
+
+    //thit = RayTCurrent();
+
+    float4x4 Q;
+    bool hitFound = false;
+    switch (type) {
+    case AnalyticPrimitive::Hyperboloid: Q = float4x4(-1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
+    case AnalyticPrimitive::Ellipsoid: Q = float4x4(1.0f / 1.5f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f / 2.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
+    case AnalyticPrimitive::Paraboloid: Q = float4x4 (1.0f / 2, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -0.1f,
+        0.0f, 0.0f, 1.0f / 1.5f, 0.0f,
+        0.0f, -0.1f, 0.0f, 0.0f);
+        break;
+    case AnalyticPrimitive::Cylinder: Q = float4x4(0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
+    case AnalyticPrimitive::Cone: Q = float4x4 (-1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, -1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f);
+        break;
+    case AnalyticPrimitive::Sphere: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
+    default: return false;
+
+    }
+    float _thit;
+    ProceduralPrimitiveAttributes _attr;
+
+    float tquadMin = -1;
+    float tquadMax = -1;
+    bool quadricHit = false;
+    if (QuadricRayIntersectionTestCSG(ray, minimum, tquadMin, tquadMax, _thit, _attr, type, Q))
+    {
+           
+            hitFound = true;
+      
+            normal = _attr.normal;
+    }
+
+    float left_thit = -1;
+    float right_thit = -1;
+    bool rightPlaneI = false;
+    bool leftPlaneI = false;
+    ProceduralPrimitiveAttributes leftPlane, rightPlane;
+
+   if (type == AnalyticPrimitive::Hyperboloid) {
+        //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
+        if (rayPlaneCSG(ray, left_thit, leftPlane, float3(1, 0, 0), 5, float3(-2, 0, 0), minimum)) {
+            if ((_thit > left_thit) || (!hitFound)) {
+                // tmin = left_thit;
+                _thit = left_thit;
+                normal = leftPlane.normal;
+                hitFound = true;
+                leftPlaneI = true;
+            }
+        }
+        if (rayPlaneCSG(ray, right_thit, rightPlane, float3(1, 0, 0), 5, float3(2, 0, 0), minimum)) {
+            if ((_thit > right_thit) || (!hitFound)) {
+                // tmin = right_thit;
+                _thit = right_thit;
+                normal = rightPlane.normal;
+                hitFound = true;
+                rightPlaneI = true;
+            }
+        }
+    }
+
+
+   /*if (type == AnalyticPrimitive::Cone) {
+       //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
+       if (rayPlaneCSGCone(ray, left_thit, leftPlane, float3(1, 0, 0), 5, float3(0, -2, 0), minimum)) {
+           if ((_thit > left_thit) || (!hitFound)) {
+               // tmin = left_thit;
+               _thit = left_thit;
+               normal = leftPlane.normal;
+               hitFound = true;
+               leftPlaneI = true;
+           }
+       }
+       if (rayPlaneCSGCone(ray, right_thit, rightPlane, float3(1, 0, 0), 5, float3(0, 3, 0), minimum)) {
+           if ((_thit > right_thit) || (!hitFound)) {
+               // tmin = right_thit;
+               _thit = right_thit;
+               normal = rightPlane.normal;
+               hitFound = true;
+               rightPlaneI = true;
+           }
+       }
+   }*/
+
+
+    if (hitFound) {
+        quadricHit = true;
+        thit = _thit;
+        //normal = .normal;
+    }
+    return hitFound;
+
+}
+
 bool CSGRayTest(in Ray ray, out float tmin, out float tmax, inout float4 intervals, out float3 normal, in AnalyticPrimitive::Enum type) {
 
     //thit = RayTCurrent();
@@ -480,6 +817,8 @@ bool CSGRayTest(in Ray ray, out float tmin, out float tmax, inout float4 interva
     {
         quadricHit = true;
        // thit = _thit;
+        tmin = tquadMin;
+        tmax = tquadMax;
         normal = _attr.normal;
         hitFound = true;
 
@@ -490,7 +829,7 @@ bool CSGRayTest(in Ray ray, out float tmin, out float tmax, inout float4 interva
    bool rightPlaneI = false;
    bool leftPlaneI = false;
     ProceduralPrimitiveAttributes leftPlane, rightPlane;
-    if (type == AnalyticPrimitive::Hyperboloid) {
+    /*if (type == AnalyticPrimitive::Hyperboloid) {
         //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
         if (rayPlane(ray, left_thit, leftPlane, float3(1, 0, 0), 5, float3(-2, 0, 0))) {
             if ((_thit > left_thit) || (!hitFound)) {
@@ -520,7 +859,7 @@ bool CSGRayTest(in Ray ray, out float tmin, out float tmax, inout float4 interva
         if (intersections[i] > 0) {
             intervals[count] = intersections[i];
         }
-    }
+    }*/
     //need to return float4 in sorted order
     return hitFound;
 

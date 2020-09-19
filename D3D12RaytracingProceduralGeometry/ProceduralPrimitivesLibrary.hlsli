@@ -50,10 +50,14 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     }
 }
 
+bool OtherRayCSGGeometryIntervals(in Ray ray, in float minimum, in AnalyticPrimitive::Enum analyticPrimitive, out float thit, out float3 normal) {
+
+    return OtherCSGRayTest(ray, minimum, thit, normal, analyticPrimitive);
+}
+
 bool RayCSGGeometryIntervals(in Ray ray, in AnalyticPrimitive::Enum analyticPrimitive, out float tMin, out float tMax, inout float4 intervals, out float3 normal, inout uint count) {
     return CSGRayTest(ray, tMin, tMax, intervals, normal, analyticPrimitive);
 }
-
 
 // Analytic geometry intersection test.
 // AABB local space dimensions: <-1,1>.

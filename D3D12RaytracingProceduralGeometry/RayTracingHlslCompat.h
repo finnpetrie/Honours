@@ -40,7 +40,7 @@ typedef UINT32 Vertex_Index;
 // PERFORMANCE TIP: Set max recursion depth as low as needed
 // as drivers may apply optimization strategies for low recursion depths.
 #define MAX_RAY_RECURSION_DEPTH 4    // ~ primary rays + reflections + shadow rays from reflected geometry.
-#define PHOTON_COUNT 10000
+#define PHOTON_COUNT 1000
 
 struct ProceduralPrimitiveAttributes
 {
@@ -174,6 +174,14 @@ struct AltNode {
     XMFLOAT3 padding;
 };
 
+struct classificationInterval {
+    float tmin;
+    UINT classification;
+    bool hit;
+    XMFLOAT3 normal;
+    int geometry;
+};
+
 struct intersectionInterval {
     float tmin;
     float tmax;
@@ -237,6 +245,22 @@ namespace CSGState {
         GoToRight = 3,
         LoadLeft = 4,
         LoadRight = 5
+    };
+}
+
+namespace Classify {
+    enum Enum {
+        Miss = -1,
+        Left = 0,
+        Right = 1,
+        LeftIfCloser = 2,
+        LeftIfFurther = 3,
+        RightIfCloser = 4,
+        RightIfFurther = 5,
+        FlipRightNormal = 6,
+        AdvanceLeftLoop = 7,
+        AdvanceRightLoop = 8,
+        RightWithNormFlip = 9
     };
 }
 namespace AnalyticPrimitive {

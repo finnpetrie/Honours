@@ -36,7 +36,7 @@ public:
 	std::vector<Primitive> analyticalObjects;
 	bool instancing = false;
 	bool albany = false;
-	bool CSG = false;
+	bool CSG = true;
 	bool triangleInstancing = false;
 	bool quatJulia = false;
 	bool plane = true;
