@@ -199,8 +199,10 @@ void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResou
     SetNodeValues(2, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
     SetNodeValues(3, -1, -1, -1, -1, 3, XMFLOAT3(0, 0, 0));
     SetNodeValues(4, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
+    SetNodeValues(5, -1, -1, -1, -1, 5, XMFLOAT3(0, 0, 0));
+    SetNodeValues(6, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
 
-    m_sceneCB->csgNodes = 5;
+    m_sceneCB->csgNodes = 7;
    /* SetNodeValues(0, -1, -1, -1, 2, 3, XMFLOAT3(0,0,0));
     SetNodeValues(1, -1, -1, -1, 2, 6, XMFLOAT3(0, 0, 0));
     SetNodeValues(2, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
