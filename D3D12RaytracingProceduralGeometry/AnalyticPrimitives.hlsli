@@ -687,7 +687,7 @@ bool OtherCSGRayTest(in Ray ray, in float minimum, out float thit, out float3 no
     case AnalyticPrimitive::Sphere: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, -1.0f);
+        0.0f, 0.0f, 0.0f, -2.0f);
         break;
     default: return false;
 
@@ -1309,10 +1309,19 @@ bool RayAABBIntersectionTest(Ray ray, float3 aabb[2], out float thit, out Proced
     {
         // Only consider intersections crossing the surface from the outside.
         if (tmin < RayTMin() || tmin > RayTCurrent() )
-            return false;
+           // return false;
 
-        thit = tmin;
-
+            if (tmin < RayTMin()) {
+                if (tmax < RayTMin()) {
+                    return false;
+                }
+                else {
+                    thit = tmax;
+                }
+            }
+            else {
+                thit = tmin;
+            }
         // Set a normal to the normal of a face the hit point lays on.
         float3 hitPosition = ray.origin + thit * ray.direction;
         float3 distanceToBounds[2] = {
@@ -1335,5 +1344,48 @@ bool RayAABBIntersectionTest(Ray ray, float3 aabb[2], out float thit, out Proced
     }
     return false;
 }
+
+bool RayAABBIntersectionTestCSG(Ray ray, float3 aabb[2], in float minimum, out float thit, out ProceduralPrimitiveAttributes attr)
+{
+    float tmin, tmax;
+    if (RayAABBIntersectionTest(ray, aabb, tmin, tmax))
+    {
+        // Only consider intersections crossing the surface from the outside.
+      
+        thit = tmin;
+
+        if (tmin < minimum) {
+            if (tmax < minimum) {
+                return false;
+            }
+            else {
+                thit = tmax;
+            }
+        }
+
+
+        // Set a normal to the normal of a face the hit point lays on.
+        float3 hitPosition = ray.origin + thit * ray.direction;
+        float3 distanceToBounds[2] = {
+            abs(aabb[0] - hitPosition),
+            abs(aabb[1] - hitPosition)
+        };
+        const float eps = 0.0001;
+        if (distanceToBounds[0].x < eps) attr.normal = float3(-1, 0, 0);
+        else if (distanceToBounds[0].y < eps) attr.normal = float3(0, -1, 0);
+        else if (distanceToBounds[0].z < eps) attr.normal = float3(0, 0, -1);
+        else if (distanceToBounds[1].x < eps) attr.normal = float3(1, 0, 0);
+        else if (distanceToBounds[1].y < eps) attr.normal = float3(0, 1, 0);
+        else if (distanceToBounds[1].z < eps) attr.normal = float3(0, 0, 1);
+
+       // if (dot(ray.direction, attr.normal) > 0) {
+         //   attr.normal = -attr.normal;
+        //}
+        return true;
+        //return IsAValidHit(ray, thit, attr.normal);
+    }
+    return false;
+}
+
 
 #endif // ANALYTICPRIMITIVES_H

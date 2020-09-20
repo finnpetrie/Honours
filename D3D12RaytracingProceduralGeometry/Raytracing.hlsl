@@ -2841,7 +2841,10 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
     uint depth = 1;
     int i = 0;
     float minimum = RayTMin();
-
+    bool rollingLeft = false;
+    bool rollingRight = false;
+    uint originalIndex = 0;
+    uint originalI;
     while (i < g_sceneCB.csgNodes){
         if (current.boolValue == -1) {
             //find nearest intersection 
@@ -2883,6 +2886,9 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
               if (revertLeft == true) {
                   //left index is then (index) - 2*depth
                   uint index = i - 2 * depth;
+                  rollingLeft = true;
+                  originalIndex = index;
+                  originalI = i;
                   while (intersections[index].geometry == -1) {
                       index = index - 2 * depth;
 
@@ -2892,7 +2898,10 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
                   //find left most primitive of the current left tree
               }
               if (revertRight == true) {
+                  rollingRight = true;
                   uint index = i - 1;
+                  originalIndex = index;
+                  originalI = i;
                   while (intersections[index].geometry == -1) {
                       index = index - 1;
                   }
@@ -2908,9 +2917,21 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
           }
       }
 
-      
-        i += 1;
+        if (rollingLeft || rollingRight && i == originalIndex)
+        {
+            if (rollingLeft) {
+                rollingLeft = false;
+            }
+            else {
+                rollingRight = false;
+            }
+            i = originalI;
+        }
+        else {
+            i += 1;
+        }
         current = csgTree[i];
+        
 
     }
 

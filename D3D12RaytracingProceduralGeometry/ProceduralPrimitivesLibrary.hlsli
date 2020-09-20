@@ -22,8 +22,8 @@
 bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum analyticPrimitive, out float thit, out ProceduralPrimitiveAttributes attr)
 {
     float3 aabb[2] = {
-        float3(-1,-1,-1),
-        float3(1,1,1)
+     float3(-1,-1,-1),
+     float3(1,1,1)
     };
     float t_min;
     float t_max;
@@ -51,8 +51,22 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
 }
 
 bool OtherRayCSGGeometryIntervals(in Ray ray, in float minimum, in AnalyticPrimitive::Enum analyticPrimitive, out float thit, out float3 normal) {
+    if (analyticPrimitive != 0) {
+        return OtherCSGRayTest(ray, minimum, thit, normal, analyticPrimitive);
+    }
+    else {
+        float3 aabb[2] = {
+         float3(-1,-1,-1),
+         float3(1,1,1)  
+        };
+        ProceduralPrimitiveAttributes attr;
+         bool hit = RayAABBIntersectionTestCSG(ray, aabb, minimum, thit, attr);//cubeIntersection(ray, thit, attr);
+         if (hit) {
+             normal = attr.normal;
+         }
+         return hit;
 
-    return OtherCSGRayTest(ray, minimum, thit, normal, analyticPrimitive);
+    }
 }
 
 bool RayCSGGeometryIntervals(in Ray ray, in AnalyticPrimitive::Enum analyticPrimitive, out float tMin, out float tMax, inout float4 intervals, out float3 normal, inout uint count) {
