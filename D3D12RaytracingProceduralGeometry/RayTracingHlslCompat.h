@@ -20,7 +20,7 @@ typedef UINT32 Vertex_Index;
 #endif
 
 // Number of metaballs to use within an AABB.
-#define N_METABALLS 3    // = {3, 5}
+#define N_METABALLS 10    // = {3, 5}
 
 // Limitting calculations only to metaballs a ray intersects can speed up raytracing
 // dramatically particularly when there is a higher number of metaballs used. 
@@ -113,6 +113,7 @@ struct SceneConstantBuffer
     float rand2;
     float rand3;
     float rand4;
+    UINT index;
     float    reflectance;
     float    elapsedTime;
     // Elapsed application time.
@@ -231,8 +232,9 @@ namespace TraceRayParameters
 
 // From: http://blog.selfshadow.com/publications/s2015-shading-course/hoffman/s2015_pbs_physics_math_slides.pdf
 static const XMFLOAT4 ChromiumReflectance = XMFLOAT4(0.549f, 0.556f, 0.554f, 1.0f);
+static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.74709, 0.770255, 1.0f);
 
-static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
+//static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.8f, 0.9f, 1.0f, 1.0f);
 static const XMFLOAT4 SkyColour = XMFLOAT4(0.4f, 0.4f, 1.0f, 1.0f);
 //static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.9, 1.0, 1.0, 1.0f);
 //static const XMFLOAT4 BackgroundColor = XMFLOAT4(0.0, 0.0, 0.0, 1.0f);
@@ -282,6 +284,9 @@ namespace AnalyticPrimitive {
         CSG_Difference,
         CSG_Intersection,
         CSG_Union,
+        BigCylinder,
+        SmallCylinder,
+        PointLightSphere,
         Count
     };
 }
@@ -300,6 +305,7 @@ namespace SignedDistancePrimitive {
         SquareTorus,
         TwistedTorus,
         Cog,
+        MetaBalls,
         QuaternionJulia,
         Cylinder,
         Count

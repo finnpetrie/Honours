@@ -5,7 +5,7 @@ using namespace DirectX;
 
 Camera::Camera(float aspectRatio) : aspectRatio(aspectRatio) {
    // m_pos = { 12,6, 3, 0 };
-    m_pos = { 2, 10, 3, 0 };
+    m_pos = { -6.50571, 6.92579, 4.95831, 0 };
    //m_at = { 0.0f, 0.0f, 0.0f, 1.0f };
     m_front = { 0.0f, 0.0f, -1.0f, 0.0f };
 

@@ -149,10 +149,10 @@ float4 PSMain(PSInput input) : SV_TARGET
      float r_1 = input.u_radius;
      float r_3 = input.t_radius;
      float r_2 = 1;
-
-     float r = 1 / probability;//1/probability;
+     //float r = 1;
+        float r = 1 / probability;//1/probability;
      // float r = input.kernelMinor + (sqrt(input.majKernelRadius) - )
-     //float r = input.majKernelRadiusSquared;
+     // r = input.majKernelRadiusSquared;
 
 
      float p_a = -beta * (distance2 / (2 * r * r));
@@ -200,7 +200,7 @@ float4 PSMain(PSInput input) : SV_TARGET
     // rasterTarget[input.position.xy] += color;
     // return  input.color;
      // return  float4(distance2, distance2, distance2, 0);
-     return 5*color;
+     return 2*color;
      // return 22*float4(n_o, n_o, n_o, n_o);//float4(gauss, gauss, gauss, gauss);//float4(gauss, gauss, gauss, gauss);
       //return float4(color.xyz, weighted_direction.x)
     // return input.position;*/

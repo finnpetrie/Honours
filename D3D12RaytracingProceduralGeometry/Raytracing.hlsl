@@ -503,12 +503,12 @@ RayPayload TraceRadianceRay(in Ray ray, in RayPayload payload)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.001;
+    rayDesc.TMin = 1;
     rayDesc.TMax = 10000;
   
     payload.recursionDepth += 1;
 
-    TraceRay(g_scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+    TraceRay(g_scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
         TraceRayParameters::InstanceMask,
         TraceRayParameters::HitGroup::Offset[RayType::Radiance],
         TraceRayParameters::HitGroup::GeometryStride,
@@ -586,7 +586,7 @@ uint wang_hash(uint seed, int x , int y)
 float chessBoard(float3 pos) {
 
     float chess = floor(sqrt(pos.x * pos.x + pos.z * pos.z)) + floor(atan(pos.z / pos.x));
-    //chess = floor(pos.x) +  floor(pos.z);
+   // chess = floor(pos.x) +  floor(pos.z);
     chess = frac(chess * 0.5);
     chess *= 2;
     if (chess == 0.0) {
@@ -1075,7 +1075,7 @@ PathTracingPayload TraceForwardPath(in Ray ray, in PathTracingPayload payload)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.001;
+    rayDesc.TMin = 1;
     rayDesc.TMax = 10000;
 
     payload.recursionDepth += 1;
@@ -1091,7 +1091,7 @@ PathTracingPayload TraceForwardPath(in Ray ray, in PathTracingPayload payload)
 
         //diffuse = integral(emmisive*BRDF(surface point x, incoming, outgoing)*Visibility(x, y) - whether point y is visibile from point x
         //if the random bouncing ends up hitting the light, then the sample needs to be discared - this will never happen since we have a point light
-        TraceRay(g_scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+        TraceRay(g_scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES ,
             TraceRayParameters::InstanceMask,
             TraceRayParameters::HitGroup::Offset[RayType::Radiance],
             TraceRayParameters::HitGroup::GeometryStride,
@@ -1488,7 +1488,7 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     float s = chessBoard(pos);
     //float3 c = float3(0.3, 0.3, 0.3);
     //float3 c = float3(1, 1, 1);
-    float3 c = float3(0.8, 0.8, 0.8);
+    float3 c = float3(0.8, 0.8, 0.8)*s;
     //float3 c = float3(0.1, 0.01, 0.3)*s;
     //lambertf is the light value here
     float3 lambert = lambertian(normal, pos, c);
@@ -1535,7 +1535,6 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
     float3 pos = HitWorldPosition();
     float3 normal = attr.normal;
     uint brdf = labelBRDF();
-
     float4 reflectiveColour = float4(0, 0, 0, 0);
     float4 hitColour = float4(0, 0, 0, 0);
     float3 lambert = float3(0, 0, 0);
@@ -1587,11 +1586,20 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
         rayPayload.randomSeed = seed;
 
         float3 specularDirection = reflect(WorldRayDirection(), attr.normal);
+       
         specularDirection = normalize(lerp(specularDirection, dir, l_materialCB.diffuseCoef * l_materialCB.diffuseCoef));
+        float3 lightDir = normalize(g_sceneCB.lightSphere.xyz - pos);
+        float3 lightReflected = normalize(reflect(lightDir, attr.normal));
+        float specHighlight = 0.0f;
+        if (!shadowHit) {
+            specHighlight = pow(max(dot(lightReflected, normalize(WorldRayDirection())), 0), 10000);
 
+        }       
+        
         rayPayload.energy *= l_materialCB.albedo;
         Ray r = { pos, specularDirection };
         reflectiveColour = TraceForwardPath(r, rayPayload).colour;
+        reflectiveColour += specHighlight*6;
 
        
         
@@ -1656,10 +1664,17 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
 
             float3 reflected = normalize(reflect(dir, attr.normal));
             Ray r = { pos, reflected };
-            reflectionColour = TraceForwardPath(r, rayPayload).colour;
+            float3 lightDir = normalize(g_sceneCB.lightSphere.xyz - pos);
+            float3 lightReflected = normalize(reflect(lightDir, attr.normal));
+            float specHighlight = 0.0f;
+            if (!shadowHit) {
+                specHighlight = pow(max(dot(lightReflected, normalize(WorldRayDirection())), 0), 10000);
 
+            }
+            reflectionColour = TraceForwardPath(r, rayPayload).colour;
+            //reflectionColour += specHighlight;
             hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel) ;
-            hitColour *= l_materialCB.albedo;
+            hitColour *= l_materialCB.albedo + float4(specHighlight, specHighlight, specHighlight, 0) * 6;
             //hitColour += l_materialCB.albedo;
 
     }
@@ -1674,8 +1689,8 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
 void MissPathTracing(inout PathTracingPayload rayPayload) {
     float3 ndir = normalize(WorldRayDirection());
     rayPayload.energy = 0.0f; 
-    rayPayload.colour = float4(0.8, 0.8, 0.8, 0.0);
-    //rayPayload.colour = float4(getColour(ndir), 0);
+    //rayPayload.colour = BackgroundColor;
+    rayPayload.colour = float4(getColour(ndir), 0);
     rayPayload.recursionDepth = MAX_RAY_RECURSION_DEPTH;
 
 }
@@ -1815,7 +1830,7 @@ void LightTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in Buil
     uint c = rayPayload.recursionDepth * 4;
 
    // colour /= lambertPdf;
-    if (dot(normalize(WorldRayDirection()), normal) < 0) {
+    if (rayPayload.recursionDepth >= 0 && (dot(normalize(WorldRayDirection()), normal) < 0)) {
         lightTracingPhotons[c][index] = float4(pos, float(brdfType));
         lightTracingPhotons[c + 1][index] = rayPayload.colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);
@@ -1868,7 +1883,7 @@ void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in Pr
     uint2 index = DispatchRaysIndex().xy;
 
     //then meant to the divide throughput or flux by the probability distribution for sampling the BRDF
-    if (dot(normalize(WorldRayDirection()), attr.normal) < 0) {
+    if (rayPayload.recursionDepth >= 0 && (dot(normalize(WorldRayDirection()), attr.normal) < 0)) {
         lightTracingPhotons[c][index] = float4(pos, brdf);
         lightTracingPhotons[c + 1][index] = colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);
@@ -2064,7 +2079,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float3 normal = float3(0, 1, 0);
     float4 reflectionColour = float4(0, 0, 0, 0);
     
-    float3 diffuseColour = float4(c, c, c, 0);
+    float3 diffuseColour = float4(0.8, 0.8, 0.8, 0)*c;
 
    
         //if immediate ray - i.e., recursion depth = 1
@@ -2151,6 +2166,9 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
         reflectionColour = TraceRadianceRay(r, rayPayload).color;
         hitColour += reflectionColour;
 
+     
+
+
     }
     else if (l_materialCB.refractiveCoef > 0.0f) {
         float fresnel = Fresnel(dir, attr.normal, l_materialCB.refractiveCoef);
@@ -2198,6 +2216,15 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     //  rayPayload.color = refractionColour;
     float4 colour;
     if (!diffuse) {
+        float3 lightDir = normalize(g_sceneCB.lightSphere.xyz - pos);
+        float3 lightReflected = normalize(reflect(lightDir, attr.normal));
+        float specHighlight = 0.0f;
+        if (!shadowHit) {
+            specHighlight = pow(max(dot(lightReflected, normalize(WorldRayDirection())), 0), 10000);
+
+        }
+
+        hitColour += specHighlight*6;
         colour = float4(l_materialCB.albedo * hitColour.xyz, 0);
     }
     else {
@@ -2225,8 +2252,8 @@ void MyMissShader(inout RayPayload rayPayload)
    // float transition = pow(smoothstep(0.02, .5, d.y), 0.4);
 //
     float3 ndir = normalize(WorldRayDirection());
-   
-    rayPayload.color += float4(getColour(ndir), 1);
+    rayPayload.color += BackgroundColor;
+   // rayPayload.color += float4(getColour(ndir), 1);
    // float4 backgroundColor = float4(BackgroundColor);
     uint depth = rayPayload.recursionDepth;
     //float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor);
@@ -2315,6 +2342,14 @@ void MyIntersectionShader_VolumetricPrimitive()
     float thit;
     ProceduralPrimitiveAttributes attr;
   
+  /*  if (RayVolumetricGeometryIntersectionTest(localRay, primitiveType, thit, attr, 0))
+    {
+        PrimitiveInstancePerFrameBuffer aabbAttribute = g_AABBPrimitiveAttributes[l_aabbCB.instanceIndex];
+        attr.normal = mul(attr.normal, (float3x3) aabbAttribute.localSpaceToBottomLevelAS);
+        attr.normal = normalize(mul((float3x3) ObjectToWorld3x4(), attr.normal));
+
+        ReportHit(thit, /*hitKind*/ //0, attr);
+   // }
 }
 
 [shader("intersection")]
@@ -2333,7 +2368,7 @@ void MyIntersectionShader_SignedDistancePrimitive()
 
         ReportHit(thit, 0, attr);
     }*/
-    if (RaySignedDistancePrimitiveTest(localRay, primitiveType, thit, attr, l_materialCB.stepScale))
+    if (RaySignedDistanceTest(localRay, primitiveType, thit, attr, g_sceneCB.elapsedTime, l_materialCB.stepScale))
     {
         PrimitiveInstancePerFrameBuffer aabbAttribute = g_AABBPrimitiveAttributes[l_aabbCB.instanceIndex];
         attr.normal = mul(attr.normal, (float3x3) aabbAttribute.localSpaceToBottomLevelAS);
@@ -2854,7 +2889,11 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
             float3 normal;
             float hitter;
             uint classification = -1;
-            bool hit = OtherRayCSGGeometryIntervals(ray, minimum, (AnalyticPrimitive::Enum)current.geometry, hitter, normal);
+            Ray r;
+            //translate a lil
+            r.origin = ray.origin + current.translation;
+            r.direction = ray.direction;
+            bool hit = OtherRayCSGGeometryIntervals(r, minimum, (AnalyticPrimitive::Enum)current.geometry, hitter, normal);
             if (hit) {
                 if (dot(ray.direction, normal) < 0) {
                     //entering
@@ -2894,18 +2933,21 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
 
                   }
                   continueLoop = false;
+                  revertLeft = false;
                   i = index - 1;
                   //find left most primitive of the current left tree
               }
-              if (revertRight == true) {
+              else if (revertRight == true) {
                   rollingRight = true;
                   uint index = i - 1;
                   originalIndex = index;
                   originalI = i;
+                  //find left most primitive of right sub-tree
                   while (intersections[index].geometry == -1) {
-                      index = index - 1;
+                      index = index - 2*depth;
                   }
                   i = index - 1;
+                  revertRight = false;
                   continueLoop = false;
                   //once we have the correct index we want to set i to this index, and start the loop from this point with the new value of t.
                   //find right most primitive of the current right tree
@@ -2917,7 +2959,7 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
           }
       }
 
-        if (rollingLeft || rollingRight && i == originalIndex)
+        if ((rollingLeft || rollingRight) && (i == originalIndex))
         {
             if (rollingLeft) {
                 rollingLeft = false;
@@ -2930,17 +2972,23 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
         else {
             i += 1;
         }
+        if ((i % 6) == 0) {
+            depth += 1;
+        }
         current = csgTree[i];
         
 
     }
 
-    classificationInterval final = intersections[i -1];//intersections[i-1];
+    classificationInterval final = intersections[g_sceneCB.index];//intersections[i-1];
 
     if (final.hit) {
         if (final.tmin > RayTMin()) {
             thit = final.tmin;
             attr.normal = final.normal;
+            if (dot(attr.normal, ray.direction) > 0) {
+                attr.normal = -attr.normal;
+            }
             return true;
         }
     }
@@ -2998,7 +3046,7 @@ bool alternativeCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttribute
     }
  
 
-    intersectionInterval final = intersections[i-1];//intersections[i-1];
+    intersectionInterval final = intersections[0];//intersections[i-1];
 
     if (final.hit) {
         if (final.tmin > RayTMin()) {

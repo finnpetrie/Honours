@@ -78,17 +78,22 @@ float3 CalculateMetaballsNormal(in float3 position, in Metaball blobs[N_METABALL
 void InitializeAnimatedMetaballs(out Metaball blobs[N_METABALLS], in float elapsedTime, in float cycleDuration)
 {
     // Metaball centers at t0 and t1 key frames.
-#if N_METABALLS == 5
+#if N_METABALLS == 10
     float3 keyFrameCenters[N_METABALLS][2] =
     {
         { float3(-0.7, 0, 0),float3(0.7,0, 0) },
         { float3(0.7 , 0, 0), float3(-0.7, 0, 0) },
         { float3(0, -0.7, 0),float3(0, 0.7, 0) },
         { float3(0, 0.7, 0), float3(0, -0.7, 0) },
-        { float3(0, 0, 0),   float3(0, 0, 0) }
+        { float3(0, 0, 0),   float3(0, 0, 0) },
+           { float3(-0.7, 0.6, 0),float3(0.7,0.1, 0) },
+        { float3(0.7 , 0.2, 0.5), float3(-0.7, 0, 0) },
+        { float3(0.6, -0.7, 0),float3(1.0, 0.7, 0) },
+        { float3(2.0, 0.7, 0), float3(0.4, -0.7, 0) },
+        { float3(0.2, 0, 0),   float3(0.8, 0, 0.9) }
     };
     // Metaball field radii of max influence
-    float radii[N_METABALLS] = { 0.35, 0.35, 0.35, 0.35, 0.25 };
+    float radii[N_METABALLS] = { 0.35, 0.35, 0.35, 0.35, 0.25, 0.476, 0.543, 0.37, 0.12, 0.9 };
 #else
     float3 keyFrameCenters[N_METABALLS][2] =
     {
@@ -178,12 +183,14 @@ bool RayMetaballsIntersectionTest(in Ray ray, out float thit, out ProceduralPrim
         if (sumFieldPotential >= Threshold)
         {
             float3 normal = CalculateMetaballsNormal(position, blobs, nActiveMetaballs);
-            if (IsAValidHit(ray, t, normal))
-            {
+            if (dot(ray.direction, normal) > 0) {
+                normal = -normal;
+            }
                 thit = t;
                 attr.normal = normal;
+                
                 return true;
-            }
+            
         }
         t += minTStep;
     }

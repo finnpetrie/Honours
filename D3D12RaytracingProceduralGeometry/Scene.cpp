@@ -9,7 +9,29 @@ void Scene::keyPress(UINT8 key)
         case 'N':
             m_sceneCB->renderFull = !m_sceneCB->renderFull;
             break;
+        case '1':
+            m_sceneCB->index = 0;
+            break;
+        case '2':
+            m_sceneCB->index = 1;
+            break;
+        case '3':
+            m_sceneCB->index = 2;
+            break;
+        case '4':
+            m_sceneCB->index = 3;
+            break;
+        case '5':
+            m_sceneCB->index = 4;
+            break;
+        case '6':
+            m_sceneCB->index = 5;
+            break;
+        case '7':
+            m_sceneCB->index = 6;
+            break;
     }
+
   
 }
 
@@ -30,6 +52,7 @@ Scene::Scene(std::unique_ptr<DX::DeviceResources> &m_deviceResources)
     m_sceneCB->frameNumber = frameCount;
     m_sceneCB->renderFull = true;
     srand((unsigned int)time(NULL));
+    m_sceneCB->index = 0;
     m_sceneCB->rand1 = rand();
     m_sceneCB->rand2 = rand() % 1000000;;
     m_sceneCB->rand3 = rand() % 1000000;;
@@ -109,11 +132,17 @@ void Scene::Init(float m_aspectRatio)
         offset += AnalyticPrimitive::Count + 1;
     }
 
-
+    
+       
     {
-        if (quatJulia) {
             using namespace SignedDistancePrimitive;
-            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.1, 0.4, 0.9, 0),0, 0, 1.0f, 0.7f, 50, 1.0f);
+
+        if (quatJulia) {
+            SetAttributes(offset + QuaternionJulia,XMFLOAT4(0.7, 0.7, 0.7, 0),0, 0, 1.0f, 0.7f, 50, 1.0f);
+
+        }
+        if (bloobs) {
+            SetAttributes(offset + MetaBalls, XMFLOAT4(0.8, 0.0, 0, 0), 1, 1.7f, 0.0f, 1, 50, 1.0f);
 
         }
         offset += SignedDistancePrimitive::Count;
@@ -127,9 +156,9 @@ void Scene::Init(float m_aspectRatio)
 
         if (CSG) {
             using namespace CSGPrimitive;
-            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0.9
-                , 0.65
-                , 0.8, 0), 1, 1.5, 1.0f, 0.7f, 50, 1.0f);
+            SetAttributes(offset + CSGPrimitive::CSG, XMFLOAT4(0.8
+                , 0.8
+                , 0.8, 0), 0, 0, 0.2f, 1.0f, 50, 1.0f);
         }
     }
 
@@ -166,13 +195,13 @@ void Scene::Init(float m_aspectRatio)
         //10, 18, 5
       //  -1, -0.4f, 2.0f
        // lightSphere = XMFLOAT4(0.0f, 18.0f, -20.0f, 0.5f);
-    // lightSphere = XMFLOAT4(10, 18, -0.0f, 0.5);
-        lightSphere = XMFLOAT4(4.07625, 5.90386, 1.00545, 0.0f);
+        lightSphere = XMFLOAT4(10, 18, -0.0f, 0.5);
+      // lightSphere = XMFLOAT4(4.07625, 5.90386, 1.00545, 0.0f);
         lightPosition = XMFLOAT4(10, 10, -10, 0.0f);
         m_sceneCB->lightPosition = XMLoadFloat4(&lightPosition);
         m_sceneCB->lightSphere = XMLoadFloat4(&lightSphere);
         m_sceneCB->lightPower = 1;
-        lightAmbientColor = XMFLOAT4(1, 1, 1, 1.0f);
+        lightAmbientColor = XMFLOAT4(0, 1, 1, 1.0f);
         m_sceneCB->lightAmbientColor = XMLoadFloat4(&lightAmbientColor);
          
         float d = 1;
@@ -197,24 +226,41 @@ void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResou
    // SetNodeValues(0, -1, -1, -1, -1, 3, XMFLOAT3(0, 0, 0));
     //SetNodeValues(1, -1, -1, -1, 1, 3, XMFLOAT3(0.5, 0.5, 0));
     //SetNodeValues(2, 0, 1,1, 1, -1, XMFLOAT3(0, 0, 0));
-
-    SetNodeValues(0, -1, -1, -1, 1, 0, XMFLOAT3(0, 0, 0));
-    SetNodeValues(1, -1, -1, -1, 1, 3, XMFLOAT3(0, 0, 0));
+    //COFFEE MUG
+    SetNodeValues(0, -1, -1, -1, 1, 17, XMFLOAT3(0, 0, 0));
+    SetNodeValues(1, -1, -1, -1, 1, 18, XMFLOAT3(0, 0.2, 0));
     SetNodeValues(2, -1, -1, 2, -1, -1, XMFLOAT3(0, 0, 0));
-   // SetNodeValues(3, -1, -1, -1, -1, 3, XMFLOAT3(0, 0, 0));
-   // SetNodeValues(4, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
+    SetNodeValues(3, -1, -1, -1, 1, 9, XMFLOAT3(1.1, 0, 0));
+    SetNodeValues(4, -1, -1, -1, 1, 0, XMFLOAT3(1.1, 0.0, 0));
+    SetNodeValues(5, -1, -1, 2, -1, -1, XMFLOAT3(0, 0, 0));
+    SetNodeValues(6, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
+    m_sceneCB->csgNodes = 7;
+
+   
+
+
+    //SetNodeValues(3, -1, -1, -1, 1, 0, XMFLOAT3(0.05, 0, 0));
+   // SetNodeValues(4, -1, -1, -1, 1, 9, XMFLOAT3(0.05, 0, 0));
+   // SetNodeValues(5, -1, -1, -1, 2, -1, XMFLOAT3(0, 0, 0));
+   // SetNodeValues(6, -1, -1, -1, 0, -1, XMFLOAT3(0, 0, 0));
+
+ //   SetNodeValues(3, -1, -1, -1, -1, 3, XMFLOAT3(0, 0, 0));
+  //  SetNodeValues(4, -1, -1, -1, -1, 8, XMFLOAT3(0, 0, 0));
+   // SetNodeValues(5, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
+    //SetNodeValues(6, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
+
    // SetNodeValues(5, -1, -1, -1, -1, 5, XMFLOAT3(0, 0, 0));
     //SetNodeValues(6, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
 
-    m_sceneCB->csgNodes = 3;
-   /* SetNodeValues(0, -1, -1, -1, 2, 3, XMFLOAT3(0,0,0));
-    SetNodeValues(1, -1, -1, -1, 2, 6, XMFLOAT3(0, 0, 0));
-    SetNodeValues(2, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
-    SetNodeValues(3, -1, -1, -1, -1, 5, XMFLOAT3(0, 0, 0));
-    SetNodeValues(4, -1, -1, -1, -1, 4, XMFLOAT3(0, 0, 0));
-    SetNodeValues(5, -1, -1, 0, -1, -1, XMFLOAT3(0, 0, 0));
-    SetNodeValues(6, -1, -1, 1, -1, -1, XMFLOAT3(0, 0, 0));
-
+   /* SetNodeValues(0, -1, -1, -1, 1, 3, XMFLOAT3(1, 0, 0));
+    SetNodeValues(1, -1, -1, -1, 1, 3, XMFLOAT3(2, 3, 0));
+    SetNodeValues(2, -1, -1, 0, 1, 3, XMFLOAT3(1, 2, 0));
+    SetNodeValues(3, -1, -1, -1, 1, 3, XMFLOAT3(1, 4, 0));
+    SetNodeValues(4, -1, -1, 0, 1, 3, XMFLOAT3(2, 1, 3));
+    SetNodeValues(5, -1, -1, -1, 1, 0, XMFLOAT3(0.1, 0.5, 0));
+    SetNodeValues(6, -1, -1, 1, 0, -1, XMFLOAT3(0.3, 0.4, 0));
+    */
+    //m_sceneCB->csgNodes = 7;
    // U(HyperBoloid, Sphere) Intersection U(Cone, Ellipsoid)
     /**
      int boolValue;
@@ -251,10 +297,16 @@ void Scene::convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResou
 }
 
 
-void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources)
+void Scene::UpdateAABBPrimitiveAttributes(float animationTime, bool animate, std::unique_ptr<DX::DeviceResources>& m_deviceResources)
 {
     auto frameIndex = m_deviceResources->GetCurrentFrameIndex();
-
+    
+   if (!animate) {
+        animationTime = previousRot;
+   }
+   else {
+       previousRot = animationTime;
+   }
     XMMATRIX mIdentity = XMMatrixIdentity();
 
     XMMATRIX mScale15y = XMMatrixScaling(1, 1.5, 1);
@@ -266,8 +318,10 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
     XMMATRIX mScale3 = XMMatrixScaling(3, 3, 3);
     XMMATRIX massive = XMMatrixScaling(10, 10, 10);
 
-
+   
     XMMATRIX mRotation = XMMatrixRotationY(-2 * animationTime);
+    XMMATRIX hypRot = XMMatrixRotationY(-2*200);
+    XMMATRIX cup = XMMatrixRotationY(0);
 
     // Apply scale, rotation and translation transforms.
     // The intersection shader tests in this sample work with local space, so here
@@ -296,6 +350,10 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
                     if (p.getType() == AnalyticPrimitive::AABB) {
                         SetTransformForAABB(offset + p.getType(), massive, mRotation);
                     }
+                    else if (p.getType() == AnalyticPrimitive::Hyperboloid) {
+                        SetTransformForAABB(offset + p.getType(), mScale15, hypRot);
+
+                    }
                     SetTransformForAABB(offset + p.getType(), mScale15, mRotation);
                     //  offset++; 
                 }
@@ -311,10 +369,17 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
         offset += AnalyticPrimitive::Count + 1;
     }
 
+
     {
+        using namespace SignedDistancePrimitive;
+
         if (quatJulia) {
-            using namespace SignedDistancePrimitive;
             SetTransformForAABB(offset + SignedDistancePrimitive::QuaternionJulia, mScale3, mRotation);
+        }
+
+        if (bloobs) {
+            SetTransformForAABB(offset + SignedDistancePrimitive::MetaBalls, mScale15, mRotation);
+
         }
         offset += SignedDistancePrimitive::Count;
 
@@ -324,7 +389,7 @@ void Scene::UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<D
 
         if (CSG) {
             using namespace CSGPrimitive;
-            SetTransformForAABB(offset + CSGPrimitive::CSG, mScale15, mRotation);
+            SetTransformForAABB(offset + CSGPrimitive::CSG, mScale15, cup);
         }
     }
 
@@ -405,12 +470,23 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
             offset += AnalyticPrimitive::Count + 1;
         }
         
+
         {
 
-            if (quatJulia) {
+         
+        {
+
                 using namespace SignedDistancePrimitive;
 
-                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMINT3(2 ,-0.3, 0), XMFLOAT3(9, 9, 9));
+            if (quatJulia) {
+
+                m_aabbs[offset + QuaternionJulia] = InitializeAABB(XMFLOAT3(-2 ,-0.3, 0), XMFLOAT3(9, 9, 9));
+            }
+            if (bloobs) {
+
+                m_aabbs[offset + SignedDistancePrimitive::MetaBalls] = InitializeAABB(XMFLOAT3(1.5f, -0.3, 0), XMFLOAT3(6, 6, 6));
+            }
+
             }
             offset += SignedDistancePrimitive::Count;
 
@@ -419,7 +495,7 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
         {
             if (CSG) {
                 using namespace CSGPrimitive;
-                m_aabbs[offset + CSGPrimitive::CSG] = InitializeAABB(XMINT3(0, 0, 0), XMFLOAT3(9, 9, 9));
+                m_aabbs[offset + CSGPrimitive::CSG] = InitializeAABB(XMFLOAT3(-0.4f, -0.7, 0), XMFLOAT3(9, 9, 9));
             }
 
         }
@@ -430,7 +506,7 @@ void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m
 void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources, ConstantBuffer<RasterSceneCB> &m_rasterConstantBuffer, bool m_animateLights, float time)
 {
     camera->Update(m_sceneCB, m_rasterConstantBuffer);
-    UpdateAABBPrimitiveAttributes(animationTime, m_deviceResources);
+    UpdateAABBPrimitiveAttributes(animationTime, m_animateLights, m_deviceResources);
     m_sceneCB->frameNumber = frameCount;
     frameCount += 1;
     if (m_animateLights)
@@ -442,7 +518,18 @@ void Scene::sceneUpdates(float animationTime, std::unique_ptr<DX::DeviceResource
         //
         m_sceneCB->lightSphere = XMVector3Transform(prevLightPosition, rotate);
 
+      //  float elapsedTime = static_cast<float>(m_timer.GetElapsedSeconds());
+        //_rasterConstantBuffer->mvp = scene->GetMVP();
+         //upload compute constants
+        // m_computeConstantBuffer->cameraDirection = scene->getCameraDirection();
+         //m_computeConstantBuffer->cameraPos = scene->getCameraPosition();
+         //m_computeConstantBuffer->projectionToWorld = XMMatrixInverse(nullptr, scene->GetMVP());
+         //memcpy
+
+
+            m_sceneCB->elapsedTime += time;
     }
+
 
     srand((unsigned int)time);
    
@@ -538,20 +625,22 @@ void Scene::CreateGeometry() {
     Primitive sphere(AnalyticPrimitive::Enum::Spheres, sphere_b, XMFLOAT3(3.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     PrimitiveConstantBuffer hy_b = { XMFLOAT4(0.01, 0.8, 0.8, 0), 1, 2, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer ellipse_b = { XMFLOAT4(0, 0.3, 0.7, 0), 1, 1.5, 0.3f, 1.0f, 50, 1 };
-    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.8, 0.8, 0.8, 0), 1, 1.5, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer AABB_b = { XMFLOAT4(0.8, 0.8, 0.8, 0), 1, 0, 0.3, 1.0f, 50, 1 };
     PrimitiveConstantBuffer cylin_b = { XMFLOAT4(0.8, 0.64, 0.12, 0), 1, 0, 0.0f, 1.0f, 50, 1 };
     PrimitiveConstantBuffer parab_b = { XMFLOAT4(0.9, 0.3, 0.9, 0), 1, 2.417f, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer cone_b = { XMFLOAT4(0.1, 0.8, 0.1, 0), 1, 1.5, 1, 0.4f, 50, 1 };
     PrimitiveConstantBuffer CSG = { XMFLOAT4(0.0, 0.0, 0.0, 0), 2, 1, 1, 0.4f, 50, 1 };
+    PrimitiveConstantBuffer pointLightSphere = { XMFLOAT4(1, 1, 1, 0) , 0, 0, 1, 0.4f, 50, 1 };
 
     PrimitiveConstantBuffer e = { ChromiumReflectance, 0, 0, 1, 0.4f, 50, 1 };
 
-    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 0.0f), XMFLOAT3(9, 9, 9));
+    Primitive hyperboloid(AnalyticPrimitive::Enum::Hyperboloid, hy_b, XMFLOAT3(2.0f, -0.36, 1.0f), XMFLOAT3(9, 9, 9));
     Primitive ellipsoid(AnalyticPrimitive::Enum::Ellipsoid, ellipse_b, XMFLOAT3(3.0f, -0.4, 2.0f ), XMFLOAT3(9, 9, 9));
-    Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(2, -0.4f, 0.0f ), XMFLOAT3(6, 6, 6));
+    Primitive AABB(AnalyticPrimitive::AABB, AABB_b, XMFLOAT3(-2, -0.4f, 3.0f ), XMFLOAT3(6, 6, 6));
     Primitive Sphere(AnalyticPrimitive::Sphere, sphere_b, XMFLOAT3(0.0, -0.4f, 0.0f), XMFLOAT3(6, 6, 6));
+    Primitive pointLight(AnalyticPrimitive::PointLightSphere, pointLightSphere, XMFLOAT3(10, 18, -0.0f), XMFLOAT3(6, 6, 6));
 
-    Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(1.0f, 0.0f, 2.0f), XMFLOAT3(6, 6, 6));
+    Primitive Cone(AnalyticPrimitive::Cone, cone_b, XMFLOAT3(0.0f, 0.0f, 2.4f), XMFLOAT3(6, 6, 6));
   //Primitive Square(AnalyticPrimitive::AABB, c, XMFLOAT3(2.0f, 0.0f, 0.0f), XMFLOAT3(3, 3, 3));
     Primitive Paraboloid(AnalyticPrimitive::Paraboloid, parab_b, XMFLOAT3(2, -0.4f, -1.0f), XMFLOAT3(6, 6, 6));
     Primitive Cylinder(AnalyticPrimitive::Cylinder, cylin_b, XMFLOAT3(1.0f, -0.14, -2.0f), XMFLOAT3(10, 2, 10));
@@ -561,9 +650,9 @@ void Scene::CreateGeometry() {
     Primitive plane(AnalyticPrimitive::Plane, parab_b, XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive plane2(AnalyticPrimitive::Plane, AABB_b, XMFLOAT3(1, 3.0f, 0.0f), XMFLOAT3(6, 6, 6));
     Primitive cornellInner(AnalyticPrimitive::CornellBack, cone_b, XMFLOAT3(0, 0, 0.0f), XMFLOAT3(3, 3, 3));
-    Primitive otherBox(AnalyticPrimitive::AABB, ellipse_b, XMFLOAT3(2.0f, 0, 0.0f), XMFLOAT3(3, 3, 3));
+    Primitive otherBox(AnalyticPrimitive::AABB, ellipse_b, XMFLOAT3(4.0f, 0, 3.0f), XMFLOAT3(3, 3, 3));
    // analyticalObjects = {};
-   analyticalObjects = { Sphere, AABB};
+    analyticalObjects = { hyperboloid, AABB, Cone};
 
 }
 

@@ -192,15 +192,15 @@ bool cornellBoxUnColoured(in Ray r, inout float tmin, inout float tmax, out floa
     return false;
     //figure out which hit point was closest
 }
-bool rayPlaneCSG(in Ray r, inout float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float3 translation, in float minimum) {
+bool rayPlaneCSG(in Ray r, inout float thit, out ProceduralPrimitiveAttributes attr, float3 normal, float radius, float translation, in float minimum) {
     float epsilon = 0.00001;
 
     //   float translation = 0;
 
-    double z0 = translation + r.origin.x;
-    double dz = r.direction.x;
+    double z0 = translation - r.origin.y;
+    double dz = r.direction.y;
 
-    double t = -z0 / dz;
+    double t = z0 / dz;
     if (t < minimum) {
         return false;
     }
@@ -211,15 +211,14 @@ bool rayPlaneCSG(in Ray r, inout float thit, out ProceduralPrimitiveAttributes a
 
     float3 intersectionPoint = r.origin + t * r.direction;
 
-    if ((abs(intersectionPoint.z <= 3)) && (abs(intersectionPoint.y) <= 3)) {
-        if (abs(dot(intersectionPoint.zy, intersectionPoint.zy)) <= radius) {
-            attr.normal = float3(0, 0, 1);
+        if (abs(dot(intersectionPoint.xz, intersectionPoint.xz)) <= radius) {
+            attr.normal = normal;
 
             thit = t;
         
             return true;
         }
-    }
+    
 
     return false;
     //float t2 = 1 - r.origin.x / r.direction.x;
@@ -484,6 +483,10 @@ bool RayQuadric(in Ray ray, out float thit, out ProceduralPrimitiveAttributes at
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, -1.0f);
         break;
+    case AnalyticPrimitive::PointLightSphere: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -0.2f);
      default: return false;
 
     }
@@ -606,6 +609,18 @@ bool QuadricRayIntersectionTestCSG (in Ray r, in float minimum, inout float tmin
             tmin = tmax;
         }
     }
+
+    if (analyticPrimitive == AnalyticPrimitive::BigCylinder) {
+        if ((abs(intersectionPoint.y) > 1) || (abs(intersectionPoint.z) > 2)) {
+            thit = tmax;
+            tmin = tmax;
+        }
+    }
+    if (analyticPrimitive == AnalyticPrimitive::SmallCylinder) {
+        if (((intersectionPoint.y) > 1.5 )|| ((intersectionPoint.y) < -0.75) || (abs(intersectionPoint.z) > 2)) {
+            return false;
+        }
+    }
     intersectionPoint = r.origin + thit * r.direction;
 
 
@@ -618,6 +633,16 @@ bool QuadricRayIntersectionTestCSG (in Ray r, in float minimum, inout float tmin
     //bound y for cylinder
     if (analyticPrimitive == AnalyticPrimitive::Cylinder) {
         if ((abs(intersectionPoint.y) > 0.5) || (abs(intersectionPoint.z) > 2)) {
+            return false;
+        }
+    }
+    if (analyticPrimitive == AnalyticPrimitive::BigCylinder) {
+        if ((abs(intersectionPoint.y) > 1) || (abs(intersectionPoint.z) > 2)) {
+            return false;
+        }
+    }
+    if (analyticPrimitive == AnalyticPrimitive::SmallCylinder) {
+        if (((intersectionPoint.y) > 1.5) || ((intersectionPoint.y) < -0.75) || (abs(intersectionPoint.z) > 2)) {
             return false;
         }
     }
@@ -679,6 +704,16 @@ bool OtherCSGRayTest(in Ray ray, in float minimum, out float thit, out float3 no
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, -1.0f);
         break;
+    case AnalyticPrimitive::BigCylinder: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.5f);
+        break;
+    case AnalyticPrimitive::SmallCylinder: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, -1.0f);
+        break;
     case AnalyticPrimitive::Cone: Q = float4x4 (-1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, -1.0f, 0.0f,
@@ -687,7 +722,7 @@ bool OtherCSGRayTest(in Ray ray, in float minimum, out float thit, out float3 no
     case AnalyticPrimitive::Sphere: Q = float4x4(1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, -2.0f);
+        0.0f, 0.0f, 0.0f, -1.0f);
         break;
     default: return false;
 
@@ -734,6 +769,50 @@ bool OtherCSGRayTest(in Ray ray, in float minimum, out float thit, out float3 no
         }
     }
 
+
+   if (type == AnalyticPrimitive::BigCylinder) {
+       //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
+       if (rayPlaneCSG(ray, left_thit, leftPlane, float3(0, 1, 0), 1.5, 1, minimum)) {
+           if ((_thit > left_thit) || (!hitFound)) {
+               // tmin = left_thit;
+               _thit = left_thit;
+               normal = leftPlane.normal;
+               hitFound = true;
+               leftPlaneI = true;
+           }
+       }
+       if (rayPlaneCSG(ray, right_thit, rightPlane, float3(0, -1, 0), 1.5, -1, minimum)) {
+           if ((_thit > right_thit) || (!hitFound)) {
+               // tmin = right_thit;
+               _thit = right_thit;
+               normal = rightPlane.normal;
+               hitFound = true;
+               rightPlaneI = true;
+           }
+       }
+   }
+
+   if (type == AnalyticPrimitive::SmallCylinder) {
+       //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
+       if (rayPlaneCSG(ray, left_thit, leftPlane, float3(0, 1, 0), 1, 1.5, minimum)) {
+           if ((_thit > left_thit) || (!hitFound)) {
+               // tmin = left_thit;
+               _thit = left_thit;
+               normal = leftPlane.normal;
+               hitFound = true;
+               leftPlaneI = true;
+           }
+       }
+       if (rayPlaneCSG(ray, right_thit, rightPlane, float3(0, -1, 0), 1, -0.75, minimum)) {
+           if ((_thit > right_thit) || (!hitFound)) {
+               // tmin = right_thit;
+               _thit = right_thit;
+               normal = rightPlane.normal;
+               hitFound = true;
+               rightPlaneI = true;
+           }
+       }
+   }
 
    /*if (type == AnalyticPrimitive::Cone) {
        //intersect ray with planes at (1, 0,0), and (-1, 0, 0)
@@ -804,6 +883,7 @@ bool CSGRayTest(in Ray ray, out float tmin, out float tmax, inout float4 interva
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, -1.0f);
         break;
+ 
     default: return false;
 
     }

@@ -37,8 +37,10 @@ public:
 	bool instancing = false;
 	bool albany = false;
 	bool CSG = true;
+	float previousRot = 0.0f;
 	bool triangleInstancing = false;
-	bool quatJulia = false;
+	bool quatJulia = true;
+	bool bloobs = true;
 	bool plane = true;
 	const float c_aabbWidth = 2;      // AABB width.
 	const float c_aabbDistance = 2;   // Distance between AABBs.
@@ -55,7 +57,7 @@ public:
 	void Init(float m_aspectRatio);
 	void convertCSGToArray(int numberOfNodes, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void UploadCompute(ComputeConstantBuffer& computeBuffer);
-	void UpdateAABBPrimitiveAttributes(float animationTime, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
+	void UpdateAABBPrimitiveAttributes(float animationTime, bool animate, std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void BuildMeshes(std::unique_ptr<DX::DeviceResources>& m_deviceResources);
 	void Scene::BuildProceduralGeometryAABBs(std::unique_ptr<DX::DeviceResources> &m_deviceResources);
 

@@ -115,7 +115,7 @@ float udRoundBox(float3 p, float3 b, float r)
 // t: {radius, tube radius}
 float sdTorus(float3 p, float2 t)
 {
-    float2 q = float2(length(p.xz) - t.x, p.y);
+    float2 q = float2(length(p.xy) - t.x, p.z);
     return length(q) - t.y;
 }
 
@@ -253,6 +253,16 @@ float3 sdCalculateNormal(in float3 pos, in SignedDistancePrimitive::Enum sdPrimi
         e.xxx * GetDistanceFromSignedDistancePrimitive(pos + e.xxx, sdPrimitive));
 }
 
+float3 sdCalculateTorusNormal(in float3 pos, in float2 sdPrimitive)
+{
+    float2 e = float2(1.0, -1.0) * 0.5773 * 0.0001;
+    return normalize(
+        e.xyy * sdTorus(pos + e.xyy, sdPrimitive) +
+        e.yyx * sdTorus(pos + e.yyx, sdPrimitive) +
+        e.yxy * sdTorus(pos + e.yxy, sdPrimitive) +
+        e.xxx * sdTorus(pos + e.xxx, sdPrimitive));
+}
+
 /*float intersectQuaternionJuliaSet(in Ray ray, out float4 res, in float4 c) {
     float4 tmp;
     float resT = -1.0;
@@ -387,7 +397,9 @@ bool RaySignedDistancePrimitiveTest(in Ray ray, in SignedDistancePrimitive::Enum
     float t = RayTMin();
     const UINT MaxSteps = 300;
     float4 tmp;
-    float4 c = float4(0.1, 0.7, 0.12, 0.12);
+   // float4 c = float4(0.6, 0.6, 0.6, 0);
+
+    float4 c = float4(0.1, 0.7, 0.8, 0.12);
     float maxD = 10.0;
     // Do sphere tracing through the AABB.
     UINT i = 0;
@@ -403,12 +415,12 @@ bool RaySignedDistancePrimitiveTest(in Ray ray, in SignedDistancePrimitive::Enum
         {
             float3 hitSurfaceNormal = calcNormal(position, c);
            // float3 hitSurfaceNormal = sdCalculateNormal(position, sdPrimitive);
-            if (IsAValidHit(ray, t, hitSurfaceNormal))
-            {
+            //if (IsAValidHit(ray, t, (SignedDistancePrimitive::Enum)hitSurfaceNormal))
+            //{
                 thit = t;
                 attr.normal = hitSurfaceNormal;
                 return true;
-            }
+           // }
         }
 
         // Since distance is the minimum distance to the primitive, 
@@ -419,6 +431,49 @@ bool RaySignedDistancePrimitiveTest(in Ray ray, in SignedDistancePrimitive::Enum
     }
     return false;
 }
+
+bool RaySignedDistancePrimitiveTestCSG(in Ray ray, in float minimum, out float thit, out ProceduralPrimitiveAttributes attr, in float stepScale = 1.0f)
+{
+    const float threshold = 0.0001;
+    float t = minimum + 0.001;
+    const UINT MaxSteps = 300;
+    float4 tmp;
+    float4 c = float4(0.1, 0.7, 0.12, 0.12);
+    float maxD = 10.0;
+    // Do sphere tracing through the AABB.
+    UINT i = 0;
+    while (i++ < MaxSteps && t <= RayTCurrent())
+    {
+        float3 position = ray.origin + t * ray.direction;
+        float distance = sdTorus(position, float2(0.75, 0.175));
+
+        //float distance = map(position, tmp, c);//GetDistanceFromSignedDistancePrimitive(position, sdPrimitive);
+        if (distance < threshold) {
+            break;
+        }
+        // Has the ray intersected the primitive? 
+        if (distance <= threshold * t)
+        {
+            SignedDistancePrimitive::Enum primitiveType = (SignedDistancePrimitive::Enum) 2;
+
+          ///  float3 hitSurfaceNormal = calcNormal(position, c);
+             float3 hitSurfaceNormal = sdCalculateTorusNormal(position, float2(0.75, 0.175));
+            
+                thit = t;
+                attr.normal = hitSurfaceNormal;
+                return true;
+            
+        }
+
+        // Since distance is the minimum distance to the primitive, 
+        // we can safely jump by that amount without intersecting the primitive.
+        // We allow for scaling of steps per primitive type due to any pre-applied 
+        // transformations that don't preserve true distances.
+        t += stepScale * distance;
+    }
+    return false;
+}
+
 
 // Analytically integrated checkerboard grid (box filter).
 // Ref: http://iquilezles.org/www/articles/filterableprocedurals/filterableprocedurals.htm
