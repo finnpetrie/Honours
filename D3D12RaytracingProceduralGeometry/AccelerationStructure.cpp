@@ -117,7 +117,7 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
 
     // Width of a bottom-level AS geometry.
     // Make the plane a little larger than the actual number of primitives in each dimension.
-    const XMUINT3 NUM_AABB = XMUINT3(30, 1, 30);
+    const XMUINT3 NUM_AABB = XMUINT3(10000, 1, 10000);
     const XMFLOAT3 fWidth = XMFLOAT3(
         NUM_AABB.x * scene->c_aabbWidth + (NUM_AABB.x - 1) * scene->c_aabbDistance,
         NUM_AABB.y * scene->c_aabbWidth + (NUM_AABB.y - 1) * scene->c_aabbDistance,
@@ -137,8 +137,8 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
 
             // Calculate transformation matrix.
 
-            XMVECTOR vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 7.35f, -0.35f));
-
+        //    XMVECTOR vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 7.35f, -0.35f));
+            XMVECTOR vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 7.35f - 0.5f, -0.35f));
             if (scene->instancing) {
                 //vBasePosition = vWidth * XMLoadFloat3(&XMFLOAT3(-0.35f, 7.35f, -0.35f));
             }
@@ -178,9 +178,9 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
 
                 Vertex_Ply coord = scene->coordinates->getPointAt(i);
 
-                x = 1 * coord.location.x();
-                y = 1 * coord.location.y();
-                z = 1 * coord.location.z();
+                x = 5 * coord.location.x();
+                y = 5 * coord.location.y();
+                z = 5 * coord.location.z();
                 XMMATRIX mScale = XMMatrixScaling(0.1, 0.1, 0.1);
 
                 XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(x, y, z)));
@@ -194,7 +194,7 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
       //XMMATRIX mScale = XMMatrixScaling(fWidth.x, fWidth.y, fWidth.z);
       
     
-    float X = 38;
+    float X = 40;
     // Create instanced bottom-level AS with procedural geometry AABBs.
     // Instances share all the data, except for a transform.
     {
@@ -212,12 +212,12 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
                float x;
                float y;
                float z;
-                if (scene->albany && !scene->instancing) {
+                if (scene->albany && scene->instancing) {
                     Vertex_Ply coord = scene->coordinates->getPointAt(i);
 
-                    x = 1 * coord.location.x();
-                    y = 1 * coord.location.y();
-                    z = 1 * coord.location.z();
+                    x = 10 * coord.location.x();
+                    y = 10 * coord.location.y();
+                    z = 10 * coord.location.z();
                 }
                 else if(!scene->instancing) {
                     x = 0;
@@ -225,15 +225,19 @@ void AccelerationStructure::BuildBotomLevelASInstanceDescs(BLASPtrType* bottomLe
                     z = 0;
                 }
                 else {
-                     x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
+                     x = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X)) - 10;
                    //  y = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-                     z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X));
-                    y = scene->c_aabbWidth / 2 ;
+                     z = static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / X)) - 5;
+                    y = scene->c_aabbWidth / 2  - 7;
 
                 }
+                XMMATRIX mScale = XMMatrixScaling(1, 1, 1);
+
                 // Move all AABBS above the ground plane.
                 XMMATRIX mTranslation = XMMatrixTranslationFromVector(XMLoadFloat3(&XMFLOAT3(x, y, z)));
-                XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTranslation);
+                XMMATRIX mTransform = mScale + mTranslation;
+
+                XMStoreFloat3x4(reinterpret_cast<XMFLOAT3X4*>(instanceDesc.Transform), mTransform);
             }
         }
     }

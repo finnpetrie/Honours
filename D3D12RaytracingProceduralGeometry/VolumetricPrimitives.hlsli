@@ -78,14 +78,9 @@ float3 CalculateMetaballsNormal(in float3 position, in Metaball blobs[N_METABALL
 void InitializeAnimatedMetaballs(out Metaball blobs[N_METABALLS], in float elapsedTime, in float cycleDuration)
 {
     // Metaball centers at t0 and t1 key frames.
-#if N_METABALLS == 10
+#if N_METABALLS == 5
     float3 keyFrameCenters[N_METABALLS][2] =
     {
-        { float3(-0.7, 0, 0),float3(0.7,0, 0) },
-        { float3(0.7 , 0, 0), float3(-0.7, 0, 0) },
-        { float3(0, -0.7, 0),float3(0, 0.7, 0) },
-        { float3(0, 0.7, 0), float3(0, -0.7, 0) },
-        { float3(0, 0, 0),   float3(0, 0, 0) },
            { float3(-0.7, 0.6, 0),float3(0.7,0.1, 0) },
         { float3(0.7 , 0.2, 0.5), float3(-0.7, 0, 0) },
         { float3(0.6, -0.7, 0),float3(1.0, 0.7, 0) },
@@ -93,7 +88,7 @@ void InitializeAnimatedMetaballs(out Metaball blobs[N_METABALLS], in float elaps
         { float3(0.2, 0, 0),   float3(0.8, 0, 0.9) }
     };
     // Metaball field radii of max influence
-    float radii[N_METABALLS] = { 0.35, 0.35, 0.35, 0.35, 0.25, 0.476, 0.543, 0.37, 0.12, 0.9 };
+    float radii[N_METABALLS] = {  1, 2, 0.37, 0.12, 0.9 };
 #else
     float3 keyFrameCenters[N_METABALLS][2] =
     {
@@ -138,6 +133,32 @@ void FindIntersectingMetaballs(in Ray ray, out float tmin, out float tmax, inout
         }
     }
     tmin = max(tmin, RayTMin());
+    tmax = min(tmax, RayTCurrent());
+}
+
+
+void FindIntersectingMetaballsCSG(in Ray ray, out float tmin, out float tmax, in float minimum, inout Metaball blobs[N_METABALLS], out UINT nActiveMetaballs)
+{
+    // Find the entry and exit points for all metaball bounding spheres combined.
+    tmin = INFINITY;
+    tmax = -INFINITY;
+
+    nActiveMetaballs = 0;
+    for (UINT i = 0; i < N_METABALLS; i++)
+    {
+        float _thit, _tmax;
+        if (RaySolidSphereIntersectionTest(ray, _thit, _tmax, blobs[i].center, blobs[i].radius))
+        {
+            tmin = min(_thit, tmin);
+            tmax = max(_tmax, tmax);
+#if LIMIT_TO_ACTIVE_METABALLS
+            blobs[nActiveMetaballs++] = blobs[i];
+#else
+            nActiveMetaballs = N_METABALLS;
+#endif
+        }
+    }
+    tmin = max(tmin, minimum);
     tmax = min(tmax, RayTCurrent());
 }
 
@@ -191,6 +212,62 @@ bool RayMetaballsIntersectionTest(in Ray ray, out float thit, out ProceduralPrim
                 
                 return true;
             
+        }
+        t += minTStep;
+    }
+
+    return false;
+}
+
+
+bool RayMetaballsIntersectionTestCSG(in Ray ray, in float minimum, out float thit, out ProceduralPrimitiveAttributes attr, in float elapsedTime)
+{
+    Metaball blobs[N_METABALLS];
+    InitializeAnimatedMetaballs(blobs, elapsedTime, 12.0f);
+
+    float tmin, tmax;   // Ray extents to first and last metaball intersections.
+    UINT nActiveMetaballs = 0;  // Number of metaballs's that the ray intersects.
+    FindIntersectingMetaballsCSG(ray, tmin, tmax, minimum, blobs, nActiveMetaballs);
+
+    UINT MAX_STEPS = 128;
+    float t = tmin;
+    float minTStep = (tmax - tmin) / (MAX_STEPS / 1);
+    UINT iStep = 0;
+
+    while (iStep++ < MAX_STEPS)
+    {
+        float3 position = ray.origin + t * ray.direction;
+        float fieldPotentials[N_METABALLS];    // Field potentials for each metaball.
+        float sumFieldPotential = 0;           // Sum of all metaball field potentials.
+
+        // Calculate field potentials from all metaballs.
+#if USE_DYNAMIC_LOOPS
+        for (UINT j = 0; j < nActiveMetaballs; j++)
+#else
+        for (UINT j = 0; j < N_METABALLS; j++)
+#endif
+        {
+            float distance;
+            fieldPotentials[j] = CalculateMetaballPotential(position, blobs[j], distance);
+            sumFieldPotential += fieldPotentials[j];
+        }
+
+        // Field potential threshold defining the isosurface.
+        // Threshold - valid range is (0, 1>, the larger the threshold the smaller the blob.
+        const float Threshold = 0.25f;
+
+        // Have we crossed the isosurface?
+        if (sumFieldPotential >= Threshold)
+        {
+            float3 normal = CalculateMetaballsNormal(position, blobs, nActiveMetaballs);
+            if (dot(ray.direction, normal) > 0) {
+                normal = -normal;
+            }
+            thit = t;
+            attr.normal = normal;
+
+            return true;
+
         }
         t += minTStep;
     }

@@ -391,15 +391,17 @@ bool RaySignedDistanceQuatTest(in Ray ray, out float thit, out ProceduralPrimiti
 }
 // Test ray against a signed distance primitive.
 // Ref: https://www.scratchapixel.com/lessons/advanced-rendering/rendering-distance-fields/basic-sphere-tracer
-bool RaySignedDistancePrimitiveTest(in Ray ray, in SignedDistancePrimitive::Enum sdPrimitive, out float thit, out ProceduralPrimitiveAttributes attr, in float stepScale = 1.0f)
+bool RaySignedDistancePrimitiveTest(in Ray ray, in SignedDistancePrimitive::Enum sdPrimitive, out float thit, out ProceduralPrimitiveAttributes attr, in float stepScale = 1.0f, in float time = 0.0f)
 {
-    const float threshold = 0.0001;
+    const float threshold = 0.00001;
     float t = RayTMin();
-    const UINT MaxSteps = 300;
+    const UINT MaxSteps = 500;
     float4 tmp;
-   // float4 c = float4(0.6, 0.6, 0.6, 0);
+   // float4 c = 0.45 * cos(float4(1.2, 3.9, 3.2, 1.1) + 0.2*time * float4(2.1, 4.3, 1.3, 2.1)) - float4(0.3, 0.0, 0.0, 0.0);
 
-    float4 c = float4(0.1, 0.7, 0.8, 0.12);
+   float4 c = float4(0.6, 0.6, 0.6, 0);
+  ///  float4 c = float4(0.185, 0.478, 0.125, -0.392);
+    //float4 c = float4(0.1, 0.7, 0.8, 0.12);
     float maxD = 10.0;
     // Do sphere tracing through the AABB.
     UINT i = 0;

@@ -3488,7 +3488,7 @@ void Application::OnRender()
    if (photonMapping) {
        if (biDirectional && mappingAndPathing) {
            DoLightPathTracing();
-           DoLightPathTracingSecondPass();
+         // DoLightPathTracingSecondPass();
            DoForwardPathTracing();
            CopyRaytracingOutputToBackbuffer();
        }
@@ -3502,12 +3502,10 @@ void Application::OnRender()
            DoRaytracing();
            //DoForwardPathTracing();
 
-          // CopyGBufferToBackBuffer();
-            //rasterise photon volumes - indirect lighting
-            //  CopyRaytracingOutputToBackbuffer();
+          
 
            DoRasterisation();
-           CopyBackBufferToRasterBuffer();
+          CopyBackBufferToRasterBuffer();
            DoCompositing();
 
            CopyRaytracingOutputToBackbuffer();
@@ -3570,7 +3568,7 @@ void Application::CalculateFrameStats()
     //has run for a total of 30 seconds, write the fps to a file, and stop.
 
     if (totalTime >= 30.0f && testing) {
-        std::ofstream output_file("/fps_stats_4k_Photon_mapping_Julia.txt");
+        std::ofstream output_file("/fps_stats_6_subs_10_thousand.txt");
         for (const auto& e : fpsAverages) output_file << e << "\n";
       //  double fps = frameCnt / totalTime;
         //output_file << fps << "\n";

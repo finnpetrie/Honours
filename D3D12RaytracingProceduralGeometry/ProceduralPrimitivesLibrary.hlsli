@@ -35,7 +35,7 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     case AnalyticPrimitive::AABB: return RayAABBIntersectionTest(ray, aabb, thit, attr);//cubeIntersection(ray, thit, attr);
     //case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
     case AnalyticPrimitive::Spheres: return RaySpheresIntersectionTest(ray, thit, attr);
-    case AnalyticPrimitive::Sphere: return RayQuadric(ray, thit, attr, analyticPrimitive);
+    case AnalyticPrimitive::Sphere: return RaySphereIntersectionTest(ray, thit, t_max, attr);//RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::PointLightSphere: return RayQuadric(ray, thit, attr, analyticPrimitive);
     case AnalyticPrimitive::CSG_Difference:  return ConstructiveSolidGeometry_D(ray, thit, attr);
     case AnalyticPrimitive::CSG_Union: return ConstructiveSolidGeometry(ray, thit, attr);
@@ -52,12 +52,21 @@ bool RayAnalyticGeometryIntersectionTest(in Ray ray, in AnalyticPrimitive::Enum 
     }
 }
 
-bool OtherRayCSGGeometryIntervals(in Ray ray, in float minimum, in AnalyticPrimitive::Enum analyticPrimitive, out float thit, out float3 normal) {
+bool OtherRayCSGGeometryIntervals(in Ray ray, in float minimum, in AnalyticPrimitive::Enum analyticPrimitive, in float elapsedTime, out float thit, out float3 normal) {
     if (analyticPrimitive != 0) {
         if (analyticPrimitive == 9) {
             ProceduralPrimitiveAttributes attr;
 
-            bool hit = RaySignedDistancePrimitiveTestCSG(ray, minimum , thit, attr, 1.0f);
+            bool hit = RaySignedDistancePrimitiveTestCSG(ray, minimum, thit, attr, 1.0f);
+            if (hit) {
+                normal = attr.normal;
+            }
+            return hit;
+        }
+        else if (analyticPrimitive == 20) {
+            ProceduralPrimitiveAttributes attr;
+
+            bool hit = RayMetaballsIntersectionTestCSG(ray, minimum, thit, attr, elapsedTime);
             if (hit) {
                 normal = attr.normal;
             }
@@ -66,17 +75,17 @@ bool OtherRayCSGGeometryIntervals(in Ray ray, in float minimum, in AnalyticPrimi
         else {
             return OtherCSGRayTest(ray, minimum, thit, normal, analyticPrimitive);
         }
-        }
+    }
     else {
-       /* float3 aabb[2] = {
+        float3 aabb[2] = {
          float3(-1,-1,-1),
          float3(1,1,1)  
-        };*/
+        };
 
-        float3 aabb[2] = {
+       /* float3 aabb[2] = {
             float3(-1, -1, -1),
             float3(1.5,1.5,1)
-        };
+        };*/
         ProceduralPrimitiveAttributes attr;
          bool hit = RayAABBIntersectionTestCSG(ray, aabb, minimum, thit, attr);//cubeIntersection(ray, thit, attr);
          if (hit) {
@@ -109,7 +118,7 @@ bool RaySignedDistanceTest(in Ray ray, in SignedDistancePrimitive::Enum signedDi
     {
     case SignedDistancePrimitive::MetaBalls: return RayMetaballsIntersectionTest(ray, thit, attr, elapsedTime);
     
-    default: return RaySignedDistancePrimitiveTest(ray, signedDistancePrimitive, thit, attr, stepScale);
+    default: return RaySignedDistancePrimitiveTest(ray, signedDistancePrimitive, thit, attr, stepScale, elapsedTime);
     }
 }
 // Signed distance functions use a shared ray signed distance test.

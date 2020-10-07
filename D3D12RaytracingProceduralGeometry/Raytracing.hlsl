@@ -473,7 +473,7 @@ PhotonPayload TracePhotonRay(in Ray ray, in PhotonPayload payload) {
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 0.01;
+    rayDesc.TMin = 0.000001;
     rayDesc.TMax = 10000;
 
     payload.recursionDepth += 1;
@@ -591,6 +591,17 @@ float chessBoard(float3 pos) {
     chess *= 2;
     if (chess == 0.0) {
         chess = 0.5;
+    }
+    return chess;
+}
+float chessSides(float3 pos) {
+
+    float chess = floor(sqrt(pos.x * pos.x + pos.z * pos.z)) + floor(atan(pos.z / pos.x));
+    chess = floor(pos.x) +  floor(pos.z);
+    chess = frac(chess * 0.5);
+    chess *= 2;
+    if (chess == 0.0) {
+        chess = 0.0;
     }
     return chess;
 }
@@ -1075,7 +1086,7 @@ PathTracingPayload TraceForwardPath(in Ray ray, in PathTracingPayload payload)
     rayDesc.Direction = ray.direction;
     // Set TMin to a zero value to avoid aliasing artifacts along contact areas.
     // Note: make sure to enable face culling so as to avoid surface face fighting.
-    rayDesc.TMin = 1;
+    rayDesc.TMin = 0.001;
     rayDesc.TMax = 10000;
 
     payload.recursionDepth += 1;
@@ -1215,12 +1226,6 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
     }
 
     // Shadow Ray.
-    RayDesc ray;
-    ray.Origin = hitPosition;
-    //ray.Direction = normalize(g_sceneCB.cameraPosition.xyz - hitPosition);
-    ray.Direction = g_sceneCB.cameraPosition.xyz - hitPosition;
-    ray.TMin = 0.0001;
-    ray.TMax = 1.001;
 
     Ray r = { hitPosition, normalize(g_sceneCB.cameraPosition.xyz - hitPosition) };
     //ShadowRayPayload shadow = { true };
@@ -1252,7 +1257,8 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
 
         //we give all photons initial flux, so we don't need to normalize (essentially cancels out)
         //convert to radiance
-        float4 radiance = colour * invSqrLength * cos_alpha;
+        //*cos_alpha*inv
+        float4 radiance = colour*cos_alpha* invSqrLength;
 
         if (brdf == 0) {
             lambertian = INV_PI * abs(dot(normalize(w_i), normal));
@@ -1260,7 +1266,7 @@ inline void VisualiseLightVertex(float4 photon, float4 colour, float4 w_i, float
             radiance *= lambertian / pdf;
         }
         else {
-            radiance = 0.0f;
+           radiance = 0.0f;
         }
 
 
@@ -1301,8 +1307,8 @@ void ForwardPathTracingRayGen() {
 
     uint accumulatedFrames = g_sceneCB.accumulatedFrames;
     //rng_state = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y  + 2000 * accumulatedFrames));
-    uint seed = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y + 2000 * accumulatedFrames));
     for (int i = 0; i < 1; i++) {
+        uint seed = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y  + accumulatedFrames*100000 ));
 
        // float2 rand = float2(rand_xorshift(), rand_xorshift());
         float2 screen_coord = DispatchRaysIndex().xy;
@@ -1326,7 +1332,7 @@ void ForwardPathTracingRayGen() {
   //  radiance *= 1.0f / float(1);
  
    // float3 averageRadiance = stagingColour;
-    float3 previousRadiance = accumulationLight[DispatchRaysIndex().xy];
+   float3 previousRadiance = accumulationLight[DispatchRaysIndex().xy].xyz;
     uint2 index = uint2(DispatchRaysIndex().xy);
 
    // float channel_r = stagingTarget_R[index];
@@ -1336,15 +1342,25 @@ void ForwardPathTracingRayGen() {
     float4 lightStaging = staging[DispatchRaysIndex().xy];
   // float3 lightStaging = float3(channel_r, channel_g, channel_b) / (262144.f);
    float3 lightAverageRadiance;
+   float w = accumulationLight[DispatchRaysIndex().xy].w;
+
     if (accumulatedFrames == 0) {
         lightAverageRadiance = lightStaging;
+        w = 0;
     }
+   
+        
     else {
-        lightAverageRadiance = lerp(previousRadiance.xyz, lightStaging.xyz, 1.0f / (accumulatedFrames + 1.0f));
+       // float blend = (iFrame < 2 || iMouse.z > 0.0 || lastFrameColor.a == 0.0f || spacePressed) ? 1.0f : 1.0f / (1.0f + (1.0f / lastFrameColor.a));
+       // 1.0f / (1.0f + (1.0f / lastFrameColor.a)
+         if (lightStaging.x > 0 || lightStaging.y > 0 || lightStaging.z > 0) {
+             w += 1;
+         }
+        lightAverageRadiance = lerp(previousRadiance.xyz, lightStaging.xyz, 1.0f / ((w) + 1.0f));
     }
-    accumulationLight[DispatchRaysIndex().xy] = float4(lightAverageRadiance , 0);
+    accumulationLight[DispatchRaysIndex().xy] = float4(lightAverageRadiance , w);
  
-   /* if (accumulatedFrames == 0) {
+  /* if (accumulatedFrames == 0) {
          averageRadiance = stagingColour.xyz;
     }
     else {
@@ -1471,6 +1487,74 @@ float3 directionFromBRDF(float3 normal, inout uint seed) {
     return dir;
 }
 
+float getWeightForPath(int e, int l) {
+    return float(e + l + 2);
+}
+
+float3 connectP(float3 pos, uint recursionDepth, float3 forwardNormal, uint jdiff, float2 index) {
+    float3 total = float3(0, 0, 0);
+    for (int j = 0; j < MAX_RAY_RECURSION_DEPTH; j++) {
+        uint c = j * 4;
+        float4 lightPosition = lightTracingPhotons[c][index];
+        float4 colour = lightTracingPhotons[c + 1][index];
+        float4 normal = lightTracingPhotons[c + 2][index];
+        float4 w_i = lightTracingPhotons[c + 3][index];
+
+        float3 d = lightPosition.xyz - pos;
+        float3 nD = normalize(d);
+        Ray r = { pos.xyz, nD };
+        bool isVisible = ShadowRay(r, recursionDepth);
+        if (isVisible) {
+            float weight = clamp(dot(nD, forwardNormal), 0.0, 1.0) * clamp(dot(-nD, normal), 0.0, 1.0) * clamp(1 / (dot(d, d)), 0.0f, 1.0f);
+            total += weight * colour/getWeightForPath(jdiff, j);
+        }
+    }
+    return total;
+}
+float3 connectPaths(float3 pos, uint recursionDepth, float3 forwardNormal, float3 brdfEval) {
+   
+    float3 total = 0.0f;
+    for (int j = 0; j < MAX_RAY_RECURSION_DEPTH; j++) {
+        uint c = j * 4;
+        
+        float4 lightPosition = lightTracingPhotons[c][DispatchRaysIndex().xy];
+        float4 colour = lightTracingPhotons[c + 1][DispatchRaysIndex().xy];
+        float4 normal = lightTracingPhotons[c + 2][DispatchRaysIndex().xy];
+        float4 w_i = lightTracingPhotons[c + 3][DispatchRaysIndex().xy];
+
+
+        float3 direct = lightPosition.xyz - pos;
+        float invDistcSqr = 1.0f / dot(direct, direct);
+        float3 n_direct = direct * invDistcSqr;
+        Ray r = { pos.xyz, n_direct };
+        float cosAtLight = max(dot(normal, n_direct), 0);
+        float cosAtEyeVertex = max(dot(forwardNormal, n_direct), 0);
+
+       
+        
+        bool isVisible = ShadowRay(r, recursionDepth);
+        if (isVisible) {
+            float3 d = lightPosition.xyz - pos.xyz;
+            float invSqrLength = 1 / dot(d, d);
+            float3 nDelta = d * sqrt(invSqrLength);
+            float3 nE = normalize(-d);
+            float3 cos_alpha = abs(dot(nE, normal));
+
+            float3 radiance = colour * cos_alpha * invSqrLength;
+            if (lightPosition.w == 0) {
+                float lambertian = INV_PI * abs(dot(normalize(w_i), normal));
+                float pdf = INV_PI * abs(dot(nE, normal));
+                radiance *= pdf;
+            }
+
+            total += radiance;
+           
+        }
+
+    }
+    return total;
+    
+}
 
 [shader("closesthit")]
 void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in BuiltInTriangleIntersectionAttributes attr) {
@@ -1478,22 +1562,34 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     float3 pos = HitWorldPosition();
     float3 normal = float3(0, 1, 0);
     float3 light_direction = (g_sceneCB.lightSphere.xyz - pos);
+
+    //float3 flux = connectPaths(pos, rayPayload.recursionDepth, normal, 0);
    // uint brdfType = labelBRDF();
     //sample lights
-    Ray sr = { pos, light_direction };
+    Ray sr = { pos , normalize(light_direction) };
     bool shadowHit = ShadowRay(sr, rayPayload.recursionDepth);
+    float3 radiantFlux = 0.0f;
 
-   
-   
-    float s = chessBoard(pos);
-    //float3 c = float3(0.3, 0.3, 0.3);
+
+
+    if (rayPayload.recursionDepth >= 0) {
+        uint seed = rayPayload.randomSeed;
+        uint2 randIndex = float2(seed_xorshift(seed), seed_xorshift(seed));
+        rayPayload.randomSeed = seed;
+        randIndex.x *= DispatchRaysDimensions().x;
+        randIndex.y *= DispatchRaysDimensions().y;
+         radiantFlux = connectP(pos, rayPayload.recursionDepth, normal, rayPayload.weight, randIndex);
+    }
+    float s = chessSides(pos);
+    float3 c = float3(0.8, 0.8, 0.8);
+        //float3 c = float3(0.3, 0.3, 0.3);
     //float3 c = float3(1, 1, 1);
-    float3 c = float3(0.8, 0.8, 0.8)*s;
+   // float3 c = float3(0.4, 0.4, 0.4);
     //float3 c = float3(0.1, 0.01, 0.3)*s;
     //lambertf is the light value here
     float3 lambert = lambertian(normal, pos, c);
 
- 
+    //radiantFlux //*= max(dot(-WorldRayDirection(), normal), 0);
     //brdf already multiplied by L_i
     //float3 dir =  calculateRandomDirectionInHemisphere(normal);
     //rayPayload.colour = float4(lambert.xyz, 0);
@@ -1504,19 +1600,19 @@ void ForwardPathTracingClosestHitTriangle(inout PathTracingPayload rayPayload, i
     float3 dir = calculateRandomDirectionInHemisphereSeedShift(normal, seed);
    //float3 dir = SampleHemisphereSeedShift(normal, seed);
     rayPayload.randomSeed = seed;
-
+    rayPayload.weight += 1;
    // rayPayload.randomSeed = seed;
     //float3 dir = normalize(normal + RandomUnitVector(seed));
     Ray r = { pos, dir };
     rayPayload.energy *= 2 * c * sdot(normal, dir);
-
+    rayPayload.pdf = 0;
     r_sample = TraceForwardPath(r, rayPayload).colour;
     if (shadowHit) {
-        lambert *= 0.2;
+        lambert *= 0.7;
     }
 
 
-    rayPayload.colour = float4(rayPayload.energy*r_sample + lambert, 0);
+    rayPayload.colour = float4(rayPayload.energy*r_sample + lambert + radiantFlux, 0);
     //rayPayload.colour +=float4(rayPayload.energy*lambert, 0);
     //sammple the hemisphere of the BRDF and connect it to the light
     //we have hit a triangle
@@ -1540,8 +1636,24 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
     float3 lambert = float3(0, 0, 0);
     float3 monte_sample = float3(0, 0, 0);
     float3 lightDir = g_sceneCB.lightSphere.xyz - pos;
-    Ray sr = { pos, lightDir };
+    float3 radiantFlux = 0.0f;
+    uint seed = rayPayload.randomSeed;
+    float2 randIndex = float2(seed_xorshift(seed), seed_xorshift(seed));
+   // randIndex.x *= DispatchRaysDimensions().x;
+    //randIndex.y *= DispatchRaysDimensions().y;
+    if (rayPayload.recursionDepth >= 0) {
+
+        uint seed = rayPayload.randomSeed;
+        float2 randIndex = float2(seed_xorshift(seed), seed_xorshift(seed));
+        randIndex.x *= DispatchRaysDimensions().x;
+        randIndex.y *= DispatchRaysDimensions().y;
+        rayPayload.randomSeed = seed;
+        radiantFlux = connectP(pos, rayPayload.recursionDepth, normal, rayPayload.weight, randIndex);
+    }    //radiantFlux *= dot(-WorldRayDirection(), normal);
+
+    Ray sr = { pos + 0.1 * attr.normal.xyz, normalize(lightDir) };
     bool shadowHit = ShadowRay(sr, rayPayload.recursionDepth);
+   // float3 flux = connectPaths(pos, rayPayload.recursionDepth, normal, brdf);
 
 
 
@@ -1550,13 +1662,17 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
     //float3 c = float3(1, 1, 1);
     //float3 c = float3(0.1, 0.01, 0.3)*s;
     //lambertf is the light value here
-    lambert = lambertian(normal, pos, l_materialCB.albedo);
-    
+    float s = chessSides(pos);
+    float3 c = float3(l_materialCB.albedo.xyz);
+   // lambert = lambertian(normal, pos, c);
+
     //uint seed = rayPayload.seed
     //float3 n_direction = SampleHemisphere()
     if (brdf == 0) {
         //sample light source
-        lambert = lambertian(normal, pos, l_materialCB.albedo);
+       // lambert = lambertian(normal, pos, l_materialCB.albedo);
+        lambert = lambertian(normal, pos, c);
+
         uint seed = rayPayload.randomSeed;
         // float3 random = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
         float3 dir = calculateRandomDirectionInHemisphereSeedShift(normal, seed);
@@ -1569,15 +1685,16 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
        // float3 dir = normalize(normal + RandomUnitVector(seed));
         Ray r = { pos, dir };
        // rayPayload.randomSeed = seed;
-
+        rayPayload.pdf = 0;
         rayPayload.energy *= 2 * l_materialCB.albedo * sdot(normal, dir);
         monte_sample = TraceForwardPath(r, rayPayload).colour;
     }
     else if (brdf == 1) {
-       
+        rayPayload.weight = 0;
         uint seed = rayPayload.randomSeed;
         float roulette = seed_xorshift(seed);
         rayPayload.randomSeed = seed;
+        rayPayload.pdf = 1;
         float doSpecular = (roulette < l_materialCB.specularCoef) ? 1.0f : 0.0f;
         seed = rayPayload.randomSeed;
         // float3 random = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
@@ -1661,7 +1778,7 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
                 //setup refracted ray
 
             }
-
+            rayPayload.weight = 0;
             float3 reflected = normalize(reflect(dir, attr.normal));
             Ray r = { pos, reflected };
             float3 lightDir = normalize(g_sceneCB.lightSphere.xyz - pos);
@@ -1673,15 +1790,24 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
             }
             reflectionColour = TraceForwardPath(r, rayPayload).colour;
             //reflectionColour += specHighlight;
-            hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel) ;
-            hitColour *= l_materialCB.albedo + float4(specHighlight, specHighlight, specHighlight, 0) * 6;
+            if (rayPayload.pdf == 1) {
+                hitColour += reflectionColour * fresnel + refractColour * (1 - fresnel);
+                hitColour *= l_materialCB.albedo + float4(specHighlight, specHighlight, specHighlight, 0) * 6;
+            }
+            //rayPayload.pdf = 1;
+
             //hitColour += l_materialCB.albedo;
 
     }
-
-   
+    if (shadowHit) {
+       // hitColour.xyz *= 0.7;
+        //reflectiveColour.xyz *= 0.7;
+        //lambert *= 0.7;
+    }
     
-    rayPayload.colour = float4(float4(rayPayload.energy, 0)*(reflectiveColour.xyz + hitColour.xyz  + monte_sample + lambert) , 0);
+//float4(randIndex.xy, 0, 0);
+    rayPayload.colour = float4(float4(rayPayload.energy, 0) * (hitColour.xyz + reflectiveColour.xyz + lambert + radiantFlux + monte_sample), 0);
+ 
 }
 
 [shader("miss")]
@@ -1689,8 +1815,14 @@ void ForwardPathTracingClosestHitProcedural(inout PathTracingPayload rayPayload,
 void MissPathTracing(inout PathTracingPayload rayPayload) {
     float3 ndir = normalize(WorldRayDirection());
     rayPayload.energy = 0.0f; 
+    //rayPayload.colour = float4(0.1f, 0.1f, 0.1f, 0);
+   // rayPayload.colour = float4(0.3f, 0.3f, 0.3f, 0);
+
+   // rayPayload.colour = float4(0.4f, 0.4f, 0.4f, 0);
+    rayPayload.colour = float4(0.6f , 0.6f, 0.6f, 0);
+    //rayPayload.colour = float4(0.2f, 0.2f, 0.2f, 0);
     //rayPayload.colour = BackgroundColor;
-    rayPayload.colour = float4(getColour(ndir), 0);
+   // rayPayload.colour = float4(getColour(ndir), 0);
     rayPayload.recursionDepth = MAX_RAY_RECURSION_DEPTH;
 
 }
@@ -1713,15 +1845,16 @@ void lightPath(inout float seed) {
    // ro = g_sceneCB.lightSphere.xyz + ro * g_sceneCB.lightSphere.w;
    // float3 origin = g_sceneCB.lightPosition;
    // float3 dir = normalize(SquareToSphereUniform(rany));
-    PathTracingPayload p = { g_sceneCB.lightDiffuseColor*200, float3(0,0,0), ro, dir, 1, 0, 0, seed };
+   uint count = 0;
+    PathTracingPayload p = { 75*g_sceneCB.lightDiffuseColor, float3(0,0,0), ro, dir, 1, 0, 0, seed };
    while(p.recursionDepth <= MAX_RAY_RECURSION_DEPTH){
         float3 normal;
         //ntersect scene
         RayDesc rayDesc;
         rayDesc.Origin = ro;
         rayDesc.Direction = dir;
-        rayDesc.TMin = 0.1;
-        rayDesc.TMax = 10000;
+        rayDesc.TMin = 0.001;
+        rayDesc.TMax = 1000000;
 
         TraceRay(g_scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
             TraceRayParameters::InstanceMask,
@@ -1735,7 +1868,9 @@ void lightPath(inout float seed) {
         //lightTracingPhotons[2][g_index] = float4(p.colour);
 
         //lightTracingPhotons[p.recursionDepth + 1][DispatchRaysIndex().xy] = float4(p.pos, 0);
-        p.recursionDepth++;
+     
+            p.recursionDepth++;
+        
         ro = p.pos;
         dir = p.dir;
     }
@@ -1760,13 +1895,13 @@ void LightTracingRayGen() {
     }
     uint accumulatedFrames = g_sceneCB.accumulatedFrames;
 
-        rng_state = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y) + accumulatedFrames*2000);
-        uint seed = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y ) + 2000 * accumulatedFrames);
+        rng_state = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y) +  accumulatedFrames*100000);
+        uint seed = uint(wang_hash_original(DispatchRaysIndex().x + DispatchRaysDimensions().x * DispatchRaysIndex().y + accumulatedFrames * 100000));
 
         //seed = DispatchRaysIndex().x + DispatchRaysIndex().y * 3.43121412313 + frac(1.12345314312 * accumulatedFrames)*g_sceneCB.rand1;
         lightPath(seed);
 
-        float3 totalRadiance = 0.0f;
+      //  float3 totalRadiance = 0.0f;
       
        // g_renderTarget[DispatchRaysIndex().xy] = float4(rand_xorshift(), rand_xorshift(), rand_xorshift(), rand_xorshift());
 
@@ -1806,12 +1941,12 @@ void lightTracingRayGenSecondPass() {
 
 [shader("closesthit")]
 void lightTracingClosestHitSecondPass(inout PathTracingPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
-
+    return;
 }
 
 [shader("miss")]
 void lightTracingSecondPassMiss(inout PathTracingPayload payload) {
-
+    return;
 }
 
 //SORT_FORCEINLINE float CosHemispherePdf(const Vector& v) {
@@ -1825,20 +1960,20 @@ void LightTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in Buil
 
     uint2 index = DispatchRaysIndex().xy;
     float4 colour = rayPayload.colour;
-
     uint brdfType = labelBRDF();
-    uint c = rayPayload.recursionDepth * 4;
 
-   // colour /= lambertPdf;
-    if (rayPayload.recursionDepth >= 0 && (dot(normalize(WorldRayDirection()), normal) < 0)) {
+    uint c = (rayPayload.recursionDepth - 1) * 4;
+    colour *= float4(0.8, 0.8, 0.8, 0);
+    if (rayPayload.recursionDepth >= 1) {
         lightTracingPhotons[c][index] = float4(pos, float(brdfType));
-        lightTracingPhotons[c + 1][index] = rayPayload.colour;
+        lightTracingPhotons[c + 1][index] = colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);
         lightTracingPhotons[c + 3][index] = float4(-WorldRayDirection(), 0);
     }
-        colour *= float4(0.8, 0.8, 0.8, 0);
+   // colour /= lambertPdf;
+   
         float lambertPdf = abs(dot(-WorldRayDirection(), normal)) * INV_PI;
-
+       
         uint seed = rayPayload.randomSeed;
         float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
        // randomSample = float2(rand_xorshift(), rand_xorshift());
@@ -1846,6 +1981,9 @@ void LightTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in Buil
 
         //uint seed = rayPayload.randomSeed;
         float3 dir = SquareToHemisphereCosine(randomSample);
+       // colour *= INV_PI;
+        //colour *= abs(dot(normal, dir)) / abs(dot(normal, -WorldRayDirection())) * INV_PI;
+ 
         Ray r = { pos, dir };
         //float3 dir = normalize(normal + RandomUnitVector(seed));
         // Ray r = { pos, dir };
@@ -1858,119 +1996,111 @@ void LightTracingClosestHitTriangle(inout PathTracingPayload rayPayload, in Buil
 }
 
 
-    //setup random ray, and trace
-   
-
-
-    //generate random diffuse ray
-    
-
 [shader("closesthit")]
 void LightTracingClosestHitProcedural(inout PathTracingPayload rayPayload, in ProceduralPrimitiveAttributes attr) {
     float3 normal = attr.normal;
-    float3 pos = HitWorldPosition();
+    float3 pos = HitWorldPosition().xyz;
+    float3 dir = normalize(WorldRayDirection());
+    //uint c = 4 * rayPayload.recursionDepth;
+    uint c = (rayPayload.recursionDepth - 1) * 4;
     float4 colour = rayPayload.colour;
-    uint c = 4 * rayPayload.recursionDepth;
-    uint brdf = labelBRDF();
-    float fresnel = Fresnel(WorldRayDirection(), attr.normal, l_materialCB.refractiveCoef);
-    if (brdf == 1) {
-       // colour *= fresnel;
-    }
-    else if(brdf == 2) {
-       // colour *= (1 - fresnel);
-    }
-    colour *= l_materialCB.albedo;
+    uint brdfType = labelBRDF();
     uint2 index = DispatchRaysIndex().xy;
+    colour *=  l_materialCB.albedo;
 
-    //then meant to the divide throughput or flux by the probability distribution for sampling the BRDF
-    if (rayPayload.recursionDepth >= 0 && (dot(normalize(WorldRayDirection()), attr.normal) < 0)) {
-        lightTracingPhotons[c][index] = float4(pos, brdf);
+    if (rayPayload.recursionDepth >= 1) {
+        lightTracingPhotons[c][index] = float4(pos, float(brdfType));
         lightTracingPhotons[c + 1][index] = colour;
         lightTracingPhotons[c + 2][index] = float4(normal, 0);
-        lightTracingPhotons[c + 3][index] = float4(-WorldRayDirection(), 1);
+        lightTracingPhotons[c + 3][index] = float4(-WorldRayDirection(), 0);
     }
 
-
-        if (brdf == 0) {
-
-            uint seed = rayPayload.randomSeed;
-            float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
-            rayPayload.randomSeed = seed;
-            //uint seed = rayPayload.randomSeed;
-            float3 dir = SquareToHemisphereCosine(randomSample);
-           // float3 dir = normalize(normal + RandomUnitVector(seed));
-            // Ray r = { pos, dir };
-           // float3 r = cosWeightedRandomHemisphereDirection(normal, seed);
-
-
-          
-              colour *=  INV_PI;
-              colour *= abs(dot(attr.normal, dir))/abs(dot(attr.normal, -WorldRayDirection()))*INV_PI;
-                //lambertian brdf
-            
+    if (l_materialCB.reflectanceCoef == 0.0f && l_materialCB.refractiveCoef == 0.0f) {
+       
+        uint seed = rayPayload.randomSeed;
+        float2 randomSample = float2(seed_xorshift(seed), seed_xorshift(seed));
+        rayPayload.randomSeed = seed;
+        //uint seed = rayPayload.randomSeed;
+        float3 dir = SquareToHemisphereCosine(randomSample);
+        // float3 dir = normalize(normal + RandomUnitVector(seed));
+         // Ray r = { pos, dir };
+        // float3 r = cosWeightedRandomHemisphereDirection(normal, seed);
 
 
-            rayPayload.dir = dir;
-            rayPayload.pos = pos;
-            rayPayload.colour = colour;
+
+        colour *= INV_PI;
+        colour *= abs(dot(attr.normal, dir)) / abs(dot(attr.normal, -WorldRayDirection())) * INV_PI;
+        //lambertian brdf
+        rayPayload.dir = dir;
+        rayPayload.pos = pos;
+        rayPayload.colour = colour;
+    }
+    if (l_materialCB.reflectanceCoef > 0.0f && l_materialCB.refractiveCoef <= 0.0f) {
+        uint seed = rayPayload.randomSeed;
+        float roulette = seed_xorshift(seed);
+        //rayPayload.randomSeed = seed;
+        float doSpecular = (roulette < l_materialCB.specularCoef) ? 1.0f : 0.0f;
+        float d = calculateRandomDirectionInHemisphereSeedShift(normal, seed);
+        rayPayload.randomSeed = seed;
+
+       
+
+        float3 specularDirection = reflect(WorldRayDirection(), attr.normal);
+        specularDirection = normalize(lerp(specularDirection, dir, l_materialCB.diffuseCoef * l_materialCB.diffuseCoef));
+        rayPayload.colour = colour;
+        rayPayload.pos = pos;
+        rayPayload.dir = specularDirection;
+
+        
+    }
+    else if (l_materialCB.refractiveCoef > 0.0f) {
+        //float3 d;
+        float fresnel = Fresnel(dir, attr.normal, l_materialCB.refractiveCoef);
+        bool outside = dot(dir, attr.normal) < 0 ? false : true;
+        float n1 = 1;
+        float n2 = l_materialCB.refractiveCoef;
+        float3 outwardNormal;
+        float index;
+        float3 refracted;
+        if (dot(dir, attr.normal) > 0) {
+            outwardNormal = -attr.normal;
+            index = n2;
         }
         else {
-            float3 dir;
-            if (l_materialCB.reflectanceCoef >= 0.0f && l_materialCB.refractiveCoef <= 0.0f) {
-                uint seed = rayPayload.randomSeed;
-                float roulette = seed_xorshift(seed);
-                rayPayload.randomSeed = seed;
-                float doSpecular = (roulette < l_materialCB.specularCoef) ? 1.0f : 0.0f;
-                seed = rayPayload.randomSeed;
-                // float3 random = float3(seed_xorshift(seed), seed_xorshift(seed), seed_xorshift(seed));
-                float3 dir = calculateRandomDirectionInHemisphereSeedShift(normal, seed);
-                //float3 dir = SampleHemisphereSeedShift(normal, seed);
-                rayPayload.randomSeed = seed;
+            outwardNormal = attr.normal;
+            index = n1 / n2;
+        }
+        refractTest(dir, outwardNormal, index, refracted);
+       // rayPayload.randomSeed = seed;
+        uint seed = rayPayload.randomSeed;
+        float roulette = seed_xorshift(seed);
+        rayPayload.randomSeed = seed;
+        if (fresnel < 1) {
 
-                float3 specularDirection = reflect(WorldRayDirection(), attr.normal);
-                specularDirection = normalize(lerp(specularDirection, dir, l_materialCB.diffuseCoef * l_materialCB.diffuseCoef));
+           // Ray r = { pos, refracted };
+            //float temp = payload.probability;
+           // payload.probability = (1 - fresnel);
 
-                rayPayload.colour *= l_materialCB.albedo;
-                rayPayload.pos = pos;
-                rayPayload.dir = specularDirection;
-               // Ray r = { pos, specularDirection };
-                //reflectiveColour = TraceForwardPath(r, rayPayload).colour;
-              /*  dir = reflect(WorldRayDirection(), attr.normal);
-                rayPayload.pos = pos;
-                rayPayload.dir = dir;*/
-            }
-            else {
-                float fresnel = Fresnel(WorldRayDirection(), normal, l_materialCB.refractiveCoef);
-                bool outside = dot(dir, normal) < 0 ? false : true;
-                float n1 = 1;
-                float n2 = l_materialCB.refractiveCoef;
-                float3 outwardNormal;
-                float index;
-                float3 refracted;
-                if (dot(WorldRayDirection(), normal) > 0) {
-                    outwardNormal = -normal;
-                    index = n2;
-                }
-                else {
-                    outwardNormal = normal;
-                    index = n1 / n2;
-                }
-               bool refract =  refractTest(dir, outwardNormal, index, refracted);
-               if (refract) {
-                   dir = refracted;
-                   rayPayload.pos = pos;
-                   rayPayload.dir = dir;
-                   // rayPayload.randomSeed = seed;
-                   rayPayload.colour = colour;
-               }
-               else {
-                   rayPayload.pos = pos;
-                   rayPayload.dir = reflect(WorldRayDirection(), attr.normal);
-                   rayPayload.colour = colour;
+            rayPayload.pos = pos;
+            rayPayload.dir = refracted;
+            rayPayload.colour = colour;
+            //setup refracted ray
 
-                    }
-               }
-          }
+        }
+        else {
+
+            float3 reflected = (reflect(dir, attr.normal));
+           // Ray r = { pos, reflected };
+            //payload.probability = (fresnel);
+            rayPayload.pos = pos;
+            rayPayload.dir = reflected;
+            rayPayload.colour = colour;
+            //refractPos = TracePhotonRay(r, payload).position;
+        }
+
+
+    }
+
 
 }
 
@@ -2070,7 +2200,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     uint depth = rayPayload.recursionDepth;
 
    
-    float c = chessBoard(pos);
+    float c = chessSides(pos);
 
     Ray shadowRay;
     shadowRay.origin = HitWorldPosition();
@@ -2079,7 +2209,7 @@ void MyClosestHitShader_Triangle(inout RayPayload rayPayload, in BuiltInTriangle
     float3 normal = float3(0, 1, 0);
     float4 reflectionColour = float4(0, 0, 0, 0);
     
-    float3 diffuseColour = float4(0.8, 0.8, 0.8, 0)*c;
+    float3 diffuseColour = float4(0.8, 0.8, 0.8, 0);
 
    
         //if immediate ray - i.e., recursion depth = 1
@@ -2140,9 +2270,10 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     //g_buffer[1080*y + x] = float4(pos, 1);
     float3 l_dir = normalize(g_sceneCB.lightSphere.xyz - pos);
     float4 reflectionColour = float4(0, 0, 0, 1);
-    Ray shadowRay = { pos, l_dir };
+    Ray shadowRay = { pos + 0.1 * attr.normal.xyz, l_dir };
     float3 currentDir = RayTCurrent() * WorldRayDirection();
     currentDir += WorldRayOrigin();
+    //Ray sr = { pos + 0.1 * attr.normal.xyz, normalize(lightDir) };
 
     bool shadowHit = ShadowRay(shadowRay, rayPayload.recursionDepth);
 
@@ -2238,6 +2369,7 @@ float t = RayTCurrent();
 float4 backColour = float4(getColour(normalize(WorldRayDirection())), 1);
 //rayPayload.color = lerp(colour, backColour, 1.0 - exp(-0.000002 * t * t * t));
 rayPayload.color = colour;
+
 }
 
 //***************************************************************************
@@ -2252,8 +2384,10 @@ void MyMissShader(inout RayPayload rayPayload)
    // float transition = pow(smoothstep(0.02, .5, d.y), 0.4);
 //
     float3 ndir = normalize(WorldRayDirection());
-    rayPayload.color += BackgroundColor;
-   // rayPayload.color += float4(getColour(ndir), 1);
+    rayPayload.color += float4(0.6f, 0.6f, 0.6f, 0);
+    //rayPayload.color += float4(0.7, 0.7, 0.7, 0);
+  //  rayPayload.color += BackgroundColor;
+//   rayPayload.color += float4(getColour(ndir), 1);
    // float4 backgroundColor = float4(BackgroundColor);
     uint depth = rayPayload.recursionDepth;
     //float3 sky = lerp(float3(0.52, 0.77, 1), float3(0.12, 0.43, 1), BackgroundColor);
@@ -2770,7 +2904,7 @@ Classify::Enum classifyIntersectionCSG(classificationInterval left, classificati
 
 
 
-bool csgLoop(in Ray ray, inout classificationInterval left, inout classificationInterval right, inout classificationInterval inter, int type, inout bool revertLeft, inout bool revertRight, inout float min) {
+bool csgLoop(in Ray ray, inout classificationInterval left, inout classificationInterval right, inout classificationInterval inter, int type, inout bool revertLeft, inout bool revertRight, inout float min, in float elapsedTime) {
     Classify::Enum action;
     if (type == 0) {
        action = classifyIntersectionCSG(left, right);
@@ -2811,7 +2945,7 @@ bool csgLoop(in Ray ray, inout classificationInterval left, inout classification
             float thit = -1;
             uint classification = -1;
 
-            bool hit = OtherRayCSGGeometryIntervals(ray, tmin, (AnalyticPrimitive::Enum)left.geometry, thit, normal);
+            bool hit = OtherRayCSGGeometryIntervals(ray, tmin, (AnalyticPrimitive::Enum)left.geometry, elapsedTime, thit, normal);
 
             if (hit) {
                 if (dot(ray.direction, normal) < 0) {
@@ -2842,7 +2976,7 @@ bool csgLoop(in Ray ray, inout classificationInterval left, inout classification
             float thit = -1;
             uint classification = -1;
 
-            bool hit = OtherRayCSGGeometryIntervals(ray, tmin, (AnalyticPrimitive::Enum)right.geometry, thit, normal);
+            bool hit = OtherRayCSGGeometryIntervals(ray, tmin, (AnalyticPrimitive::Enum)right.geometry, elapsedTime, thit, normal);
 
             if (hit) {
                 if (dot(ray.direction, normal) < 0) {
@@ -2893,7 +3027,7 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
             //translate a lil
             r.origin = ray.origin + current.translation;
             r.direction = ray.direction;
-            bool hit = OtherRayCSGGeometryIntervals(r, minimum, (AnalyticPrimitive::Enum)current.geometry, hitter, normal);
+            bool hit = OtherRayCSGGeometryIntervals(r, minimum, (AnalyticPrimitive::Enum)current.geometry, g_sceneCB.elapsedTime, hitter, normal);
             if (hit) {
                 if (dot(ray.direction, normal) < 0) {
                     //entering
@@ -2921,7 +3055,7 @@ bool latestCSG(in Ray ray, out float thit, out ProceduralPrimitiveAttributes att
           bool revertLeft = false;
           bool revertRight = false;
           while (continueLoop) {
-              continueLoop = csgLoop(ray, left, right, inter, current.boolValue, revertLeft, revertRight, minimum);
+              continueLoop = csgLoop(ray, left, right, inter, current.boolValue, revertLeft, revertRight, minimum, g_sceneCB.elapsedTime);
               if (revertLeft == true) {
                   //left index is then (index) - 2*depth
                   uint index = i - 2 * depth;
